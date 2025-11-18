@@ -4,5 +4,3 @@
 pub mod extractor;
 pub mod artwork;
 pub mod lyrics;
-
-pub use extractor::MetadataExtractor;

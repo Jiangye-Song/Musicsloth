@@ -3,6 +3,3 @@
 
 pub mod scanner;
 pub mod indexer;
-
-pub use scanner::Scanner;
-pub use indexer::Indexer;

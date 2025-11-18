@@ -2,5 +2,3 @@
 // This module handles audio playback using rodio
 
 pub mod player;
-
-pub use player::Player;
