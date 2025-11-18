@@ -8,7 +8,20 @@ pub struct Track {
     pub title: String,
     pub artist: Option<String>,
     pub album: Option<String>,
+    pub album_artist: Option<String>,
+    pub year: Option<u32>,
+    pub track_number: Option<i32>,
+    pub disc_number: Option<i32>,
     pub duration_ms: Option<i64>,
+    pub genre: Option<String>,
+    pub file_size: Option<i64>,
+    pub file_format: Option<String>,
+    pub bitrate: Option<i32>,
+    pub sample_rate: Option<i32>,
+    pub date_added: i64,
+    pub date_modified: i64,
+    pub play_count: i32,
+    pub last_played: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

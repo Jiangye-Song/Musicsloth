@@ -1,23 +1,51 @@
 // Musicsloth - Desktop Music Player
 // Module declarations
 mod audio;
+mod commands;
 mod db;
 mod library;
 mod metadata;
 mod playlist;
 mod queue;
+mod state;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use audio::player::Player;
+use db::connection::DatabaseConnection;
+use state::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .setup(|app| {
+            // Get app data directory
+            let app_dir = app.path().app_data_dir()
+                .expect("Failed to get app data directory");
+            let db_path = app_dir.join("musicsloth.db");
+
+            // Initialize database
+            let db = DatabaseConnection::new(db_path)
+                .expect("Failed to initialize database");
+
+            // Initialize audio player
+            let player = Player::new()
+                .expect("Failed to initialize audio player");
+
+            // Create and manage app state
+            let app_state = AppState::new(player, db);
+            app.manage(app_state);
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::play_file,
+            commands::pause_playback,
+            commands::resume_playback,
+            commands::stop_playback,
+            commands::set_volume,
+            commands::get_player_state,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

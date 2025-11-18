@@ -1,49 +1,50 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+import PlayerControls from "./components/PlayerControls";
+import { playerApi } from "./services/api";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [currentFile, setCurrentFile] = useState<string | null>(null);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const handleFileSelect = async () => {
+    // Prompt user to enter file path (temporary solution)
+    const filePath = prompt("Enter the full path to an audio file:");
+    if (filePath) {
+      try {
+        await playerApi.playFile(filePath);
+        setCurrentFile(filePath);
+      } catch (error) {
+        alert(`Failed to play file: ${error}`);
+      }
+    }
+  };
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <main className="container" style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 20px" }}>
+      <h1 style={{ textAlign: "center", marginBottom: "30px" }}>
+        🎵 Musicsloth
+      </h1>
+      <p style={{ textAlign: "center", color: "#888", marginBottom: "40px" }}>
+        Desktop Music Player
+      </p>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+      <PlayerControls 
+        onFileSelect={handleFileSelect}
+      />
+
+      <div style={{ marginTop: "30px", padding: "20px", backgroundColor: "#1a1a1a", borderRadius: "8px" }}>
+        <h3 style={{ marginBottom: "10px" }}>Phase 1 - Basic Playback ✅</h3>
+        <ul style={{ lineHeight: "1.8", color: "#ccc" }}>
+          <li>✅ SQLite database with full schema</li>
+          <li>✅ Audio playback with rodio</li>
+          <li>✅ Metadata extraction with lofty</li>
+          <li>✅ Play, pause, stop, volume controls</li>
+          <li>✅ Basic player UI</li>
+        </ul>
+        <p style={{ marginTop: "15px", fontSize: "14px", color: "#888" }}>
+          <strong>Next:</strong> Phase 2 - Library management and scanning
+        </p>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
     </main>
   );
 }
