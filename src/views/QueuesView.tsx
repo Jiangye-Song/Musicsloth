@@ -63,17 +63,6 @@ export default function QueuesView() {
     await loadQueueTracks(queue.id);
   };
 
-  // Poll for queue track updates when a queue is selected
-  useEffect(() => {
-    if (!selectedQueue) return;
-
-    const interval = setInterval(() => {
-      loadQueueTracks(selectedQueue.id, true); // Silent reload
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [selectedQueue]);
-
   const handlePlayQueue = async () => {
     if (!selectedQueue) return;
     

@@ -200,9 +200,23 @@ pub fn create_queue_from_tracks(
         return Ok(existing_queue_id);
     }
     
-    // Create new queue
-    let queue_id = DbOperations::create_queue(&state.db, &name)
-        .map_err(|e| format!("Failed to create queue: {}", e))?;
+    // Generate unique queue name (Windows-style: name, name (2), name (3), etc.)
+    let mut queue_name = name.clone();
+    let mut counter = 2;
+    loop {
+        match DbOperations::create_queue(&state.db, &queue_name) {
+            Ok(queue_id) => break Ok(queue_id),
+            Err(e) => {
+                // Check if it's a UNIQUE constraint error
+                if e.to_string().contains("UNIQUE constraint failed") {
+                    queue_name = format!("{} ({})", name, counter);
+                    counter += 1;
+                } else {
+                    return Err(format!("Failed to create queue: {}", e));
+                }
+            }
+        }
+    }?;
     
     // Reorder tracks: clicked track first, then remaining after, then before clicked
     let mut reordered_tracks = Vec::new();
@@ -218,44 +232,13 @@ pub fn create_queue_from_tracks(
         reordered_tracks.push(track_ids[i]);
     }
     
-    // Add only first 50 tracks immediately for responsiveness
-    const INITIAL_BATCH_SIZE: usize = 50;
-    let initial_batch: Vec<i64> = reordered_tracks.iter()
-        .take(INITIAL_BATCH_SIZE)
-        .copied()
-        .collect();
+    // Add all tracks immediately - only inserting IDs is fast
+    DbOperations::add_tracks_to_queue(&state.db, queue_id, &reordered_tracks)
+        .map_err(|e| format!("Failed to add tracks to queue: {}", e))?;
     
-    DbOperations::add_tracks_to_queue(&state.db, queue_id, &initial_batch)
-        .map_err(|e| format!("Failed to add initial tracks to queue: {}", e))?;
-    
-    // Add remaining tracks in background if there are more
-    if reordered_tracks.len() > INITIAL_BATCH_SIZE {
-        let remaining_tracks: Vec<i64> = reordered_tracks.iter()
-            .skip(INITIAL_BATCH_SIZE)
-            .copied()
-            .collect();
-        let db = state.db.clone();
-        
-        let all_track_ids = reordered_tracks.clone();
-        std::thread::spawn(move || {
-            // Add remaining tracks in chunks of 100 for more frequent updates
-            const CHUNK_SIZE: usize = 100;
-            let mut position = INITIAL_BATCH_SIZE;
-            
-            for chunk in remaining_tracks.chunks(CHUNK_SIZE) {
-                if let Err(e) = DbOperations::add_tracks_to_queue_at_position(&db, queue_id, chunk, position) {
-                    eprintln!("Failed to add track chunk to queue: {}", e);
-                    break;
-                }
-                position += chunk.len();
-            }
-            
-            // After all tracks added, update the queue hash for duplicate detection
-            if let Err(e) = DbOperations::update_queue_track_hash(&db, queue_id, &all_track_ids) {
-                eprintln!("Failed to update queue track hash: {}", e);
-            }
-        });
-    }
+    // Update queue hash for duplicate detection
+    DbOperations::update_queue_track_hash(&state.db, queue_id, &reordered_tracks)
+        .map_err(|e| format!("Failed to update queue track hash: {}", e))?;
     
     Ok(queue_id)
 }
