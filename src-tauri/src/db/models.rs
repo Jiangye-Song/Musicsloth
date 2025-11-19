@@ -30,12 +30,14 @@ pub struct Album {
     pub name: String,
     pub artist: Option<String>,
     pub year: Option<i32>,
+    pub song_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Artist {
     pub id: i64,
     pub name: String,
+    pub song_count: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

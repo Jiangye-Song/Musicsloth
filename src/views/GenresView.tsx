@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import { libraryApi } from "../services/api";
+import { libraryApi, Genre } from "../services/api";
 
 export default function GenresView() {
-  const [genres, setGenres] = useState<string[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [filteredGenres, setFilteredGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const loadGenres = async () => {
       try {
         const allGenres = await libraryApi.getAllGenres();
         setGenres(allGenres);
+        setFilteredGenres(allGenres);
       } catch (error) {
         console.error("Failed to load genres:", error);
       } finally {
@@ -20,47 +23,128 @@ export default function GenresView() {
     loadGenres();
   }, []);
 
-  return (
-    <div>
-      <h2 style={{ marginBottom: "20px" }}>Genres ({genres.length})</h2>
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredGenres(genres);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredGenres(
+        genres.filter((genre) => genre.name.toLowerCase().includes(query))
+      );
+    }
+  }, [searchQuery, genres]);
 
-      {loading ? (
-        <p style={{ color: "#888" }}>Loading genres...</p>
-      ) : genres.length === 0 ? (
-        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
-          <p style={{ color: "#888", margin: 0 }}>
-            No genres in library. Scan your music folder to populate the library.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "15px" }}>
-          {genres.map((genre, index) => (
-            <div
-              key={index}
-              style={{
-                padding: "30px 20px",
-                backgroundColor: "#2a2a2a",
-                borderRadius: "8px",
-                border: "1px solid #333",
-                textAlign: "center",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#333";
-                e.currentTarget.style.borderColor = "#4CAF50";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#2a2a2a";
-                e.currentTarget.style.borderColor = "#333";
-              }}
-            >
-              <div style={{ fontSize: "32px", marginBottom: "10px" }}>🎵</div>
-              <h3 style={{ margin: 0, fontSize: "16px" }}>{genre}</h3>
-            </div>
-          ))}
-        </div>
-      )}
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {/* Search Bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "15px 20px",
+          backgroundColor: "#1a1a1a",
+          borderBottom: "1px solid #333",
+          gap: "10px",
+        }}
+      >
+        <span style={{ fontSize: "20px" }}>🔍</span>
+        <input
+          type="text"
+          placeholder="Search a genre..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "10px 15px",
+            backgroundColor: "transparent",
+            border: "none",
+            color: "#fff",
+            fontSize: "16px",
+            outline: "none",
+          }}
+        />
+      </div>
+
+      {/* Genres List */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+        {loading ? (
+          <p style={{ color: "#888" }}>Loading genres...</p>
+        ) : genres.length === 0 ? (
+          <div
+            style={{
+              padding: "20px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "#888", margin: 0 }}>
+              No genres in library. Scan your music folder to populate the
+              library.
+            </p>
+          </div>
+        ) : filteredGenres.length === 0 ? (
+          <div
+            style={{
+              padding: "20px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "#888", margin: 0 }}>
+              No genres found matching "{searchQuery}"
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+            {filteredGenres.map((genre, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "20px",
+                  borderBottom: "1px solid #2a2a2a",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s",
+                  gap: "15px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#2a2a2a";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {/* Genre Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3
+                    style={{
+                      margin: "0 0 5px 0",
+                      fontSize: "18px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {genre.name}
+                  </h3>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "14px",
+                      color: "#888",
+                    }}
+                  >
+                    {genre.song_count} song{genre.song_count !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -108,7 +108,7 @@ pub fn get_all_artists(state: State<'_, AppState>) -> Result<Vec<Artist>, String
 }
 
 #[tauri::command]
-pub fn get_all_genres(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+pub fn get_all_genres(state: State<'_, AppState>) -> Result<Vec<(String, i32)>, String> {
     DbOperations::get_all_genres(&state.db)
         .map_err(|e| format!("Failed to get genres: {}", e))
 }

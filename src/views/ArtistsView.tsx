@@ -3,13 +3,17 @@ import { libraryApi, Artist } from "../services/api";
 
 export default function ArtistsView() {
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"artists" | "album-artists" | "composers">("artists");
 
   useEffect(() => {
     const loadArtists = async () => {
       try {
         const allArtists = await libraryApi.getAllArtists();
         setArtists(allArtists);
+        setFilteredArtists(allArtists);
       } catch (error) {
         console.error("Failed to load artists:", error);
       } finally {
@@ -20,48 +24,159 @@ export default function ArtistsView() {
     loadArtists();
   }, []);
 
-  return (
-    <div>
-      <h2 style={{ marginBottom: "20px" }}>Artists ({artists.length})</h2>
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredArtists(artists);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredArtists(
+        artists.filter((artist) => artist.name.toLowerCase().includes(query))
+      );
+    }
+  }, [searchQuery, artists]);
 
-      {loading ? (
-        <p style={{ color: "#888" }}>Loading artists...</p>
-      ) : artists.length === 0 ? (
-        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
-          <p style={{ color: "#888", margin: 0 }}>
-            No artists in library. Scan your music folder to populate the library.
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "15px" }}>
-          {artists.map((artist) => (
-            <div
-              key={artist.id}
-              style={{
-                padding: "20px",
-                backgroundColor: "#2a2a2a",
-                borderRadius: "8px",
-                border: "1px solid #333",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#333";
-                e.currentTarget.style.borderColor = "#4CAF50";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#2a2a2a";
-                e.currentTarget.style.borderColor = "#333";
-              }}
-            >
-              <div style={{ fontSize: "48px", textAlign: "center", marginBottom: "10px" }}>🎤</div>
-              <h3 style={{ margin: 0, fontSize: "16px", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {artist.name}
-              </h3>
-            </div>
-          ))}
-        </div>
-      )}
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      {/* Tab Buttons */}
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          padding: "15px 20px",
+          backgroundColor: "#1a1a1a",
+          borderBottom: "1px solid #333",
+        }}
+      >
+        {["artists", "album-artists", "composers"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab as typeof activeTab)}
+            style={{
+              padding: "8px 20px",
+              backgroundColor: activeTab === tab ? "transparent" : "transparent",
+              color: "#fff",
+              border: activeTab === tab ? "2px solid #ff4444" : "2px solid #444",
+              borderRadius: "20px",
+              cursor: "pointer",
+              fontSize: "14px",
+              textTransform: "capitalize",
+              transition: "all 0.2s",
+            }}
+          >
+            {tab === "album-artists" ? "Album-Artists" : tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Search Bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "15px 20px",
+          backgroundColor: "#1a1a1a",
+          borderBottom: "1px solid #333",
+          gap: "10px",
+        }}
+      >
+        <span style={{ fontSize: "20px" }}>🔍</span>
+        <input
+          type="text"
+          placeholder="Search an artist..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "10px 15px",
+            backgroundColor: "transparent",
+            border: "none",
+            color: "#fff",
+            fontSize: "16px",
+            outline: "none",
+          }}
+        />
+      </div>
+
+      {/* Artists List */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+        {loading ? (
+          <p style={{ color: "#888" }}>Loading artists...</p>
+        ) : artists.length === 0 ? (
+          <div
+            style={{
+              padding: "20px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "#888", margin: 0 }}>
+              No artists in library. Scan your music folder to populate the
+              library.
+            </p>
+          </div>
+        ) : filteredArtists.length === 0 ? (
+          <div
+            style={{
+              padding: "20px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "#888", margin: 0 }}>
+              No artists found matching "{searchQuery}"
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+            {filteredArtists.map((artist) => (
+              <div
+                key={artist.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "15px 20px",
+                  borderBottom: "1px solid #2a2a2a",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s",
+                  gap: "15px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#2a2a2a";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {/* Artist Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3
+                    style={{
+                      margin: "0 0 5px 0",
+                      fontSize: "16px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {artist.name}
+                  </h3>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "14px",
+                      color: "#888",
+                    }}
+                  >
+                    {artist.song_count} song{artist.song_count !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -60,11 +60,18 @@ export interface Album {
   name: string;
   artist: string | null;
   year: number | null;
+  song_count: number;
 }
 
 export interface Artist {
   id: number;
   name: string;
+  song_count: number;
+}
+
+export interface Genre {
+  name: string;
+  song_count: number;
 }
 
 export interface IndexingResult {
@@ -91,8 +98,9 @@ export const libraryApi = {
     return await invoke("get_all_artists");
   },
 
-  getAllGenres: async (): Promise<string[]> => {
-    return await invoke("get_all_genres");
+  getAllGenres: async (): Promise<Genre[]> => {
+    const result: [string, number][] = await invoke("get_all_genres");
+    return result.map(([name, song_count]) => ({ name, song_count }));
   },
 };
 

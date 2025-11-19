@@ -170,7 +170,7 @@ impl DbOperations {
         Ok(tracks)
     }
     
-    /// Get all albums
+    /// Get all albums with song counts
     pub fn get_all_albums(
         db: &DatabaseConnection,
     ) -> Result<Vec<Album>, anyhow::Error> {
@@ -178,9 +178,11 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, artist, year
-             FROM albums
-             ORDER BY name"
+            "SELECT a.id, a.name, a.artist, a.year, COUNT(t.id) as song_count
+             FROM albums a
+             LEFT JOIN tracks t ON t.album = a.name
+             GROUP BY a.id, a.name, a.artist, a.year
+             ORDER BY a.name"
         )?;
         
         let albums = stmt.query_map([], |row| {
@@ -189,6 +191,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 artist: row.get(2)?,
                 year: row.get(3)?,
+                song_count: row.get(4)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -196,7 +199,7 @@ impl DbOperations {
         Ok(albums)
     }
     
-    /// Get all artists
+    /// Get all artists with song counts
     pub fn get_all_artists(
         db: &DatabaseConnection,
     ) -> Result<Vec<Artist>, anyhow::Error> {
@@ -204,15 +207,18 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name
-             FROM artists
-             ORDER BY name"
+            "SELECT ar.id, ar.name, COUNT(t.id) as song_count
+             FROM artists ar
+             LEFT JOIN tracks t ON t.artist = ar.name
+             GROUP BY ar.id, ar.name
+             ORDER BY ar.name"
         )?;
         
         let artists = stmt.query_map([], |row| {
             Ok(Artist {
                 id: row.get(0)?,
                 name: row.get(1)?,
+                song_count: row.get(2)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -220,19 +226,25 @@ impl DbOperations {
         Ok(artists)
     }
     
-    /// Get all genres
+    /// Get all genres with song counts
     pub fn get_all_genres(
         db: &DatabaseConnection,
-    ) -> Result<Vec<String>, anyhow::Error> {
+    ) -> Result<Vec<(String, i32)>, anyhow::Error> {
         let conn = db.get_connection();
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT name FROM genres ORDER BY name"
+            "SELECT g.name, COUNT(t.id) as song_count
+             FROM genres g
+             LEFT JOIN tracks t ON t.genre = g.name
+             GROUP BY g.name
+             ORDER BY g.name"
         )?;
         
-        let genres = stmt.query_map([], |row| row.get(0))?
-            .collect::<Result<Vec<_>, _>>()?;
+        let genres = stmt.query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
         
         Ok(genres)
     }
