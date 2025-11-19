@@ -175,21 +175,49 @@ pub fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
         .read()
         .map_err(|e| format!("Failed to read file: {}", e))?;
     
-    // Try to get the primary tag
+    // Priority order for picture types (matching foobar2000 behavior)
+    let picture_priority = [
+        PictureType::CoverFront,      // Front Cover (most common)
+        PictureType::Media,            // Media (e.g., label side of CD)
+        PictureType::CoverBack,        // Back Cover
+        PictureType::Leaflet,          // Leaflet page
+        PictureType::Other,            // Other/Undefined
+        PictureType::Icon,             // Icon
+        PictureType::OtherIcon,        // Other Icon
+        PictureType::Artist,           // Artist/Performer
+        PictureType::Band,             // Band/Orchestra
+        PictureType::Composer,         // Composer
+        PictureType::Lyricist,         // Lyricist/Text writer
+        PictureType::RecordingLocation, // Recording Location
+        PictureType::DuringRecording,  // During Recording
+        PictureType::DuringPerformance, // During Performance
+        PictureType::ScreenCapture,    // Screen Capture
+        PictureType::BrightFish,       // Bright Colored Fish
+        PictureType::Illustration,     // Illustration
+        PictureType::BandLogo,         // Band/Artist Logotype
+        PictureType::PublisherLogo,    // Publisher/Studio Logotype
+    ];
+    
+    // Try to get the primary tag first
     if let Some(tag) = tagged_file.primary_tag() {
-        // Look for cover art
-        for picture in tag.pictures() {
-            if picture.pic_type() == PictureType::CoverFront || picture.pic_type() == PictureType::Other {
-                return Ok(Some(picture.data().to_vec()));
+        // Try each picture type in priority order
+        for pic_type in &picture_priority {
+            for picture in tag.pictures() {
+                if picture.pic_type() == *pic_type {
+                    return Ok(Some(picture.data().to_vec()));
+                }
             }
         }
     }
     
     // Try all tags if primary tag didn't have cover art
     for tag in tagged_file.tags() {
-        for picture in tag.pictures() {
-            if picture.pic_type() == PictureType::CoverFront || picture.pic_type() == PictureType::Other {
-                return Ok(Some(picture.data().to_vec()));
+        // Try each picture type in priority order
+        for pic_type in &picture_priority {
+            for picture in tag.pictures() {
+                if picture.pic_type() == *pic_type {
+                    return Ok(Some(picture.data().to_vec()));
+                }
             }
         }
     }
