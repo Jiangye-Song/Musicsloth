@@ -1,14 +1,7 @@
 import { useState, useEffect } from "react";
-import { playerApi, libraryApi, PlayerState, Track } from "../services/api";
+import { playerApi, libraryApi, Track } from "../services/api";
 
 export default function NowPlayingView() {
-  const [playerState, setPlayerState] = useState<PlayerState>({
-    is_playing: false,
-    is_paused: false,
-    current_file: null,
-    position_ms: 0,
-    duration_ms: null,
-  });
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [albumArt, setAlbumArt] = useState<string | null>(null);
 
@@ -17,7 +10,6 @@ export default function NowPlayingView() {
     const interval = setInterval(async () => {
       try {
         const state = await playerApi.getState();
-        setPlayerState(state);
 
         // Fetch track metadata if a file is playing
         if (state.current_file) {
@@ -58,9 +50,7 @@ export default function NowPlayingView() {
     };
   }, []);
 
-  const fileName = playerState.current_file
-    ? playerState.current_file.split(/[\\/]/).pop()
-    : null;
+
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return "—";
@@ -89,10 +79,20 @@ export default function NowPlayingView() {
       >
         {albumArt ? (
           <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : fileName ? (
-          <span style={{ fontSize: "64px" }}>🎵</span>
         ) : (
-          <span style={{ fontSize: "48px", color: "#666" }}>No Track</span>
+          <svg
+            width="80"
+            height="80"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ opacity: 0.3 }}
+          >
+            <path
+              d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+              fill="currentColor"
+            />
+          </svg>
         )}
       </div>
 

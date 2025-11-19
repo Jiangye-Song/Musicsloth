@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { libraryApi, Album, Track } from "../services/api";
-import TrackList from "../components/TrackList";
+import VirtualTrackList from "../components/VirtualTrackList";
 
 interface AlbumItemProps {
   album: Album;
@@ -140,7 +140,19 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
         {albumArt ? (
           <img src={albumArt} alt={album.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          "💿"
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ opacity: 0.3 }}
+          >
+            <path
+              d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
+              fill="currentColor"
+            />
+          </svg>
         )}
       </div>
 
@@ -230,11 +242,39 @@ export default function AlbumsView() {
 
   if (selectedAlbum) {
     return (
-      <TrackList
-        tracks={albumTracks}
-        onBack={handleBack}
-        title={`${selectedAlbum.name} ${selectedAlbum.artist ? `by ${selectedAlbum.artist}` : ""} (${albumTracks.length} tracks)`}
-      />
+      <div>
+        <div
+          style={{
+            padding: "15px 20px",
+            backgroundColor: "#1a1a1a",
+            borderBottom: "1px solid #333",
+            display: "flex",
+            alignItems: "center",
+            gap: "15px",
+          }}
+        >
+          <button
+            onClick={handleBack}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#333",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "14px",
+            }}
+          >
+            ← Back
+          </button>
+          <h2 style={{ margin: 0, fontSize: "18px" }}>
+            {selectedAlbum.name} {selectedAlbum.artist ? `by ${selectedAlbum.artist}` : ""} ({albumTracks.length} tracks)
+          </h2>
+        </div>
+        <div style={{ padding: "20px" }}>
+          <VirtualTrackList tracks={albumTracks} />
+        </div>
+      </div>
     );
   }
 

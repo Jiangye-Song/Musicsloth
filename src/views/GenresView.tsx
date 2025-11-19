@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { libraryApi, Genre, Track } from "../services/api";
-import TrackList from "../components/TrackList";
+import VirtualTrackList from "../components/VirtualTrackList";
 
 export default function GenresView() {
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -54,11 +54,39 @@ export default function GenresView() {
 
   if (selectedGenre) {
     return (
-      <TrackList
-        tracks={genreTracks}
-        onBack={handleBack}
-        title={`${selectedGenre.name} (${genreTracks.length} tracks)`}
-      />
+      <div>
+        <div
+          style={{
+            padding: "15px 20px",
+            backgroundColor: "#1a1a1a",
+            borderBottom: "1px solid #333",
+            display: "flex",
+            alignItems: "center",
+            gap: "15px",
+          }}
+        >
+          <button
+            onClick={handleBack}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#333",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "14px",
+            }}
+          >
+            ← Back
+          </button>
+          <h2 style={{ margin: 0, fontSize: "18px" }}>
+            {selectedGenre.name} ({genreTracks.length} tracks)
+          </h2>
+        </div>
+        <div style={{ padding: "20px" }}>
+          <VirtualTrackList tracks={genreTracks} />
+        </div>
+      </div>
     );
   }
 
