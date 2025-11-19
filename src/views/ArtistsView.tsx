@@ -7,7 +7,6 @@ export default function ArtistsView() {
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"artists" | "album-artists" | "composers">("artists");
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [artistTracks, setArtistTracks] = useState<Track[]>([]);
 
@@ -93,37 +92,6 @@ export default function ArtistsView() {
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Tab Buttons */}
-      <div
-        style={{
-          display: "flex",
-          gap: "10px",
-          padding: "15px 20px",
-          backgroundColor: "#1a1a1a",
-          borderBottom: "1px solid #333",
-        }}
-      >
-        {["artists", "album-artists", "composers"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as typeof activeTab)}
-            style={{
-              padding: "8px 20px",
-              backgroundColor: activeTab === tab ? "transparent" : "transparent",
-              color: "#fff",
-              border: activeTab === tab ? "2px solid #ff4444" : "2px solid #444",
-              borderRadius: "20px",
-              cursor: "pointer",
-              fontSize: "14px",
-              textTransform: "capitalize",
-              transition: "all 0.2s",
-            }}
-          >
-            {tab === "album-artists" ? "Album-Artists" : tab}
-          </button>
-        ))}
-      </div>
-
       {/* Search Bar */}
       <div
         style={{
