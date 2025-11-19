@@ -58,70 +58,61 @@ export default function PlayerControls({ onFileSelect }: PlayerControlsProps) {
   };
 
   return (
-    <div style={{ 
-      padding: "20px", 
-      backgroundColor: "#2a2a2a", 
-      borderRadius: "8px",
-      color: "white"
-    }}>
-      <h2>Music Player</h2>
-      
-      {playerState.current_file && (
-        <div style={{ marginBottom: "15px", fontSize: "14px", color: "#ccc" }}>
-          <strong>Playing:</strong> {playerState.current_file.split(/[\\/]/).pop()}
-        </div>
-      )}
+    <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+      {/* Track Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {playerState.current_file ? (
+          <div style={{ fontSize: "14px", color: "#ccc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <strong>Now Playing:</strong> {playerState.current_file.split(/[\\/]/).pop()}
+          </div>
+        ) : (
+          <div style={{ fontSize: "14px", color: "#666" }}>No track loaded</div>
+        )}
+      </div>
 
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+      {/* Playback Controls */}
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
         <button
-          onClick={onFileSelect}
+          onClick={handleStop}
+          disabled={!playerState.current_file}
           style={{
-            padding: "10px 20px",
-            backgroundColor: "#4CAF50",
+            padding: "8px 12px",
+            backgroundColor: "#444",
             color: "white",
             border: "none",
             borderRadius: "5px",
-            cursor: "pointer",
+            cursor: playerState.current_file ? "pointer" : "not-allowed",
+            opacity: playerState.current_file ? 1 : 0.4,
+            fontSize: "16px",
           }}
+          title="Stop"
         >
-          Open File
+          ⏹
         </button>
 
         <button
           onClick={handlePlayPause}
           disabled={!playerState.current_file}
           style={{
-            padding: "10px 20px",
-            backgroundColor: playerState.is_playing ? "#ff9800" : "#2196F3",
+            padding: "10px 16px",
+            backgroundColor: playerState.is_playing ? "#ff9800" : "#4CAF50",
             color: "white",
             border: "none",
             borderRadius: "5px",
             cursor: playerState.current_file ? "pointer" : "not-allowed",
-            opacity: playerState.current_file ? 1 : 0.5,
+            opacity: playerState.current_file ? 1 : 0.4,
+            fontSize: "16px",
+            fontWeight: "bold",
           }}
+          title={playerState.is_playing ? "Pause" : "Play"}
         >
-          {playerState.is_playing ? "⏸ Pause" : "▶ Play"}
-        </button>
-
-        <button
-          onClick={handleStop}
-          disabled={!playerState.current_file}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#f44336",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: playerState.current_file ? "pointer" : "not-allowed",
-            opacity: playerState.current_file ? 1 : 0.5,
-          }}
-        >
-          ⏹ Stop
+          {playerState.is_playing ? "⏸" : "▶"}
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <span>🔊 Volume:</span>
+      {/* Volume Control */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "150px" }}>
+        <span style={{ fontSize: "16px" }}>🔊</span>
         <input
           type="range"
           min="0"
@@ -130,12 +121,11 @@ export default function PlayerControls({ onFileSelect }: PlayerControlsProps) {
           value={volume}
           onChange={handleVolumeChange}
           style={{ flex: 1 }}
+          title={`Volume: ${Math.round(volume * 100)}%`}
         />
-        <span>{Math.round(volume * 100)}%</span>
-      </div>
-
-      <div style={{ marginTop: "15px", fontSize: "12px", color: "#888" }}>
-        Status: {playerState.is_playing ? "Playing" : playerState.is_paused ? "Paused" : "Stopped"}
+        <span style={{ fontSize: "12px", color: "#888", minWidth: "35px" }}>
+          {Math.round(volume * 100)}%
+        </span>
       </div>
     </div>
   );

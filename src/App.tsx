@@ -1,10 +1,18 @@
 import { useState } from "react";
 import "./App.css";
 import PlayerControls from "./components/PlayerControls";
+import NowPlayingView from "./views/NowPlayingView";
+import QueuesView from "./views/QueuesView";
+import PlaylistsView from "./views/PlaylistsView";
+import ArtistsView from "./views/ArtistsView";
+import AlbumsView from "./views/AlbumsView";
+import GenresView from "./views/GenresView";
 import { playerApi } from "./services/api";
 
+type Tab = "nowplaying" | "queues" | "playlists" | "artists" | "albums" | "genres";
+
 function App() {
-  const [currentFile, setCurrentFile] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("nowplaying");
 
   const handleFileSelect = async () => {
     // Prompt user to enter file path (temporary solution)
@@ -12,40 +20,94 @@ function App() {
     if (filePath) {
       try {
         await playerApi.playFile(filePath);
-        setCurrentFile(filePath);
       } catch (error) {
         alert(`Failed to play file: ${error}`);
       }
     }
   };
 
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "nowplaying":
+        return <NowPlayingView />;
+      case "queues":
+        return <QueuesView />;
+      case "playlists":
+        return <PlaylistsView />;
+      case "artists":
+        return <ArtistsView />;
+      case "albums":
+        return <AlbumsView />;
+      case "genres":
+        return <GenresView />;
+      default:
+        return <QueuesView />;
+    }
+  };
+
   return (
-    <main className="container" style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 20px" }}>
-      <h1 style={{ textAlign: "center", marginBottom: "30px" }}>
-        🎵 Musicsloth
-      </h1>
-      <p style={{ textAlign: "center", color: "#888", marginBottom: "40px" }}>
-        Desktop Music Player
-      </p>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#1a1a1a", color: "white" }}>
+      {/* Header */}
+      <header style={{ padding: "15px 20px", backgroundColor: "#2a2a2a", borderBottom: "1px solid #333" }}>
+        <h1 style={{ margin: 0, fontSize: "24px" }}>🎵 Musicsloth</h1>
+      </header>
 
-      <PlayerControls 
-        onFileSelect={handleFileSelect}
-      />
+      {/* Main Content Area */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* Tab Navigation */}
+        <nav style={{ width: "200px", backgroundColor: "#252525", padding: "20px 0", borderRight: "1px solid #333" }}>
+          <button
+            onClick={handleFileSelect}
+            style={{
+              width: "calc(100% - 20px)",
+              margin: "0 10px 20px 10px",
+              padding: "10px",
+              backgroundColor: "#4CAF50",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "bold"
+            }}
+          >
+            📂 Open File
+          </button>
 
-      <div style={{ marginTop: "30px", padding: "20px", backgroundColor: "#1a1a1a", borderRadius: "8px" }}>
-        <h3 style={{ marginBottom: "10px" }}>Phase 1 - Basic Playback ✅</h3>
-        <ul style={{ lineHeight: "1.8", color: "#ccc" }}>
-          <li>✅ SQLite database with full schema</li>
-          <li>✅ Audio playback with rodio</li>
-          <li>✅ Metadata extraction with lofty</li>
-          <li>✅ Play, pause, stop, volume controls</li>
-          <li>✅ Basic player UI</li>
-        </ul>
-        <p style={{ marginTop: "15px", fontSize: "14px", color: "#888" }}>
-          <strong>Next:</strong> Phase 2 - Library management and scanning
-        </p>
+          {(["nowplaying", "queues", "playlists", "artists", "albums", "genres"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: "12px 20px",
+                backgroundColor: activeTab === tab ? "#333" : "transparent",
+                color: activeTab === tab ? "white" : "#aaa",
+                border: "none",
+                borderLeft: activeTab === tab ? "3px solid #4CAF50" : "3px solid transparent",
+                textAlign: "left",
+                cursor: "pointer",
+                fontSize: "14px",
+                transition: "all 0.2s"
+              }}
+            >
+              {tab === "nowplaying" ? "Now Playing" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+
+        {/* Content Area */}
+        <main style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
+          {renderTabContent()}
+        </main>
       </div>
-    </main>
+
+      {/* Player Controls (Footer) */}
+      <footer style={{ backgroundColor: "#2a2a2a", borderTop: "1px solid #333", padding: "15px 20px" }}>
+        <PlayerControls onFileSelect={handleFileSelect} />
+      </footer>
+    </div>
   );
 }
 
