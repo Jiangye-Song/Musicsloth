@@ -53,13 +53,8 @@ impl LibraryIndexer {
         db: &DatabaseConnection,
     ) -> Result<i64, anyhow::Error> {
         // Extract metadata - this already creates a Track struct
-        let track = match MetadataExtractor::extract_from_file(path) {
-            Ok(t) => t,
-            Err(e) => {
-                // Skip files with invalid metadata (corrupted tags, invalid timestamps, etc.)
-                return Err(anyhow::anyhow!("Metadata extraction failed: {}", e));
-            }
-        };
+        // Fallback is now handled inside extract_from_file
+        let track = MetadataExtractor::extract_from_file(path)?;
         
         // Insert artist if present (for relational queries later)
         if let Some(ref artist_name) = track.artist {
