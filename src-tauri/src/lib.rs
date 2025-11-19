@@ -39,13 +39,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::play_file,
-            commands::pause_playback,
-            commands::resume_playback,
-            commands::stop_playback,
-            commands::set_volume,
-            commands::seek_to,
-            commands::get_player_state,
+            commands::set_current_track,
+            commands::clear_current_track,
             commands::scan_library,
             commands::get_all_tracks,
             commands::get_all_albums,

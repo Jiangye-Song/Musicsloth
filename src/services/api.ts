@@ -1,5 +1,6 @@
 // API service for Tauri commands
 import { invoke } from "@tauri-apps/api/core";
+import { audioPlayer } from "./audioPlayer";
 
 export interface PlayerState {
   is_playing: boolean;
@@ -9,33 +10,45 @@ export interface PlayerState {
   duration_ms: number | null;
 }
 
+// Player API now uses frontend audio player
 export const playerApi = {
   playFile: async (filePath: string): Promise<void> => {
-    return await invoke("play_file", { filePath });
+    await audioPlayer.play(filePath);
+    // Notify backend of current track
+    await invoke("set_current_track", { filePath });
   },
 
   pause: async (): Promise<void> => {
-    return await invoke("pause_playback");
+    audioPlayer.pause();
   },
 
   resume: async (): Promise<void> => {
-    return await invoke("resume_playback");
+    audioPlayer.resume();
   },
 
   stop: async (): Promise<void> => {
-    return await invoke("stop_playback");
+    audioPlayer.stop();
+    // Clear backend current track
+    await invoke("clear_current_track");
   },
 
   setVolume: async (volume: number): Promise<void> => {
-    return await invoke("set_volume", { volume });
+    audioPlayer.setVolume(volume);
   },
 
   seekTo: async (positionMs: number): Promise<void> => {
-    return await invoke("seek_to", { positionMs });
+    audioPlayer.seek(positionMs);
   },
 
   getState: async (): Promise<PlayerState> => {
-    return await invoke("get_player_state");
+    const state = audioPlayer.getState();
+    return {
+      is_playing: state.isPlaying,
+      is_paused: state.isPaused,
+      current_file: state.currentFile,
+      position_ms: state.position,
+      duration_ms: state.duration > 0 ? state.duration : null,
+    };
   },
 };
 
