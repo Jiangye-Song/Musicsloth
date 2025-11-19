@@ -550,6 +550,25 @@ impl DbOperations {
         Ok(conn.last_insert_rowid())
     }
 
+    /// Update queue track hash after all tracks are added
+    pub fn update_queue_track_hash(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_ids: &[i64],
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let hash = Self::calculate_track_hash(track_ids);
+        
+        conn.execute(
+            "UPDATE queues SET track_hash = ?1 WHERE id = ?2",
+            params![hash, queue_id],
+        )?;
+        
+        Ok(())
+    }
+
     /// Add tracks to queue
     pub fn add_tracks_to_queue(
         db: &DatabaseConnection,
@@ -597,7 +616,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active FROM queues ORDER BY id DESC"
+            "SELECT id, name, is_active, track_hash FROM queues ORDER BY id DESC"
         )?;
         
         let queues = stmt.query_map([], |row| {
@@ -605,6 +624,7 @@ impl DbOperations {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 is_active: row.get(2)?,
+                track_hash: row.get(3)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -659,7 +679,22 @@ impl DbOperations {
         Ok(tracks)
     }
 
-    /// Find queue with same tracks (ignoring order)
+    /// Calculate SHA-256 hash of sorted track IDs
+    fn calculate_track_hash(track_ids: &[i64]) -> String {
+        use sha2::{Sha256, Digest};
+        
+        let mut sorted = track_ids.to_vec();
+        sorted.sort();
+        
+        let mut hasher = Sha256::new();
+        for id in sorted {
+            hasher.update(id.to_le_bytes());
+        }
+        
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// Find queue with same tracks (ignoring order) using hash comparison
     pub fn find_queue_with_tracks(
         db: &DatabaseConnection,
         track_ids: &[i64],
@@ -667,28 +702,15 @@ impl DbOperations {
         let conn = db.get_connection();
         let conn = conn.lock().unwrap();
         
-        // Get all queues
-        let mut stmt = conn.prepare("SELECT id FROM queues")?;
-        let queue_ids: Vec<i64> = stmt.query_map([], |row| row.get(0))?
-            .collect::<Result<Vec<_>, _>>()?;
+        // Calculate hash of input track IDs
+        let hash = Self::calculate_track_hash(track_ids);
         
-        // Check each queue
-        for queue_id in queue_ids {
-            let mut stmt = conn.prepare(
-                "SELECT track_id FROM queue_tracks WHERE queue_id = ?1 ORDER BY track_id"
-            )?;
-            
-            let mut queue_track_ids: Vec<i64> = stmt.query_map([queue_id], |row| row.get(0))?
-                .collect::<Result<Vec<_>, _>>()?;
-            
-            // Sort both arrays to compare
-            let mut sorted_input = track_ids.to_vec();
-            sorted_input.sort();
-            queue_track_ids.sort();
-            
-            if sorted_input == queue_track_ids {
-                return Ok(Some(queue_id));
-            }
+        // Look up queue by hash (instant with index)
+        let mut stmt = conn.prepare("SELECT id FROM queues WHERE track_hash = ?1")?;
+        let mut rows = stmt.query([&hash])?;
+        
+        if let Some(row) = rows.next()? {
+            return Ok(Some(row.get(0)?));
         }
         
         Ok(None)
@@ -719,7 +741,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active FROM queues WHERE is_active = 1 LIMIT 1"
+            "SELECT id, name, is_active, track_hash FROM queues WHERE is_active = 1 LIMIT 1"
         )?;
         
         let mut rows = stmt.query([])?;
@@ -729,6 +751,7 @@ impl DbOperations {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 is_active: row.get(2)?,
+                track_hash: row.get(3)?,
             }))
         } else {
             Ok(None)

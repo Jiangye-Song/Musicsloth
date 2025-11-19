@@ -46,15 +46,15 @@ export default function QueuesView() {
     }
   };
 
-  const loadQueueTracks = async (queueId: number) => {
-    setLoading(true);
+  const loadQueueTracks = async (queueId: number, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const tracks = await queueApi.getQueueTracks(queueId);
       setQueueTracks(tracks);
     } catch (error) {
       console.error("Failed to load queue tracks:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -62,6 +62,17 @@ export default function QueuesView() {
     setSelectedQueue(queue);
     await loadQueueTracks(queue.id);
   };
+
+  // Poll for queue track updates when a queue is selected
+  useEffect(() => {
+    if (!selectedQueue) return;
+
+    const interval = setInterval(() => {
+      loadQueueTracks(selectedQueue.id, true); // Silent reload
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [selectedQueue]);
 
   const handlePlayQueue = async () => {
     if (!selectedQueue) return;

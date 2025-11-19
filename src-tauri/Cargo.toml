@@ -43,3 +43,6 @@ walkdir = "2"
 # Time utilities
 chrono = "0.4"
 
+# Hashing for queue deduplication
+sha2 = "0.10"
+

@@ -185,20 +185,11 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
         // Get all track IDs
         const trackIds = tracks.map(t => t.id);
         
-        // Create or reuse queue (backend handles duplicate detection)
+        // Create or reuse queue (backend handles duplicate detection and returns immediately after first batch)
         const createdQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, index);
         
-        // Get the reordered tracks from the queue
-        const queueTracks = await queueApi.getQueueTracks(createdQueueId);
-        
-        // Find the clicked track in the queue and play it
-        const clickedTrackInQueue = queueTracks.find(t => t.id === track.id);
-        if (clickedTrackInQueue) {
-          await playerApi.playFile(clickedTrackInQueue.file_path);
-        } else if (queueTracks.length > 0) {
-          // Fallback: play first track if we can't find the clicked one
-          await playerApi.playFile(queueTracks[0].file_path);
-        }
+        // Play the clicked track immediately (don't wait for full queue to load)
+        await playerApi.playFile(track.file_path);
       }
     } catch (error) {
       console.error("Failed to play track:", error);

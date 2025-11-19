@@ -218,8 +218,8 @@ pub fn create_queue_from_tracks(
         reordered_tracks.push(track_ids[i]);
     }
     
-    // Add only first 100 tracks immediately for responsiveness
-    const INITIAL_BATCH_SIZE: usize = 100;
+    // Add only first 50 tracks immediately for responsiveness
+    const INITIAL_BATCH_SIZE: usize = 50;
     let initial_batch: Vec<i64> = reordered_tracks.iter()
         .take(INITIAL_BATCH_SIZE)
         .copied()
@@ -236,9 +236,10 @@ pub fn create_queue_from_tracks(
             .collect();
         let db = state.db.clone();
         
+        let all_track_ids = reordered_tracks.clone();
         std::thread::spawn(move || {
-            // Add remaining tracks in chunks of 500
-            const CHUNK_SIZE: usize = 500;
+            // Add remaining tracks in chunks of 100 for more frequent updates
+            const CHUNK_SIZE: usize = 100;
             let mut position = INITIAL_BATCH_SIZE;
             
             for chunk in remaining_tracks.chunks(CHUNK_SIZE) {
@@ -247,6 +248,11 @@ pub fn create_queue_from_tracks(
                     break;
                 }
                 position += chunk.len();
+            }
+            
+            // After all tracks added, update the queue hash for duplicate detection
+            if let Err(e) = DbOperations::update_queue_track_hash(&db, queue_id, &all_track_ids) {
+                eprintln!("Failed to update queue track hash: {}", e);
             }
         });
     }
