@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { playerApi, PlayerState } from "../services/api";
 
 export default function PlayerControls() {
@@ -6,8 +6,13 @@ export default function PlayerControls() {
     is_playing: false,
     is_paused: false,
     current_file: null,
+    position_ms: 0,
+    duration_ms: null,
   });
   const [volume, setVolume] = useState(0.7);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPosition, setSeekPosition] = useState(0);
+  const seekTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Update player state periodically
@@ -53,8 +58,68 @@ export default function PlayerControls() {
     }
   };
 
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const position = parseInt(e.target.value);
+    setSeekPosition(position);
+    setIsSeeking(true);
+
+    // Debounce seek requests
+    if (seekTimeoutRef.current) {
+      clearTimeout(seekTimeoutRef.current);
+    }
+
+    seekTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        await playerApi.seekTo(position);
+        setIsSeeking(false);
+      } catch (error) {
+        console.error("Failed to seek:", error);
+        setIsSeeking(false);
+      }
+    }, 100);
+  };
+
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  const currentPosition = isSeeking ? seekPosition : playerState.position_ms;
+  const duration = playerState.duration_ms || 0;
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {/* Seekbar */}
+      {playerState.current_file && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
+          <span style={{ fontSize: "12px", color: "#888", minWidth: "45px", textAlign: "right" }}>
+            {formatTime(currentPosition)}
+          </span>
+          <input
+            type="range"
+            min="0"
+            max={duration}
+            value={currentPosition}
+            onChange={handleSeekChange}
+            disabled={!playerState.current_file}
+            style={{
+              flex: 1,
+              height: "4px",
+              borderRadius: "2px",
+              outline: "none",
+              cursor: playerState.current_file ? "pointer" : "not-allowed",
+            }}
+          />
+          <span style={{ fontSize: "12px", color: "#888", minWidth: "45px" }}>
+            {formatTime(duration)}
+          </span>
+        </div>
+      )}
+
+      {/* Player Controls */}
+      <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
       {/* Track Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {playerState.current_file ? (
@@ -122,6 +187,7 @@ export default function PlayerControls() {
         <span style={{ fontSize: "12px", color: "#888", minWidth: "35px" }}>
           {Math.round(volume * 100)}%
         </span>
+      </div>
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ export interface PlayerState {
   is_playing: boolean;
   is_paused: boolean;
   current_file: string | null;
+  position_ms: number;
+  duration_ms: number | null;
 }
 
 export const playerApi = {
@@ -26,6 +28,10 @@ export const playerApi = {
 
   setVolume: async (volume: number): Promise<void> => {
     return await invoke("set_volume", { volume });
+  },
+
+  seekTo: async (positionMs: number): Promise<void> => {
+    return await invoke("seek_to", { positionMs });
   },
 
   getState: async (): Promise<PlayerState> => {

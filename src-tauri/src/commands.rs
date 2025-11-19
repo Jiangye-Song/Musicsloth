@@ -55,6 +55,18 @@ pub fn set_volume(
 }
 
 #[tauri::command]
+pub fn seek_to(
+    position_ms: u64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().unwrap();
+    let position = std::time::Duration::from_millis(position_ms);
+    player.seek(position)
+        .map_err(|e| format!("Failed to seek: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_player_state(state: State<'_, AppState>) -> Result<PlayerStateResponse, String> {
     let player = state.player.lock().unwrap();
     
@@ -62,6 +74,8 @@ pub fn get_player_state(state: State<'_, AppState>) -> Result<PlayerStateRespons
         is_playing: player.is_playing(),
         is_paused: player.is_paused(),
         current_file: player.current_file().map(|p| p.to_string_lossy().to_string()),
+        position_ms: player.current_position().as_millis() as u64,
+        duration_ms: player.total_duration().map(|d| d.as_millis() as u64),
     })
 }
 
@@ -70,6 +84,8 @@ pub struct PlayerStateResponse {
     pub is_playing: bool,
     pub is_paused: bool,
     pub current_file: Option<String>,
+    pub position_ms: u64,
+    pub duration_ms: Option<u64>,
 }
 
 // ===== Library Management Commands =====

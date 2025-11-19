@@ -6,6 +6,8 @@ export default function NowPlayingView() {
     is_playing: false,
     is_paused: false,
     current_file: null,
+    position_ms: 0,
+    duration_ms: null,
   });
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [albumArt, setAlbumArt] = useState<string | null>(null);

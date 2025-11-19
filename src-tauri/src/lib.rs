@@ -44,6 +44,7 @@ pub fn run() {
             commands::resume_playback,
             commands::stop_playback,
             commands::set_volume,
+            commands::seek_to,
             commands::get_player_state,
             commands::scan_library,
             commands::get_all_tracks,
