@@ -113,6 +113,8 @@ export default function PlayerControls() {
               borderRadius: "2px",
               outline: "none",
               cursor: playerState.current_file ? "pointer" : "not-allowed",
+              margin: 0,
+              padding: 0,
             }}
           />
           <span style={{ fontSize: "12px", color: "#888", minWidth: "45px" }}>
@@ -184,7 +186,7 @@ export default function PlayerControls() {
           step="0.01"
           value={volume}
           onChange={handleVolumeChange}
-          style={{ flex: 1 }}
+          style={{ flex: 1, margin: 0, padding: 0 }}
           title={`Volume: ${Math.round(volume * 100)}%`}
         />
         <span style={{ fontSize: "12px", color: "#888", minWidth: "35px" }}>
