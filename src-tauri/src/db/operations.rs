@@ -86,6 +86,58 @@ impl DbOperations {
         Ok(conn.last_insert_rowid())
     }
     
+    /// Link a track with multiple artists
+    pub fn link_track_artists(
+        db: &DatabaseConnection,
+        track_id: i64,
+        artist_names: &[String],
+    ) -> Result<(), anyhow::Error> {
+        if artist_names.is_empty() {
+            return Ok(());
+        }
+        
+        for artist_name in artist_names {
+            // Get or create artist
+            let artist_id = Self::insert_or_get_artist(db, artist_name)?;
+            
+            // Link track to artist
+            let conn = db.get_connection();
+            let conn = conn.lock().unwrap();
+            conn.execute(
+                "INSERT OR IGNORE INTO track_artists (track_id, artist_id) VALUES (?1, ?2)",
+                params![track_id, artist_id],
+            )?;
+        }
+        
+        Ok(())
+    }
+    
+    /// Link a track with multiple genres
+    pub fn link_track_genres(
+        db: &DatabaseConnection,
+        track_id: i64,
+        genre_names: &[String],
+    ) -> Result<(), anyhow::Error> {
+        if genre_names.is_empty() {
+            return Ok(());
+        }
+        
+        for genre_name in genre_names {
+            // Get or create genre
+            let genre_id = Self::insert_or_get_genre(db, genre_name)?;
+            
+            // Link track to genre
+            let conn = db.get_connection();
+            let conn = conn.lock().unwrap();
+            conn.execute(
+                "INSERT OR IGNORE INTO track_genres (track_id, genre_id) VALUES (?1, ?2)",
+                params![track_id, genre_id],
+            )?;
+        }
+        
+        Ok(())
+    }
+    
     /// Insert a track (using the Track model)
     pub fn insert_track(
         db: &DatabaseConnection,
@@ -207,9 +259,9 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT ar.id, ar.name, COUNT(t.id) as song_count
+            "SELECT ar.id, ar.name, COUNT(DISTINCT ta.track_id) as song_count
              FROM artists ar
-             LEFT JOIN tracks t ON t.artist = ar.name
+             LEFT JOIN track_artists ta ON ta.artist_id = ar.id
              GROUP BY ar.id, ar.name
              ORDER BY ar.name"
         )?;
@@ -234,9 +286,9 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT g.name, COUNT(t.id) as song_count
+            "SELECT g.name, COUNT(DISTINCT tg.track_id) as song_count
              FROM genres g
-             LEFT JOIN tracks t ON t.genre = g.name
+             LEFT JOIN track_genres tg ON tg.genre_id = g.id
              GROUP BY g.name
              ORDER BY g.name"
         )?;

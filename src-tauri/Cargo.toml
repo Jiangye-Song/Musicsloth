@@ -28,6 +28,7 @@ rodio = "0.19"
 
 # Metadata parsing
 lofty = "0.21"
+regex = "1"
 
 # Database
 rusqlite = { version = "0.32", features = ["bundled"] }

@@ -135,6 +135,32 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Create track_artists junction table for many-to-many relationship
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS track_artists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            track_id INTEGER NOT NULL,
+            artist_id INTEGER NOT NULL,
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+            FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE,
+            UNIQUE(track_id, artist_id)
+        )",
+        [],
+    )?;
+
+    // Create track_genres junction table for many-to-many relationship
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS track_genres (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            track_id INTEGER NOT NULL,
+            genre_id INTEGER NOT NULL,
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+            FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE CASCADE,
+            UNIQUE(track_id, genre_id)
+        )",
+        [],
+    )?;
+
     // Create indexes for better query performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist)",
@@ -154,6 +180,22 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_queue_tracks_queue ON queue_tracks(queue_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_artists_track ON track_artists(track_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_artists_artist ON track_artists(artist_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_genres_track ON track_genres(track_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_genres_genre ON track_genres(genre_id)",
         [],
     )?;
 
