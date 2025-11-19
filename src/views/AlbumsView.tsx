@@ -11,20 +11,32 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
   const [albumArt, setAlbumArt] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const itemRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Intersection Observer for lazy loading
+  // Intersection Observer for lazy loading with unload on exit
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setIsVisible(true);
-            observer.disconnect(); // Stop observing once visible
+          } else {
+            // Item left viewport - cancel loading and cleanup
+            setIsVisible(false);
+            if (abortControllerRef.current) {
+              abortControllerRef.current.abort();
+              abortControllerRef.current = null;
+            }
+            // Cleanup album art to free memory
+            setAlbumArt((prevArt) => {
+              if (prevArt) URL.revokeObjectURL(prevArt);
+              return null;
+            });
           }
         });
       },
       {
-        rootMargin: "100px", // Start loading 100px before item enters viewport
+        rootMargin: "200px", // Start loading 200px before item enters viewport
       }
     );
 
@@ -34,6 +46,9 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
 
     return () => {
       observer.disconnect();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, []);
 
@@ -41,19 +56,39 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
   useEffect(() => {
     if (!isVisible) return;
 
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    const currentController = abortControllerRef.current;
+
     const loadAlbumArt = async () => {
       try {
         // Get first track of the album
         const tracks = await libraryApi.getTracksByAlbum(album.name);
+        
+        // Check if request was cancelled
+        if (currentController.signal.aborted) return;
+        
         if (tracks.length > 0) {
           const artData = await libraryApi.getAlbumArt(tracks[0].file_path);
+          
+          // Check again if request was cancelled
+          if (currentController.signal.aborted) return;
+          
           if (artData && artData.length > 0) {
             const blob = new Blob([new Uint8Array(artData)], { type: "image/jpeg" });
             const url = URL.createObjectURL(blob);
-            setAlbumArt(url);
+            setAlbumArt((prevArt) => {
+              if (prevArt) URL.revokeObjectURL(prevArt);
+              return url;
+            });
           }
         }
       } catch (err) {
+        if (currentController.signal.aborted) return; // Ignore cancelled requests
         console.error("Failed to load album art:", err);
       }
     };
@@ -61,7 +96,9 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
     loadAlbumArt();
 
     return () => {
-      if (albumArt) URL.revokeObjectURL(albumArt);
+      if (currentController) {
+        currentController.abort();
+      }
     };
   }, [isVisible, album.name]);
 
