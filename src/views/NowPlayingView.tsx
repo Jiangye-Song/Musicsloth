@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { playerApi, PlayerState } from "../services/api";
+import { playerApi, libraryApi, PlayerState, Track } from "../services/api";
 
 export default function NowPlayingView() {
   const [playerState, setPlayerState] = useState<PlayerState>({
@@ -7,28 +7,70 @@ export default function NowPlayingView() {
     is_paused: false,
     current_file: null,
   });
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [albumArt, setAlbumArt] = useState<string | null>(null);
 
   useEffect(() => {
-    // Update player state periodically
+    // Update player state and track metadata periodically
     const interval = setInterval(async () => {
       try {
         const state = await playerApi.getState();
         setPlayerState(state);
+
+        // Fetch track metadata if a file is playing
+        if (state.current_file) {
+          const track = await libraryApi.getCurrentTrack();
+          setCurrentTrack(track);
+
+          // Fetch album art
+          if (track) {
+            try {
+              const artData = await libraryApi.getAlbumArt(track.file_path);
+              if (artData && artData.length > 0) {
+                const blob = new Blob([new Uint8Array(artData)], { type: "image/jpeg" });
+                const url = URL.createObjectURL(blob);
+                setAlbumArt((prevUrl) => {
+                  if (prevUrl) URL.revokeObjectURL(prevUrl);
+                  return url;
+                });
+              } else {
+                setAlbumArt(null);
+              }
+            } catch (err) {
+              console.error("Failed to load album art:", err);
+              setAlbumArt(null);
+            }
+          }
+        } else {
+          setCurrentTrack(null);
+          setAlbumArt(null);
+        }
       } catch (error) {
         console.error("Failed to get player state:", error);
       }
     }, 500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (albumArt) URL.revokeObjectURL(albumArt);
+    };
   }, []);
 
   const fileName = playerState.current_file
     ? playerState.current_file.split(/[\\/]/).pop()
     : null;
 
+  const formatDuration = (ms: number | null) => {
+    if (!ms) return "—";
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "40px" }}>
-      {/* Album Art Placeholder */}
+      {/* Album Art */}
       <div
         style={{
           width: "300px",
@@ -40,9 +82,12 @@ export default function NowPlayingView() {
           justifyContent: "center",
           marginBottom: "30px",
           border: "1px solid #333",
+          overflow: "hidden",
         }}
       >
-        {fileName ? (
+        {albumArt ? (
+          <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : fileName ? (
           <span style={{ fontSize: "64px" }}>🎵</span>
         ) : (
           <span style={{ fontSize: "48px", color: "#666" }}>No Track</span>
@@ -50,16 +95,16 @@ export default function NowPlayingView() {
       </div>
 
       {/* Track Information */}
-      {fileName ? (
+      {currentTrack ? (
         <div style={{ textAlign: "center", maxWidth: "600px", marginBottom: "30px" }}>
           <h2 style={{ margin: "0 0 10px 0", fontSize: "24px", fontWeight: "bold" }}>
-            {fileName}
+            {currentTrack.title}
           </h2>
           <p style={{ margin: "5px 0", fontSize: "16px", color: "#aaa" }}>
-            Unknown Artist
+            {currentTrack.artist || "Unknown Artist"}
           </p>
           <p style={{ margin: "5px 0", fontSize: "14px", color: "#888" }}>
-            Unknown Album
+            {currentTrack.album || "Unknown Album"}
           </p>
         </div>
       ) : (
@@ -74,40 +119,57 @@ export default function NowPlayingView() {
       )}
 
       {/* Tag Information Section */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "600px",
-          backgroundColor: "#2a2a2a",
-          borderRadius: "8px",
-          padding: "20px",
-          marginBottom: "20px",
-          border: "1px solid #333",
-        }}
-      >
-        <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-          Track Information
-        </h3>
-        <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "10px", fontSize: "14px" }}>
-          <span style={{ color: "#888" }}>Title:</span>
-          <span>{fileName || "—"}</span>
-          
-          <span style={{ color: "#888" }}>Artist:</span>
-          <span>—</span>
-          
-          <span style={{ color: "#888" }}>Album:</span>
-          <span>—</span>
-          
-          <span style={{ color: "#888" }}>Year:</span>
-          <span>—</span>
-          
-          <span style={{ color: "#888" }}>Genre:</span>
-          <span>—</span>
-          
-          <span style={{ color: "#888" }}>Duration:</span>
-          <span>—</span>
+      {currentTrack && (
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "600px",
+            backgroundColor: "#2a2a2a",
+            borderRadius: "8px",
+            padding: "20px",
+            marginBottom: "20px",
+            border: "1px solid #333",
+          }}
+        >
+          <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
+            Track Information
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "10px", fontSize: "14px" }}>
+            <span style={{ color: "#888" }}>Title:</span>
+            <span>{currentTrack.title}</span>
+            
+            <span style={{ color: "#888" }}>Artist:</span>
+            <span>{currentTrack.artist || "—"}</span>
+            
+            <span style={{ color: "#888" }}>Album Artist:</span>
+            <span>{currentTrack.album_artist || "—"}</span>
+            
+            <span style={{ color: "#888" }}>Album:</span>
+            <span>{currentTrack.album || "—"}</span>
+            
+            <span style={{ color: "#888" }}>Year:</span>
+            <span>{currentTrack.year || "—"}</span>
+            
+            <span style={{ color: "#888" }}>Genre:</span>
+            <span>{currentTrack.genre || "—"}</span>
+            
+            <span style={{ color: "#888" }}>Track:</span>
+            <span>{currentTrack.track_number ? `${currentTrack.track_number}${currentTrack.disc_number ? ` (Disc ${currentTrack.disc_number})` : ""}` : "—"}</span>
+            
+            <span style={{ color: "#888" }}>Duration:</span>
+            <span>{formatDuration(currentTrack.duration_ms)}</span>
+            
+            <span style={{ color: "#888" }}>Format:</span>
+            <span>{currentTrack.file_format?.toUpperCase() || "—"}</span>
+            
+            <span style={{ color: "#888" }}>Bitrate:</span>
+            <span>{currentTrack.bitrate ? `${Math.round(currentTrack.bitrate / 1000)} kbps` : "—"}</span>
+            
+            <span style={{ color: "#888" }}>Sample Rate:</span>
+            <span>{currentTrack.sample_rate ? `${currentTrack.sample_rate} Hz` : "—"}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Lyrics Section */}
       <div

@@ -7,6 +7,7 @@ use crate::library::scanner::DirectoryScanner;
 use crate::library::indexer::{LibraryIndexer, IndexingResult};
 use crate::db::operations::DbOperations;
 use crate::db::models::{Track, Album, Artist, Genre};
+use lofty::file::TaggedFileExt;
 
 #[tauri::command]
 pub fn play_file(
@@ -149,4 +150,49 @@ pub fn get_tracks_by_genre(state: State<'_, AppState>, genre_id: i64) -> Result<
 pub fn get_tracks_by_album(state: State<'_, AppState>, album_name: String) -> Result<Vec<Track>, String> {
     DbOperations::get_tracks_by_album(&state.db, &album_name)
         .map_err(|e| format!("Failed to get tracks by album: {}", e))
+}
+
+#[tauri::command]
+pub fn get_current_track(state: State<'_, AppState>) -> Result<Option<Track>, String> {
+    let player = state.player.lock().unwrap();
+    
+    if let Some(file_path) = player.current_file() {
+        let file_path_str = file_path.to_string_lossy().to_string();
+        DbOperations::get_track_by_file_path(&state.db, &file_path_str)
+            .map_err(|e| format!("Failed to get track: {}", e))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
+    use lofty::probe::Probe;
+    use lofty::picture::PictureType;
+    
+    let tagged_file = Probe::open(&file_path)
+        .map_err(|e| format!("Failed to open file: {}", e))?
+        .read()
+        .map_err(|e| format!("Failed to read file: {}", e))?;
+    
+    // Try to get the primary tag
+    if let Some(tag) = tagged_file.primary_tag() {
+        // Look for cover art
+        for picture in tag.pictures() {
+            if picture.pic_type() == PictureType::CoverFront || picture.pic_type() == PictureType::Other {
+                return Ok(Some(picture.data().to_vec()));
+            }
+        }
+    }
+    
+    // Try all tags if primary tag didn't have cover art
+    for tag in tagged_file.tags() {
+        for picture in tag.pictures() {
+            if picture.pic_type() == PictureType::CoverFront || picture.pic_type() == PictureType::Other {
+                return Ok(Some(picture.data().to_vec()));
+            }
+        }
+    }
+    
+    Ok(None)
 }

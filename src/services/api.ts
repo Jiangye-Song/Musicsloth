@@ -118,6 +118,14 @@ export const libraryApi = {
   clearLibrary: async (): Promise<void> => {
     return await invoke("clear_library");
   },
+
+  getCurrentTrack: async (): Promise<Track | null> => {
+    return await invoke("get_current_track");
+  },
+
+  getAlbumArt: async (filePath: string): Promise<number[] | null> => {
+    return await invoke("get_album_art", { filePath });
+  },
 };
 
 export const fileApi = {

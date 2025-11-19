@@ -2,6 +2,110 @@ import { useState, useEffect } from "react";
 import { libraryApi, Album, Track } from "../services/api";
 import TrackList from "../components/TrackList";
 
+interface AlbumItemProps {
+  album: Album;
+  onClick: () => void;
+}
+
+function AlbumItem({ album, onClick }: AlbumItemProps) {
+  const [albumArt, setAlbumArt] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadAlbumArt = async () => {
+      try {
+        // Get first track of the album
+        const tracks = await libraryApi.getTracksByAlbum(album.name);
+        if (tracks.length > 0) {
+          const artData = await libraryApi.getAlbumArt(tracks[0].file_path);
+          if (artData && artData.length > 0) {
+            const blob = new Blob([new Uint8Array(artData)], { type: "image/jpeg" });
+            const url = URL.createObjectURL(blob);
+            setAlbumArt(url);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load album art:", err);
+      }
+    };
+
+    loadAlbumArt();
+
+    return () => {
+      if (albumArt) URL.revokeObjectURL(albumArt);
+    };
+  }, [album.name]);
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "15px 20px",
+        borderBottom: "1px solid #2a2a2a",
+        cursor: "pointer",
+        transition: "background-color 0.2s",
+        gap: "15px",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#2a2a2a";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "transparent";
+      }}
+    >
+      {/* Album Cover */}
+      <div
+        style={{
+          width: "60px",
+          height: "60px",
+          backgroundColor: "#1a1a1a",
+          borderRadius: "6px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "28px",
+          flexShrink: 0,
+          overflow: "hidden",
+        }}
+      >
+        {albumArt ? (
+          <img src={albumArt} alt={album.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          "💿"
+        )}
+      </div>
+
+      {/* Album Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h3
+          style={{
+            margin: "0 0 5px 0",
+            fontSize: "16px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {album.name}
+        </h3>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "14px",
+            color: "#888",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {album.song_count} song{album.song_count !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function AlbumsView() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
@@ -131,69 +235,11 @@ export default function AlbumsView() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
             {filteredAlbums.map((album) => (
-              <div
+              <AlbumItem
                 key={album.id}
+                album={album}
                 onClick={() => handleAlbumClick(album)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "15px 20px",
-                  borderBottom: "1px solid #2a2a2a",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s",
-                  gap: "15px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#2a2a2a";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
-              >
-                {/* Album Cover */}
-                <div
-                  style={{
-                    width: "60px",
-                    height: "60px",
-                    backgroundColor: "#1a1a1a",
-                    borderRadius: "6px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "28px",
-                    flexShrink: 0,
-                  }}
-                >
-                  💿
-                </div>
-
-                {/* Album Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3
-                    style={{
-                      margin: "0 0 5px 0",
-                      fontSize: "16px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {album.name}
-                  </h3>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "14px",
-                      color: "#888",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {album.song_count} song{album.song_count !== 1 ? "s" : ""}
-                  </p>
-                </div>
-              </div>
+              />
             ))}
           </div>
         )}
