@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import { playerApi, PlayerState } from "../services/api";
 
-interface PlayerControlsProps {
-  onFileSelect: () => void;
-}
-
-export default function PlayerControls({ onFileSelect }: PlayerControlsProps) {
+export default function PlayerControls() {
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,

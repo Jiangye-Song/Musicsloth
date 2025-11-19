@@ -1,0 +1,252 @@
+use rusqlite::params;
+use crate::db::models::{Track, Album, Artist};
+use crate::db::connection::DatabaseConnection;
+
+/// Database operations for library management
+pub struct DbOperations;
+
+impl DbOperations {
+    /// Insert or get artist ID
+    pub fn insert_or_get_artist(
+        db: &DatabaseConnection,
+        name: &str,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Check if artist exists
+        let mut stmt = conn.prepare("SELECT id FROM artists WHERE name = ?1")?;
+        let mut rows = stmt.query(params![name])?;
+        
+        if let Some(row) = rows.next()? {
+            return Ok(row.get(0)?);
+        }
+        
+        // Insert new artist
+        conn.execute(
+            "INSERT INTO artists (name) VALUES (?1)",
+            params![name],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+    
+    /// Insert or get album ID
+    pub fn insert_or_get_album(
+        db: &DatabaseConnection,
+        title: &str,
+        artist_name: Option<&str>,
+        year: Option<u32>,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Check if album exists
+        let mut stmt = conn.prepare(
+            "SELECT id FROM albums WHERE name = ?1 AND artist IS ?2"
+        )?;
+        let mut rows = stmt.query(params![title, artist_name])?;
+        
+        if let Some(row) = rows.next()? {
+            return Ok(row.get(0)?);
+        }
+        
+        // Insert new album
+        let year_i32 = year.map(|y| y as i32);
+        conn.execute(
+            "INSERT INTO albums (name, artist, year) VALUES (?1, ?2, ?3)",
+            params![title, artist_name, year_i32],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+    
+    /// Insert or get genre ID
+    pub fn insert_or_get_genre(
+        db: &DatabaseConnection,
+        name: &str,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Check if genre exists
+        let mut stmt = conn.prepare("SELECT id FROM genres WHERE name = ?1")?;
+        let mut rows = stmt.query(params![name])?;
+        
+        if let Some(row) = rows.next()? {
+            return Ok(row.get(0)?);
+        }
+        
+        // Insert new genre
+        conn.execute(
+            "INSERT INTO genres (name) VALUES (?1)",
+            params![name],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+    
+    /// Insert a track (using the Track model)
+    pub fn insert_track(
+        db: &DatabaseConnection,
+        track: &Track,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute(
+            "INSERT OR IGNORE INTO tracks (
+                file_path, title, artist, album, album_artist, year,
+                track_number, disc_number, duration_ms, genre,
+                file_size, file_format, bitrate, sample_rate,
+                play_count, last_played, date_added, date_modified
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+            params![
+                track.file_path,
+                track.title,
+                track.artist,
+                track.album,
+                track.album_artist,
+                track.year.map(|y| y as i32),
+                track.track_number,
+                track.disc_number,
+                track.duration_ms,
+                track.genre,
+                track.file_size,
+                track.file_format,
+                track.bitrate,
+                track.sample_rate,
+                track.play_count,
+                track.last_played,
+                track.date_added,
+                track.date_modified,
+            ],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+    
+    /// Get all tracks
+    pub fn get_all_tracks(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path, title, artist, album, album_artist, year,
+                    track_number, disc_number, duration_ms, genre,
+                    file_size, file_format, bitrate, sample_rate,
+                    play_count, last_played, date_added, date_modified
+             FROM tracks
+             ORDER BY date_added DESC"
+        )?;
+        
+        let tracks = stmt.query_map([], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get::<_, Option<i32>>(6)?.map(|y| y as u32),
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                play_count: row.get(15)?,
+                last_played: row.get(16)?,
+                date_added: row.get(17)?,
+                date_modified: row.get(18)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+    
+    /// Get all albums
+    pub fn get_all_albums(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Album>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, name, artist, year
+             FROM albums
+             ORDER BY name"
+        )?;
+        
+        let albums = stmt.query_map([], |row| {
+            Ok(Album {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                artist: row.get(2)?,
+                year: row.get(3)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(albums)
+    }
+    
+    /// Get all artists
+    pub fn get_all_artists(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Artist>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, name
+             FROM artists
+             ORDER BY name"
+        )?;
+        
+        let artists = stmt.query_map([], |row| {
+            Ok(Artist {
+                id: row.get(0)?,
+                name: row.get(1)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(artists)
+    }
+    
+    /// Get all genres
+    pub fn get_all_genres(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT name FROM genres ORDER BY name"
+        )?;
+        
+        let genres = stmt.query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(genres)
+    }
+    
+    /// Delete all tracks (for testing/reset)
+    pub fn clear_library(db: &DatabaseConnection) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute("DELETE FROM tracks", [])?;
+        conn.execute("DELETE FROM albums", [])?;
+        conn.execute("DELETE FROM artists", [])?;
+        conn.execute("DELETE FROM genres", [])?;
+        
+        Ok(())
+    }
+}

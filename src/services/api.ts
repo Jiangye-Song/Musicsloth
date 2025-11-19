@@ -33,6 +33,69 @@ export const playerApi = {
   },
 };
 
+export interface Track {
+  id: number;
+  file_path: string;
+  title: string;
+  artist: string | null;
+  album: string | null;
+  album_artist: string | null;
+  year: number | null;
+  track_number: number | null;
+  disc_number: number | null;
+  duration_ms: number | null;
+  genre: string | null;
+  file_size: number | null;
+  file_format: string | null;
+  bitrate: number | null;
+  sample_rate: number | null;
+  play_count: number;
+  last_played: number | null;
+  date_added: number;
+  date_modified: number;
+}
+
+export interface Album {
+  id: number;
+  name: string;
+  artist: string | null;
+  year: number | null;
+}
+
+export interface Artist {
+  id: number;
+  name: string;
+}
+
+export interface IndexingResult {
+  total_files: number;
+  successful: number;
+  failed: number;
+  errors: string[];
+}
+
+export const libraryApi = {
+  scanLibrary: async (directory: string): Promise<IndexingResult> => {
+    return await invoke("scan_library", { directory });
+  },
+
+  getAllTracks: async (): Promise<Track[]> => {
+    return await invoke("get_all_tracks");
+  },
+
+  getAllAlbums: async (): Promise<Album[]> => {
+    return await invoke("get_all_albums");
+  },
+
+  getAllArtists: async (): Promise<Artist[]> => {
+    return await invoke("get_all_artists");
+  },
+
+  getAllGenres: async (): Promise<string[]> => {
+    return await invoke("get_all_genres");
+  },
+};
+
 export const fileApi = {
   openFile: async (): Promise<string | null> => {
     // TODO: Use Tauri's file dialog

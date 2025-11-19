@@ -45,6 +45,11 @@ pub fn run() {
             commands::stop_playback,
             commands::set_volume,
             commands::get_player_state,
+            commands::scan_library,
+            commands::get_all_tracks,
+            commands::get_all_albums,
+            commands::get_all_artists,
+            commands::get_all_genres,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

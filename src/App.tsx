@@ -2,6 +2,7 @@ import { useState } from "react";
 import "./App.css";
 import PlayerControls from "./components/PlayerControls";
 import NowPlayingView from "./views/NowPlayingView";
+import LibraryView from "./views/LibraryView";
 import QueuesView from "./views/QueuesView";
 import PlaylistsView from "./views/PlaylistsView";
 import ArtistsView from "./views/ArtistsView";
@@ -9,7 +10,7 @@ import AlbumsView from "./views/AlbumsView";
 import GenresView from "./views/GenresView";
 import { playerApi } from "./services/api";
 
-type Tab = "nowplaying" | "queues" | "playlists" | "artists" | "albums" | "genres";
+type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres";
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>("nowplaying");
@@ -30,6 +31,8 @@ function App() {
     switch (activeTab) {
       case "nowplaying":
         return <NowPlayingView />;
+      case "library":
+        return <LibraryView />;
       case "queues":
         return <QueuesView />;
       case "playlists":
@@ -41,7 +44,7 @@ function App() {
       case "genres":
         return <GenresView />;
       default:
-        return <QueuesView />;
+        return <NowPlayingView />;
     }
   };
 
@@ -74,7 +77,7 @@ function App() {
             📂 Open File
           </button>
 
-          {(["nowplaying", "queues", "playlists", "artists", "albums", "genres"] as Tab[]).map((tab) => (
+          {(["nowplaying", "library", "queues", "playlists", "artists", "albums", "genres"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -92,7 +95,7 @@ function App() {
                 transition: "all 0.2s"
               }}
             >
-              {tab === "nowplaying" ? "Now Playing" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === "nowplaying" ? "Now Playing" : tab === "library" ? "Library" : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </nav>
@@ -105,7 +108,7 @@ function App() {
 
       {/* Player Controls (Footer) */}
       <footer style={{ backgroundColor: "#2a2a2a", borderTop: "1px solid #333", padding: "15px 20px" }}>
-        <PlayerControls onFileSelect={handleFileSelect} />
+        <PlayerControls />
       </footer>
     </div>
   );
