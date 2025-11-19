@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { playerApi, PlayerState } from "../services/api";
 
 export default function PlayerControls() {
@@ -12,21 +12,22 @@ export default function PlayerControls() {
   const [volume, setVolume] = useState(0.7);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
-  const seekTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Update player state periodically
+    // Update player state periodically (faster for smoother seekbar)
     const interval = setInterval(async () => {
       try {
         const state = await playerApi.getState();
-        setPlayerState(state);
+        if (!isSeeking) {
+          setPlayerState(state);
+        }
       } catch (error) {
         console.error("Failed to get player state:", error);
       }
-    }, 500);
+    }, 100);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isSeeking]);
 
   const handlePlayPause = async () => {
     try {
@@ -58,25 +59,24 @@ export default function PlayerControls() {
     }
   };
 
+  const handleSeekMouseDown = () => {
+    setIsSeeking(true);
+  };
+
   const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const position = parseInt(e.target.value);
     setSeekPosition(position);
-    setIsSeeking(true);
+  };
 
-    // Debounce seek requests
-    if (seekTimeoutRef.current) {
-      clearTimeout(seekTimeoutRef.current);
+  const handleSeekMouseUp = async (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+    const position = parseInt((e.target as HTMLInputElement).value);
+    try {
+      await playerApi.seekTo(position);
+    } catch (error) {
+      console.error("Failed to seek:", error);
+    } finally {
+      setIsSeeking(false);
     }
-
-    seekTimeoutRef.current = window.setTimeout(async () => {
-      try {
-        await playerApi.seekTo(position);
-        setIsSeeking(false);
-      } catch (error) {
-        console.error("Failed to seek:", error);
-        setIsSeeking(false);
-      }
-    }, 100);
   };
 
   const formatTime = (ms: number) => {
@@ -102,7 +102,10 @@ export default function PlayerControls() {
             min="0"
             max={duration}
             value={currentPosition}
+            onMouseDown={handleSeekMouseDown}
             onChange={handleSeekChange}
+            onMouseUp={handleSeekMouseUp}
+            onTouchEnd={handleSeekMouseUp}
             disabled={!playerState.current_file}
             style={{
               flex: 1,
