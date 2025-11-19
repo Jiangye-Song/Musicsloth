@@ -50,10 +50,6 @@ function App() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#1a1a1a", color: "white" }}>
-      {/* Header */}
-      <header style={{ padding: "15px 20px", backgroundColor: "#2a2a2a", borderBottom: "1px solid #333" }}>
-        <h1 style={{ margin: 0, fontSize: "24px" }}>🎵 Musicsloth</h1>
-      </header>
 
       {/* Main Content Area */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>

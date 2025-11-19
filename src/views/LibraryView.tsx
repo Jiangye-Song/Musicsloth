@@ -38,7 +38,7 @@ export default function LibraryView() {
             </p>
           </div>
         ) : (
-          <VirtualTrackList tracks={tracks} />
+          <VirtualTrackList tracks={tracks} contextType="library" />
         )}
       </div>
     </div>

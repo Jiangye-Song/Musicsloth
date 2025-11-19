@@ -272,7 +272,7 @@ export default function AlbumsView() {
           </h2>
         </div>
         <div style={{ padding: "20px" }}>
-          <VirtualTrackList tracks={albumTracks} />
+          <VirtualTrackList tracks={albumTracks} contextType="album" contextName={selectedAlbum?.name} />
         </div>
       </div>
     );

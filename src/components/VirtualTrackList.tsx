@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { libraryApi, Track, playerApi } from "../services/api";
+import { libraryApi, Track, playerApi, queueApi } from "../services/api";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -7,12 +7,18 @@ const MAX_CONCURRENT_LOADS = 3; // Limit concurrent album art loads
 
 interface VirtualTrackListProps {
   tracks: Track[];
+  contextType: "library" | "artist" | "album" | "genre" | "queue";
+  contextName?: string; // Artist name, album name, or genre name
+  queueId?: number; // Queue ID if contextType is "queue"
+  showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
+  onQueueActivated?: () => void; // Callback when queue is activated
 }
 
-export default function VirtualTrackList({ tracks }: VirtualTrackListProps) {
+export default function VirtualTrackList({ tracks, contextType, contextName, queueId, showPlayingIndicator = false, onQueueActivated }: VirtualTrackListProps) {
   const [albumArtCache, setAlbumArtCache] = useState<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(20);
+  const [currentPlayingFile, setCurrentPlayingFile] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -48,6 +54,24 @@ export default function VirtualTrackList({ tracks }: VirtualTrackListProps) {
   useEffect(() => {
     handleScroll();
   }, [tracks, handleScroll]);
+
+  // Update currently playing track
+  useEffect(() => {
+    if (!showPlayingIndicator) return;
+
+    const updatePlayingTrack = async () => {
+      try {
+        const state = await playerApi.getState();
+        setCurrentPlayingFile(state.current_file);
+      } catch (error) {
+        console.error("Failed to get player state:", error);
+      }
+    };
+
+    updatePlayingTrack();
+    const interval = setInterval(updatePlayingTrack, 1000);
+    return () => clearInterval(interval);
+  }, [showPlayingIndicator]);
 
   // Process album art load queue
   const processLoadQueue = useCallback(async () => {
@@ -135,9 +159,47 @@ export default function VirtualTrackList({ tracks }: VirtualTrackListProps) {
     };
   }, []);
 
-  const handlePlayTrack = async (track: Track) => {
+  const handlePlayTrack = async (track: Track, index: number) => {
     try {
-      await playerApi.playFile(track.file_path);
+      if (contextType === "queue" && queueId !== undefined) {
+        // If we're in a queue view, just play the track directly
+        // and set this queue as active
+        await queueApi.setActiveQueue(queueId);
+        // Immediately update the current playing file for instant visual feedback
+        setCurrentPlayingFile(track.file_path);
+        await playerApi.playFile(track.file_path);
+        // Notify parent to refresh queue status
+        if (onQueueActivated) {
+          onQueueActivated();
+        }
+      } else {
+        // Create queue name based on context
+        const queueName = contextType === "library" 
+          ? "Library"
+          : contextType === "artist"
+          ? `Artist: ${contextName}`
+          : contextType === "album"
+          ? `Album: ${contextName}`
+          : `Genre: ${contextName}`;
+        
+        // Get all track IDs
+        const trackIds = tracks.map(t => t.id);
+        
+        // Create or reuse queue (backend handles duplicate detection)
+        const createdQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, index);
+        
+        // Get the reordered tracks from the queue
+        const queueTracks = await queueApi.getQueueTracks(createdQueueId);
+        
+        // Find the clicked track in the queue and play it
+        const clickedTrackInQueue = queueTracks.find(t => t.id === track.id);
+        if (clickedTrackInQueue) {
+          await playerApi.playFile(clickedTrackInQueue.file_path);
+        } else if (queueTracks.length > 0) {
+          // Fallback: play first track if we can't find the clicked one
+          await playerApi.playFile(queueTracks[0].file_path);
+        }
+      }
     } catch (error) {
       console.error("Failed to play track:", error);
       alert(`Failed to play track: ${error}`);
@@ -185,13 +247,15 @@ export default function VirtualTrackList({ tracks }: VirtualTrackListProps) {
             right: 0,
           }}
         >
-          {visibleTracks.map((track) => {
+          {visibleTracks.map((track, visibleIndex) => {
             const albumArt = albumArtCache.get(track.file_path);
+            const actualIndex = visibleStart + visibleIndex;
+            const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
             
             return (
               <div
                 key={track.id}
-                onClick={() => handlePlayTrack(track)}
+                onClick={() => handlePlayTrack(track, actualIndex)}
                 style={{
                   height: `${ITEM_HEIGHT}px`,
                   display: "flex",
@@ -200,9 +264,16 @@ export default function VirtualTrackList({ tracks }: VirtualTrackListProps) {
                   borderBottom: "1px solid #333",
                   cursor: "pointer",
                   transition: "background-color 0.2s",
+                  backgroundColor: isPlaying ? "#1a1a1a" : "transparent",
+                  border: isPlaying ? "2px solid #1db954" : "2px solid transparent",
+                  borderRadius: isPlaying ? "4px" : "0",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#333")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                onMouseEnter={(e) => {
+                  if (!isPlaying) e.currentTarget.style.backgroundColor = "#333";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isPlaying) e.currentTarget.style.backgroundColor = "transparent";
+                }}
               >
                 {/* Album Art */}
                 <div

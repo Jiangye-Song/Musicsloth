@@ -524,4 +524,228 @@ impl DbOperations {
         
         Ok(())
     }
+
+    /// Create a new queue
+    pub fn create_queue(
+        db: &DatabaseConnection,
+        name: &str,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Deactivate all queues
+        conn.execute("UPDATE queues SET is_active = 0", [])?;
+        
+        // Get current timestamp
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs() as i64;
+        
+        // Create new queue
+        conn.execute(
+            "INSERT INTO queues (name, is_active, current_track_index, date_created, date_modified) VALUES (?1, 1, 0, ?2, ?3)",
+            params![name, now, now],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Add tracks to queue
+    pub fn add_tracks_to_queue(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_ids: &[i64],
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        for (index, track_id) in track_ids.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![queue_id, track_id, index as i32],
+            )?;
+        }
+        
+        Ok(())
+    }
+
+    /// Add tracks to queue at specific starting position (for chunked loading)
+    pub fn add_tracks_to_queue_at_position(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_ids: &[i64],
+        start_position: usize,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        for (index, track_id) in track_ids.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![queue_id, track_id, (start_position + index) as i32],
+            )?;
+        }
+        
+        Ok(())
+    }
+
+    /// Get all queues
+    pub fn get_all_queues(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<crate::db::models::Queue>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, name, is_active FROM queues ORDER BY id DESC"
+        )?;
+        
+        let queues = stmt.query_map([], |row| {
+            Ok(crate::db::models::Queue {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                is_active: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(queues)
+    }
+
+    /// Get tracks in a queue
+    pub fn get_queue_tracks(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist, t.year,
+                    t.track_number, t.disc_number, t.duration_ms, t.genre,
+                    t.file_size, t.file_format, t.bitrate, t.sample_rate,
+                    t.play_count, t.last_played, t.date_added, t.date_modified
+             FROM tracks t
+             INNER JOIN queue_tracks qt ON qt.track_id = t.id
+             WHERE qt.queue_id = ?1
+             ORDER BY qt.position"
+        )?;
+        
+        let tracks = stmt.query_map([queue_id], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get::<_, Option<i32>>(6)?.map(|y| y as u32),
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                play_count: row.get(15)?,
+                last_played: row.get(16)?,
+                date_added: row.get(17)?,
+                date_modified: row.get(18)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+
+    /// Find queue with same tracks (ignoring order)
+    pub fn find_queue_with_tracks(
+        db: &DatabaseConnection,
+        track_ids: &[i64],
+    ) -> Result<Option<i64>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Get all queues
+        let mut stmt = conn.prepare("SELECT id FROM queues")?;
+        let queue_ids: Vec<i64> = stmt.query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        
+        // Check each queue
+        for queue_id in queue_ids {
+            let mut stmt = conn.prepare(
+                "SELECT track_id FROM queue_tracks WHERE queue_id = ?1 ORDER BY track_id"
+            )?;
+            
+            let mut queue_track_ids: Vec<i64> = stmt.query_map([queue_id], |row| row.get(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            
+            // Sort both arrays to compare
+            let mut sorted_input = track_ids.to_vec();
+            sorted_input.sort();
+            queue_track_ids.sort();
+            
+            if sorted_input == queue_track_ids {
+                return Ok(Some(queue_id));
+            }
+        }
+        
+        Ok(None)
+    }
+
+    /// Set active queue
+    pub fn set_active_queue(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Deactivate all queues
+        conn.execute("UPDATE queues SET is_active = 0", [])?;
+        
+        // Activate specified queue
+        conn.execute("UPDATE queues SET is_active = 1 WHERE id = ?1", params![queue_id])?;
+        
+        Ok(())
+    }
+
+    /// Get active queue
+    pub fn get_active_queue(
+        db: &DatabaseConnection,
+    ) -> Result<Option<crate::db::models::Queue>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, name, is_active FROM queues WHERE is_active = 1 LIMIT 1"
+        )?;
+        
+        let mut rows = stmt.query([])?;
+        
+        if let Some(row) = rows.next()? {
+            Ok(Some(crate::db::models::Queue {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                is_active: row.get(2)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Delete a queue
+    pub fn delete_queue(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute("DELETE FROM queue_tracks WHERE queue_id = ?1", params![queue_id])?;
+        conn.execute("DELETE FROM queues WHERE id = ?1", params![queue_id])?;
+        
+        Ok(())
+    }
 }

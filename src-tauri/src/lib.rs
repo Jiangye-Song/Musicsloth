@@ -52,6 +52,12 @@ pub fn run() {
             commands::get_tracks_by_album,
             commands::get_current_track,
             commands::get_album_art,
+            commands::create_queue_from_tracks,
+            commands::get_all_queues,
+            commands::get_queue_tracks,
+            commands::set_active_queue,
+            commands::get_active_queue,
+            commands::delete_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

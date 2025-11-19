@@ -94,6 +94,12 @@ export interface Genre {
   song_count: number;
 }
 
+export interface Queue {
+  id: number;
+  name: string;
+  is_active: boolean;
+}
+
 export interface IndexingResult {
   total_files: number;
   successful: number;
@@ -144,6 +150,40 @@ export const libraryApi = {
 
   getAlbumArt: async (filePath: string): Promise<number[] | null> => {
     return await invoke("get_album_art", { filePath });
+  },
+};
+
+export const queueApi = {
+  createQueueFromTracks: async (
+    name: string,
+    trackIds: number[],
+    clickedIndex: number
+  ): Promise<number> => {
+    return await invoke("create_queue_from_tracks", {
+      name,
+      trackIds,
+      clickedIndex,
+    });
+  },
+
+  getAllQueues: async (): Promise<Queue[]> => {
+    return await invoke("get_all_queues");
+  },
+
+  getQueueTracks: async (queueId: number): Promise<Track[]> => {
+    return await invoke("get_queue_tracks", { queueId });
+  },
+
+  setActiveQueue: async (queueId: number): Promise<void> => {
+    return await invoke("set_active_queue", { queueId });
+  },
+
+  getActiveQueue: async (): Promise<Queue | null> => {
+    return await invoke("get_active_queue");
+  },
+
+  deleteQueue: async (queueId: number): Promise<void> => {
+    return await invoke("delete_queue", { queueId });
   },
 };
 

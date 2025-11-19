@@ -84,7 +84,7 @@ export default function ArtistsView() {
           </h2>
         </div>
         <div style={{ padding: "20px" }}>
-          <VirtualTrackList tracks={artistTracks} />
+          <VirtualTrackList tracks={artistTracks} contextType="artist" contextName={selectedArtist?.name} />
         </div>
       </div>
     );

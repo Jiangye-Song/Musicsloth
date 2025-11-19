@@ -84,7 +84,7 @@ export default function GenresView() {
           </h2>
         </div>
         <div style={{ padding: "20px" }}>
-          <VirtualTrackList tracks={genreTracks} />
+          <VirtualTrackList tracks={genreTracks} contextType="genre" contextName={selectedGenre?.name} />
         </div>
       </div>
     );
