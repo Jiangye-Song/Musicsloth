@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { libraryApi, Album, Track } from "../services/api";
 import TrackList from "../components/TrackList";
 
@@ -9,8 +9,38 @@ interface AlbumItemProps {
 
 function AlbumItem({ album, onClick }: AlbumItemProps) {
   const [albumArt, setAlbumArt] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const itemRef = useRef<HTMLDivElement>(null);
 
+  // Intersection Observer for lazy loading
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect(); // Stop observing once visible
+          }
+        });
+      },
+      {
+        rootMargin: "100px", // Start loading 100px before item enters viewport
+      }
+    );
+
+    if (itemRef.current) {
+      observer.observe(itemRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  // Load album art only when visible
+  useEffect(() => {
+    if (!isVisible) return;
+
     const loadAlbumArt = async () => {
       try {
         // Get first track of the album
@@ -33,10 +63,11 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
     return () => {
       if (albumArt) URL.revokeObjectURL(albumArt);
     };
-  }, [album.name]);
+  }, [isVisible, album.name]);
 
   return (
     <div
+      ref={itemRef}
       onClick={onClick}
       style={{
         display: "flex",
