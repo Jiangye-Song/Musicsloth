@@ -416,23 +416,39 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT a.id, a.name, a.artist, a.year, COUNT(t.id) as song_count
-             FROM albums a
-             LEFT JOIN tracks t ON t.album = a.name
-             GROUP BY a.id, a.name, a.artist, a.year
-             ORDER BY a.name"
+            "SELECT DISTINCT t.album, 
+                    COALESCE(t.album_artist, t.artist) as artist,
+                    t.year,
+                    COUNT(DISTINCT t.id) as song_count
+             FROM tracks t
+             WHERE t.album IS NOT NULL
+             GROUP BY t.album, COALESCE(t.album_artist, t.artist), t.year
+             ORDER BY t.album"
         )?;
         
-        let albums = stmt.query_map([], |row| {
-            Ok(Album {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                artist: row.get(2)?,
-                year: row.get(3)?,
-                song_count: row.get(4)?,
-            })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
+        let mut albums = Vec::new();
+        let mut id = 1;
+        
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<i32>>(2)?,
+                row.get::<_, i32>(3)?,
+            ))
+        })?;
+        
+        for row in rows {
+            let (name, artist, year, song_count) = row?;
+            albums.push(Album {
+                id,
+                name,
+                artist,
+                year,
+                song_count,
+            });
+            id += 1;
+        }
         
         Ok(albums)
     }
