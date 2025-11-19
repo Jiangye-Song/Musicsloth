@@ -41,6 +41,13 @@ pub struct Artist {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Genre {
+    pub id: i64,
+    pub name: String,
+    pub song_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
     pub id: i64,
     pub name: String,

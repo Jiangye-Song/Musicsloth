@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { libraryApi, Artist } from "../services/api";
+import { libraryApi, Artist, Track } from "../services/api";
+import TrackList from "../components/TrackList";
 
 export default function ArtistsView() {
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -7,6 +8,8 @@ export default function ArtistsView() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"artists" | "album-artists" | "composers">("artists");
+  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
+  const [artistTracks, setArtistTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     const loadArtists = async () => {
@@ -24,6 +27,21 @@ export default function ArtistsView() {
     loadArtists();
   }, []);
 
+  const handleArtistClick = async (artist: Artist) => {
+    setSelectedArtist(artist);
+    try {
+      const tracks = await libraryApi.getTracksByArtist(artist.id);
+      setArtistTracks(tracks);
+    } catch (error) {
+      console.error("Failed to load artist tracks:", error);
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedArtist(null);
+    setArtistTracks([]);
+  };
+
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredArtists(artists);
@@ -34,6 +52,16 @@ export default function ArtistsView() {
       );
     }
   }, [searchQuery, artists]);
+
+  if (selectedArtist) {
+    return (
+      <TrackList
+        tracks={artistTracks}
+        onBack={handleBack}
+        title={`${selectedArtist.name} (${artistTracks.length} tracks)`}
+      />
+    );
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -133,6 +161,7 @@ export default function ArtistsView() {
             {filteredArtists.map((artist) => (
               <div
                 key={artist.id}
+                onClick={() => handleArtistClick(artist)}
                 style={{
                   display: "flex",
                   alignItems: "center",

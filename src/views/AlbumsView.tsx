@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { libraryApi, Album } from "../services/api";
+import { libraryApi, Album, Track } from "../services/api";
+import TrackList from "../components/TrackList";
 
 export default function AlbumsView() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [albumTracks, setAlbumTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     const loadAlbums = async () => {
@@ -23,6 +26,21 @@ export default function AlbumsView() {
     loadAlbums();
   }, []);
 
+  const handleAlbumClick = async (album: Album) => {
+    setSelectedAlbum(album);
+    try {
+      const tracks = await libraryApi.getTracksByAlbum(album.name);
+      setAlbumTracks(tracks);
+    } catch (error) {
+      console.error("Failed to load album tracks:", error);
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedAlbum(null);
+    setAlbumTracks([]);
+  };
+
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredAlbums(albums);
@@ -37,6 +55,16 @@ export default function AlbumsView() {
       );
     }
   }, [searchQuery, albums]);
+
+  if (selectedAlbum) {
+    return (
+      <TrackList
+        tracks={albumTracks}
+        onBack={handleBack}
+        title={`${selectedAlbum.name} ${selectedAlbum.artist ? `by ${selectedAlbum.artist}` : ""} (${albumTracks.length} tracks)`}
+      />
+    );
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -105,6 +133,7 @@ export default function AlbumsView() {
             {filteredAlbums.map((album) => (
               <div
                 key={album.id}
+                onClick={() => handleAlbumClick(album)}
                 style={{
                   display: "flex",
                   alignItems: "center",

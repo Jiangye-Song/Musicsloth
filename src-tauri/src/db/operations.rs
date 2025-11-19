@@ -222,6 +222,146 @@ impl DbOperations {
         Ok(tracks)
     }
     
+    /// Get tracks by artist (using junction table)
+    pub fn get_tracks_by_artist(
+        db: &DatabaseConnection,
+        artist_id: i64,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist, t.year,
+                    t.track_number, t.disc_number, t.duration_ms, t.genre,
+                    t.file_size, t.file_format, t.bitrate, t.sample_rate,
+                    t.play_count, t.last_played, t.date_added, t.date_modified
+             FROM tracks t
+             INNER JOIN track_artists ta ON ta.track_id = t.id
+             WHERE ta.artist_id = ?1
+             ORDER BY t.album, t.track_number"
+        )?;
+        
+        let tracks = stmt.query_map([artist_id], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get::<_, Option<i32>>(6)?.map(|y| y as u32),
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                play_count: row.get(15)?,
+                last_played: row.get(16)?,
+                date_added: row.get(17)?,
+                date_modified: row.get(18)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+    
+    /// Get tracks by genre (using junction table)
+    pub fn get_tracks_by_genre(
+        db: &DatabaseConnection,
+        genre_id: i64,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist, t.year,
+                    t.track_number, t.disc_number, t.duration_ms, t.genre,
+                    t.file_size, t.file_format, t.bitrate, t.sample_rate,
+                    t.play_count, t.last_played, t.date_added, t.date_modified
+             FROM tracks t
+             INNER JOIN track_genres tg ON tg.track_id = t.id
+             WHERE tg.genre_id = ?1
+             ORDER BY t.artist, t.album, t.track_number"
+        )?;
+        
+        let tracks = stmt.query_map([genre_id], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get::<_, Option<i32>>(6)?.map(|y| y as u32),
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                play_count: row.get(15)?,
+                last_played: row.get(16)?,
+                date_added: row.get(17)?,
+                date_modified: row.get(18)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+    
+    /// Get tracks by album
+    pub fn get_tracks_by_album(
+        db: &DatabaseConnection,
+        album_name: &str,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path, title, artist, album, album_artist, year,
+                    track_number, disc_number, duration_ms, genre,
+                    file_size, file_format, bitrate, sample_rate,
+                    play_count, last_played, date_added, date_modified
+             FROM tracks
+             WHERE album = ?1
+             ORDER BY disc_number, track_number"
+        )?;
+        
+        let tracks = stmt.query_map([album_name], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get::<_, Option<i32>>(6)?.map(|y| y as u32),
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                play_count: row.get(15)?,
+                last_played: row.get(16)?,
+                date_added: row.get(17)?,
+                date_modified: row.get(18)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+    
     /// Get all albums with song counts
     pub fn get_all_albums(
         db: &DatabaseConnection,
@@ -281,20 +421,24 @@ impl DbOperations {
     /// Get all genres with song counts
     pub fn get_all_genres(
         db: &DatabaseConnection,
-    ) -> Result<Vec<(String, i32)>, anyhow::Error> {
+    ) -> Result<Vec<crate::db::models::Genre>, anyhow::Error> {
         let conn = db.get_connection();
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT g.name, COUNT(DISTINCT tg.track_id) as song_count
+            "SELECT g.id, g.name, COUNT(DISTINCT tg.track_id) as song_count
              FROM genres g
              LEFT JOIN track_genres tg ON tg.genre_id = g.id
-             GROUP BY g.name
+             GROUP BY g.id, g.name
              ORDER BY g.name"
         )?;
         
         let genres = stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?))
+            Ok(crate::db::models::Genre {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                song_count: row.get(2)?,
+            })
         })?
         .collect::<Result<Vec<_>, _>>()?;
         

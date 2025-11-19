@@ -6,7 +6,7 @@ use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
 use crate::library::indexer::{LibraryIndexer, IndexingResult};
 use crate::db::operations::DbOperations;
-use crate::db::models::{Track, Album, Artist};
+use crate::db::models::{Track, Album, Artist, Genre};
 
 #[tauri::command]
 pub fn play_file(
@@ -122,7 +122,7 @@ pub fn get_all_artists(state: State<'_, AppState>) -> Result<Vec<Artist>, String
 }
 
 #[tauri::command]
-pub fn get_all_genres(state: State<'_, AppState>) -> Result<Vec<(String, i32)>, String> {
+pub fn get_all_genres(state: State<'_, AppState>) -> Result<Vec<Genre>, String> {
     DbOperations::get_all_genres(&state.db)
         .map_err(|e| format!("Failed to get genres: {}", e))
 }
@@ -131,4 +131,22 @@ pub fn get_all_genres(state: State<'_, AppState>) -> Result<Vec<(String, i32)>, 
 pub fn clear_library(state: State<'_, AppState>) -> Result<(), String> {
     DbOperations::clear_library(&state.db)
         .map_err(|e| format!("Failed to clear library: {}", e))
+}
+
+#[tauri::command]
+pub fn get_tracks_by_artist(state: State<'_, AppState>, artist_id: i64) -> Result<Vec<Track>, String> {
+    DbOperations::get_tracks_by_artist(&state.db, artist_id)
+        .map_err(|e| format!("Failed to get tracks by artist: {}", e))
+}
+
+#[tauri::command]
+pub fn get_tracks_by_genre(state: State<'_, AppState>, genre_id: i64) -> Result<Vec<Track>, String> {
+    DbOperations::get_tracks_by_genre(&state.db, genre_id)
+        .map_err(|e| format!("Failed to get tracks by genre: {}", e))
+}
+
+#[tauri::command]
+pub fn get_tracks_by_album(state: State<'_, AppState>, album_name: String) -> Result<Vec<Track>, String> {
+    DbOperations::get_tracks_by_album(&state.db, &album_name)
+        .map_err(|e| format!("Failed to get tracks by album: {}", e))
 }

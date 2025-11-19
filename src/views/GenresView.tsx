@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { libraryApi, Genre } from "../services/api";
+import { libraryApi, Genre, Track } from "../services/api";
+import TrackList from "../components/TrackList";
 
 export default function GenresView() {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [filteredGenres, setFilteredGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
+  const [genreTracks, setGenreTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     const loadGenres = async () => {
@@ -23,6 +26,21 @@ export default function GenresView() {
     loadGenres();
   }, []);
 
+  const handleGenreClick = async (genre: Genre) => {
+    setSelectedGenre(genre);
+    try {
+      const tracks = await libraryApi.getTracksByGenre(genre.id);
+      setGenreTracks(tracks);
+    } catch (error) {
+      console.error("Failed to load genre tracks:", error);
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedGenre(null);
+    setGenreTracks([]);
+  };
+
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredGenres(genres);
@@ -33,6 +51,16 @@ export default function GenresView() {
       );
     }
   }, [searchQuery, genres]);
+
+  if (selectedGenre) {
+    return (
+      <TrackList
+        tracks={genreTracks}
+        onBack={handleBack}
+        title={`${selectedGenre.name} (${genreTracks.length} tracks)`}
+      />
+    );
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -98,9 +126,10 @@ export default function GenresView() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-            {filteredGenres.map((genre, index) => (
+            {filteredGenres.map((genre) => (
               <div
-                key={index}
+                key={genre.id}
+                onClick={() => handleGenreClick(genre)}
                 style={{
                   display: "flex",
                   alignItems: "center",

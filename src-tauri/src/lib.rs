@@ -51,6 +51,9 @@ pub fn run() {
             commands::get_all_artists,
             commands::get_all_genres,
             commands::clear_library,
+            commands::get_tracks_by_artist,
+            commands::get_tracks_by_genre,
+            commands::get_tracks_by_album,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

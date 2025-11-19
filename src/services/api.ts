@@ -70,6 +70,7 @@ export interface Artist {
 }
 
 export interface Genre {
+  id: number;
   name: string;
   song_count: number;
 }
@@ -99,8 +100,19 @@ export const libraryApi = {
   },
 
   getAllGenres: async (): Promise<Genre[]> => {
-    const result: [string, number][] = await invoke("get_all_genres");
-    return result.map(([name, song_count]) => ({ name, song_count }));
+    return await invoke("get_all_genres");
+  },
+
+  getTracksByArtist: async (artistId: number): Promise<Track[]> => {
+    return await invoke("get_tracks_by_artist", { artistId });
+  },
+
+  getTracksByGenre: async (genreId: number): Promise<Track[]> => {
+    return await invoke("get_tracks_by_genre", { genreId });
+  },
+
+  getTracksByAlbum: async (albumName: string): Promise<Track[]> => {
+    return await invoke("get_tracks_by_album", { albumName });
   },
 
   clearLibrary: async (): Promise<void> => {
