@@ -13,22 +13,44 @@ pub struct IndexingResult {
     pub errors: Vec<String>,
 }
 
+/// Progress update for indexing
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct IndexingProgress {
+    pub current: usize,
+    pub total: usize,
+    pub current_file: String,
+}
+
 /// Library indexer for adding tracks to database
 pub struct LibraryIndexer;
 
 impl LibraryIndexer {
-    /// Index a list of audio files into the database
-    pub fn index_files<P: AsRef<Path>>(
+    /// Index a list of audio files into the database with progress callback
+    pub fn index_files_with_progress<P: AsRef<Path>, F>(
         paths: &[P],
         db: &DatabaseConnection,
-    ) -> Result<IndexingResult, anyhow::Error> {
+        mut progress_callback: F,
+    ) -> Result<IndexingResult, anyhow::Error>
+    where
+        F: FnMut(IndexingProgress),
+    {
         let total_files = paths.len();
         let mut successful = 0;
         let mut failed = 0;
         let mut errors = Vec::new();
         
-        for path in paths {
+        for (index, path) in paths.iter().enumerate() {
             let path_ref = path.as_ref();
+            
+            // Send progress update
+            progress_callback(IndexingProgress {
+                current: index + 1,
+                total: total_files,
+                current_file: path_ref.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string(),
+            });
             
             match Self::index_single_file(path_ref, db) {
                 Ok(_) => successful += 1,
@@ -46,6 +68,14 @@ impl LibraryIndexer {
             failed,
             errors,
         })
+    }
+    
+    /// Index a list of audio files into the database (without progress)
+    pub fn index_files<P: AsRef<Path>>(
+        paths: &[P],
+        db: &DatabaseConnection,
+    ) -> Result<IndexingResult, anyhow::Error> {
+        Self::index_files_with_progress(paths, db, |_| {})
     }
     
     /// Index a single audio file

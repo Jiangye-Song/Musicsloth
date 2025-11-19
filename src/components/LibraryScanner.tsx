@@ -1,10 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { libraryApi, IndexingResult } from "../services/api";
+
+interface ScanProgress {
+  current: number;
+  total: number;
+  current_file: string;
+}
 
 export default function LibraryScanner() {
   const [scanning, setScanning] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<IndexingResult | null>(null);
+  const [progress, setProgress] = useState<ScanProgress | null>(null);
+
+  useEffect(() => {
+    // Listen for scan progress events
+    const unlisten = listen<ScanProgress>("scan-progress", (event) => {
+      setProgress(event.payload);
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
 
   const handleScan = async () => {
     // Prompt user to enter directory path
@@ -13,10 +32,12 @@ export default function LibraryScanner() {
 
     setScanning(true);
     setResult(null);
+    setProgress(null);
 
     try {
       const scanResult = await libraryApi.scanLibrary(directory);
       setResult(scanResult);
+      setProgress(null);
     } catch (error) {
       alert(`Failed to scan library: ${error}`);
     } finally {
@@ -84,10 +105,49 @@ export default function LibraryScanner() {
       </div>
 
       {scanning && (
-        <div style={{ padding: "15px", backgroundColor: "#2a2a2a", borderRadius: "8px", border: "1px solid #4CAF50" }}>
-          <p style={{ margin: 0, fontSize: "14px" }}>
-            ⏳ Scanning directory and indexing files...
-          </p>
+        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", border: "1px solid #4CAF50" }}>
+          <div style={{ marginBottom: "15px" }}>
+            <p style={{ margin: "0 0 10px 0", fontSize: "14px", fontWeight: "bold" }}>
+              ⏳ Scanning directory and indexing files...
+            </p>
+            {progress && (
+              <p style={{ margin: "0 0 10px 0", fontSize: "13px", color: "#888" }}>
+                Processing: {progress.current_file}
+              </p>
+            )}
+          </div>
+          
+          {progress && (
+            <>
+              <div style={{
+                width: "100%",
+                height: "24px",
+                backgroundColor: "#1a1a1a",
+                borderRadius: "12px",
+                overflow: "hidden",
+                marginBottom: "10px",
+                border: "1px solid #333",
+              }}>
+                <div style={{
+                  height: "100%",
+                  backgroundColor: "#4CAF50",
+                  width: `${(progress.current / progress.total) * 100}%`,
+                  transition: "width 0.3s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  color: "#fff",
+                }}>
+                  {Math.round((progress.current / progress.total) * 100)}%
+                </div>
+              </div>
+              <p style={{ margin: 0, fontSize: "13px", color: "#888", textAlign: "center" }}>
+                {progress.current} / {progress.total} files
+              </p>
+            </>
+          )}
         </div>
       )}
 

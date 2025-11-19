@@ -1,5 +1,5 @@
 // Tauri command handlers
-use tauri::State;
+use tauri::{State, AppHandle, Emitter};
 use std::path::PathBuf;
 
 use crate::state::AppState;
@@ -74,17 +74,31 @@ pub struct PlayerStateResponse {
 // ===== Library Management Commands =====
 
 #[tauri::command]
-pub fn scan_library(
+pub async fn scan_library(
     directory: String,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<IndexingResult, String> {
-    // Scan directory for audio files
-    let audio_files = DirectoryScanner::scan(&directory)
-        .map_err(|e| format!("Failed to scan directory: {}", e))?;
+    // Clone what we need for the async task
+    let db = state.db.clone();
     
-    // Index files into database
-    let result = LibraryIndexer::index_files(&audio_files, &state.db)
+    // Spawn blocking task to avoid blocking the event loop
+    let result = tokio::task::spawn_blocking(move || {
+        // Scan directory for audio files
+        let audio_files = DirectoryScanner::scan(&directory)
+            .map_err(|e| format!("Failed to scan directory: {}", e))?;
+        
+        // Index files into database with progress updates
+        let result = LibraryIndexer::index_files_with_progress(&audio_files, &db, |progress| {
+            // Emit progress event to frontend
+            let _ = app.emit("scan-progress", progress);
+        })
         .map_err(|e| format!("Failed to index files: {}", e))?;
+        
+        Ok::<IndexingResult, String>(result)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))??;
     
     Ok(result)
 }
