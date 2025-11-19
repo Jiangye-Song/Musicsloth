@@ -112,3 +112,9 @@ pub fn get_all_genres(state: State<'_, AppState>) -> Result<Vec<(String, i32)>, 
     DbOperations::get_all_genres(&state.db)
         .map_err(|e| format!("Failed to get genres: {}", e))
 }
+
+#[tauri::command]
+pub fn clear_library(state: State<'_, AppState>) -> Result<(), String> {
+    DbOperations::clear_library(&state.db)
+        .map_err(|e| format!("Failed to clear library: {}", e))
+}

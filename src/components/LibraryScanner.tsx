@@ -3,6 +3,7 @@ import { libraryApi, IndexingResult } from "../services/api";
 
 export default function LibraryScanner() {
   const [scanning, setScanning] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<IndexingResult | null>(null);
 
   const handleScan = async () => {
@@ -23,11 +24,30 @@ export default function LibraryScanner() {
     }
   };
 
+  const handleClearLibrary = async () => {
+    if (!confirm("Are you sure you want to clear the entire library? This will delete all tracks, artists, albums, and genres.")) {
+      return;
+    }
+
+    setClearing(true);
+    try {
+      await libraryApi.clearLibrary();
+      alert("Library cleared successfully! You can now rescan your music folder.");
+      setResult(null);
+      // Reload page to refresh all views
+      window.location.reload();
+    } catch (error) {
+      alert(`Failed to clear library: ${error}`);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div style={{ padding: "20px" }}>
       <h2 style={{ marginBottom: "20px" }}>Library Scanner</h2>
       
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
         <button
           onClick={handleScan}
           disabled={scanning}
@@ -43,6 +63,23 @@ export default function LibraryScanner() {
           }}
         >
           {scanning ? "Scanning..." : "📂 Scan Music Folder"}
+        </button>
+
+        <button
+          onClick={handleClearLibrary}
+          disabled={clearing || scanning}
+          style={{
+            padding: "12px 24px",
+            backgroundColor: clearing || scanning ? "#666" : "#f44336",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: clearing || scanning ? "not-allowed" : "pointer",
+            fontSize: "16px",
+            fontWeight: "bold",
+          }}
+        >
+          {clearing ? "Clearing..." : "🗑️ Clear Library"}
         </button>
       </div>
 

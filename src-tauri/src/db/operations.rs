@@ -306,6 +306,11 @@ impl DbOperations {
         let conn = db.get_connection();
         let conn = conn.lock().unwrap();
         
+        // Delete junction tables first (foreign key constraints)
+        conn.execute("DELETE FROM track_artists", [])?;
+        conn.execute("DELETE FROM track_genres", [])?;
+        
+        // Delete main tables
         conn.execute("DELETE FROM tracks", [])?;
         conn.execute("DELETE FROM albums", [])?;
         conn.execute("DELETE FROM artists", [])?;

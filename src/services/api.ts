@@ -102,6 +102,10 @@ export const libraryApi = {
     const result: [string, number][] = await invoke("get_all_genres");
     return result.map(([name, song_count]) => ({ name, song_count }));
   },
+
+  clearLibrary: async (): Promise<void> => {
+    return await invoke("clear_library");
+  },
 };
 
 export const fileApi = {
