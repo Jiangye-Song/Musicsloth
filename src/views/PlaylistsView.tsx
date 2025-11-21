@@ -15,6 +15,10 @@ interface PlaylistItemProps {
   onClick: () => void;
 }
 
+interface PlaylistsViewProps {
+  searchQuery?: string;
+}
+
 function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
   return (
     <div
@@ -70,7 +74,7 @@ function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
   );
 }
 
-export default function PlaylistsView() {
+export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) {
   const [systemPlaylists] = useState<SystemPlaylist[]>([
     {
       id: "all-songs",
@@ -97,6 +101,7 @@ export default function PlaylistsView() {
       loadTracks: () => playlistApi.getUnplayedTracks(),
     },
   ]);
+  const [filteredPlaylists, setFilteredPlaylists] = useState<SystemPlaylist[]>(systemPlaylists);
 
   const [selectedPlaylist, setSelectedPlaylist] = useState<SystemPlaylist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -140,9 +145,22 @@ export default function PlaylistsView() {
     }
   }, [trackSearchQuery, tracks]);
 
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredPlaylists(systemPlaylists);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredPlaylists(
+        systemPlaylists.filter((playlist) =>
+          playlist.name.toLowerCase().includes(query)
+        )
+      );
+    }
+  }, [searchQuery, systemPlaylists]);
+
   if (selectedPlaylist) {
     return (
-      <div>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div
           style={{
             padding: "15px 20px",
@@ -172,35 +190,38 @@ export default function PlaylistsView() {
             {selectedPlaylist.name} ({tracks.length} tracks)
           </h2>
         </div>
-        <SearchBar
-          placeholder="Search in this list..."
-          value={trackSearchQuery}
-          onChange={setTrackSearchQuery}
-        />
-        <div style={{ padding: "20px" }}>
-          {loading ? (
-            <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
-              Loading tracks...
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
+            Loading tracks...
+          </div>
+        ) : tracks.length > 0 ? (
+          <>
+            <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
+              <VirtualTrackList
+                tracks={filteredTracks}
+                contextType="library"
+                contextName={selectedPlaylist.name}
+              />
             </div>
-          ) : tracks.length > 0 ? (
-            <VirtualTrackList
-              tracks={filteredTracks}
-              contextType="library"
-              contextName={selectedPlaylist.name}
+            <SearchBar
+              placeholder="Search in this list..."
+              value={trackSearchQuery}
+              onChange={setTrackSearchQuery}
             />
-          ) : (
-            <div
-              style={{
-                padding: "20px",
-                backgroundColor: "#2a2a2a",
-                borderRadius: "8px",
-                textAlign: "center",
-              }}
-            >
-              <p style={{ color: "#888", margin: 0 }}>No tracks in this playlist.</p>
-            </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <div
+            style={{
+              padding: "20px",
+              margin: "20px",
+              backgroundColor: "#2a2a2a",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ color: "#888", margin: 0 }}>No tracks in this playlist.</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -238,7 +259,7 @@ export default function PlaylistsView() {
             System
           </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-            {systemPlaylists.map((playlist) => (
+            {filteredPlaylists.map((playlist) => (
               <PlaylistItem
                 key={playlist.id}
                 playlist={playlist}

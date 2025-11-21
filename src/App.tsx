@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 import PlayerControls from "./components/PlayerControls";
+import SearchBar from "./components/SearchBar";
 import NowPlayingView from "./views/NowPlayingView";
 import LibraryView from "./views/LibraryView";
 import QueuesView from "./views/QueuesView";
@@ -14,6 +15,7 @@ type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albu
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>("nowplaying");
+  const [globalSearchQuery, setGlobalSearchQuery] = useState("");
 
   const handleFileSelect = async () => {
     // Prompt user to enter file path (temporary solution)
@@ -36,20 +38,35 @@ function App() {
       case "queues":
         return <QueuesView />;
       case "playlists":
-        return <PlaylistsView />;
+        return <PlaylistsView searchQuery={globalSearchQuery} />;
       case "artists":
-        return <ArtistsView />;
+        return <ArtistsView searchQuery={globalSearchQuery} />;
       case "albums":
-        return <AlbumsView />;
+        return <AlbumsView searchQuery={globalSearchQuery} />;
       case "genres":
-        return <GenresView />;
+        return <GenresView searchQuery={globalSearchQuery} />;
       default:
         return <NowPlayingView />;
     }
   };
 
+  const showGlobalSearch = activeTab === "artists" || activeTab === "albums" || activeTab === "genres" || activeTab === "playlists";
+  const searchPlaceholder = 
+    activeTab === "artists" ? "Search an artist..." :
+    activeTab === "albums" ? "Search an album..." :
+    activeTab === "genres" ? "Search a genre..." :
+    activeTab === "playlists" ? "Search a playlist..." : "";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#1a1a1a", color: "white" }}>
+      {/* Global Search Bar */}
+      {showGlobalSearch && (
+        <SearchBar
+          placeholder={searchPlaceholder}
+          value={globalSearchQuery}
+          onChange={setGlobalSearchQuery}
+        />
+      )}
 
       {/* Main Content Area */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>

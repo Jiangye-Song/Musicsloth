@@ -3,11 +3,14 @@ import { libraryApi, Genre, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
 
-export default function GenresView() {
+interface GenresViewProps {
+  searchQuery?: string;
+}
+
+export default function GenresView({ searchQuery = "" }: GenresViewProps) {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [filteredGenres, setFilteredGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
@@ -75,7 +78,7 @@ export default function GenresView() {
 
   if (selectedGenre) {
     return (
-      <div>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div
           style={{
             padding: "15px 20px",
@@ -104,14 +107,14 @@ export default function GenresView() {
             {selectedGenre.name} ({genreTracks.length} tracks)
           </h2>
         </div>
+        <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
+          <VirtualTrackList tracks={filteredTracks} contextType="genre" contextName={selectedGenre?.name} />
+        </div>
         <SearchBar
           placeholder="Search in this list..."
           value={trackSearchQuery}
           onChange={setTrackSearchQuery}
         />
-        <div style={{ padding: "20px" }}>
-          <VirtualTrackList tracks={filteredTracks} contextType="genre" contextName={selectedGenre?.name} />
-        </div>
       </div>
     );
   }
@@ -199,13 +202,6 @@ export default function GenresView() {
           </div>
         )}
       </div>
-
-      {/* Search Bar at bottom */}
-      <SearchBar
-        placeholder="Search a genre..."
-        value={searchQuery}
-        onChange={setSearchQuery}
-      />
     </div>
   );
 }

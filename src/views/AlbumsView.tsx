@@ -187,11 +187,14 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
   );
 }
 
-export default function AlbumsView() {
+interface AlbumsViewProps {
+  searchQuery?: string;
+}
+
+export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [albumTracks, setAlbumTracks] = useState<Track[]>([]);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
@@ -263,7 +266,7 @@ export default function AlbumsView() {
 
   if (selectedAlbum) {
     return (
-      <div>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div
           style={{
             padding: "15px 20px",
@@ -292,14 +295,14 @@ export default function AlbumsView() {
             {selectedAlbum.name} {selectedAlbum.artist ? `by ${selectedAlbum.artist}` : ""} ({albumTracks.length} tracks)
           </h2>
         </div>
+        <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
+          <VirtualTrackList tracks={filteredTracks} contextType="album" contextName={selectedAlbum?.name} />
+        </div>
         <SearchBar
           placeholder="Search in this list..."
           value={trackSearchQuery}
           onChange={setTrackSearchQuery}
         />
-        <div style={{ padding: "20px" }}>
-          <VirtualTrackList tracks={filteredTracks} contextType="album" contextName={selectedAlbum?.name} />
-        </div>
       </div>
     );
   }
@@ -349,13 +352,6 @@ export default function AlbumsView() {
           </div>
         )}
       </div>
-
-      {/* Search Bar at bottom */}
-      <SearchBar
-        placeholder="Search an album..."
-        value={searchQuery}
-        onChange={setSearchQuery}
-      />
     </div>
   );
 }

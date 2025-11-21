@@ -3,11 +3,14 @@ import { libraryApi, Artist, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
 
-export default function ArtistsView() {
+interface ArtistsViewProps {
+  searchQuery?: string;
+}
+
+export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [artistTracks, setArtistTracks] = useState<Track[]>([]);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
@@ -75,7 +78,7 @@ export default function ArtistsView() {
 
   if (selectedArtist) {
     return (
-      <div>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div
           style={{
             padding: "15px 20px",
@@ -104,14 +107,14 @@ export default function ArtistsView() {
             {selectedArtist.name} ({artistTracks.length} tracks)
           </h2>
         </div>
+        <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
+          <VirtualTrackList tracks={filteredTracks} contextType="artist" contextName={selectedArtist?.name} />
+        </div>
         <SearchBar
           placeholder="Search in this list..."
           value={trackSearchQuery}
           onChange={setTrackSearchQuery}
         />
-        <div style={{ padding: "20px" }}>
-          <VirtualTrackList tracks={filteredTracks} contextType="artist" contextName={selectedArtist?.name} />
-        </div>
       </div>
     );
   }
@@ -199,13 +202,6 @@ export default function ArtistsView() {
           </div>
         )}
       </div>
-
-      {/* Search Bar at bottom */}
-      <SearchBar
-        placeholder="Search an artist..."
-        value={searchQuery}
-        onChange={setSearchQuery}
-      />
     </div>
   );
 }
