@@ -1,16 +1,35 @@
 import { useState, useEffect } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
+import SearchBar from "../components/SearchBar";
 
 export default function QueuesView() {
   const [queues, setQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [queueTracks, setQueueTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     loadQueues();
   }, []);
+
+  useEffect(() => {
+    if (trackSearchQuery.trim() === "") {
+      setFilteredTracks(queueTracks);
+    } else {
+      const query = trackSearchQuery.toLowerCase();
+      setFilteredTracks(
+        queueTracks.filter(
+          (track) =>
+            track.title.toLowerCase().includes(query) ||
+            track.artist?.toLowerCase().includes(query) ||
+            track.album?.toLowerCase().includes(query)
+        )
+      );
+    }
+  }, [trackSearchQuery, queueTracks]);
 
   const loadQueues = async (forceReloadTracks = false) => {
     try {
@@ -48,9 +67,11 @@ export default function QueuesView() {
 
   const loadQueueTracks = async (queueId: number, silent = false) => {
     if (!silent) setLoading(true);
+    setTrackSearchQuery("");
     try {
       const tracks = await queueApi.getQueueTracks(queueId);
       setQueueTracks(tracks);
+      setFilteredTracks(tracks);
     } catch (error) {
       console.error("Failed to load queue tracks:", error);
     } finally {
@@ -233,6 +254,11 @@ export default function QueuesView() {
                 ▶ Play Queue
               </button>
             </div>
+            <SearchBar
+              placeholder="Search in this list..."
+              value={trackSearchQuery}
+              onChange={setTrackSearchQuery}
+            />
             {loading ? (
               <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
                 Loading tracks...
@@ -240,7 +266,7 @@ export default function QueuesView() {
             ) : queueTracks.length > 0 ? (
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <VirtualTrackList
-                  tracks={queueTracks}
+                  tracks={filteredTracks}
                   contextType="queue"
                   queueId={selectedQueue.id}
                   showPlayingIndicator={true}
