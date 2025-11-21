@@ -224,11 +224,12 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
         borderRadius: "8px",
         overflow: "auto",
         maxHeight: "calc(100vh - 250px)",
+        minHeight: "calc(100vh - 250px)",
         position: "relative",
       }}
     >
       {/* Spacer for virtual scrolling */}
-      <div style={{ height: `${tracks.length * ITEM_HEIGHT}px`, position: "relative" }}>
+      <div style={{ height: `${tracks.length * ITEM_HEIGHT}px`, minHeight: "100%", position: "relative" }}>
         {/* Only render visible items */}
         <div
           style={{
@@ -255,9 +256,8 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                   borderBottom: "1px solid #333",
                   cursor: "pointer",
                   transition: "background-color 0.2s",
-                  backgroundColor: isPlaying ? "#1a1a1a" : "transparent",
-                  border: isPlaying ? "2px solid #1db954" : "2px solid transparent",
-                  borderRadius: isPlaying ? "4px" : "0",
+                  backgroundColor: isPlaying ? "#333" : "transparent",
+                  borderLeft: isPlaying ? "3px solid #4CAF50" : "3px solid transparent",
                 }}
                 onMouseEnter={(e) => {
                   if (!isPlaying) e.currentTarget.style.backgroundColor = "#333";
