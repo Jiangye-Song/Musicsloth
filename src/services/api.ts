@@ -187,6 +187,20 @@ export const queueApi = {
   },
 };
 
+export const playlistApi = {
+  getRecentTracks: async (): Promise<Track[]> => {
+    return await invoke("get_recent_tracks");
+  },
+
+  getMostPlayedTracks: async (): Promise<Track[]> => {
+    return await invoke("get_most_played_tracks");
+  },
+
+  getUnplayedTracks: async (): Promise<Track[]> => {
+    return await invoke("get_unplayed_tracks");
+  },
+};
+
 export const fileApi = {
   openFile: async (): Promise<string | null> => {
     // TODO: Use Tauri's file dialog

@@ -203,7 +203,7 @@ pub fn create_queue_from_tracks(
     // Generate unique queue name (Windows-style: name, name (2), name (3), etc.)
     let mut queue_name = name.clone();
     let mut counter = 2;
-    loop {
+    let queue_id: Result<i64, String> = loop {
         match DbOperations::create_queue(&state.db, &queue_name) {
             Ok(queue_id) => break Ok(queue_id),
             Err(e) => {
@@ -216,7 +216,8 @@ pub fn create_queue_from_tracks(
                 }
             }
         }
-    }?;
+    };
+    let queue_id = queue_id?;
     
     // Reorder tracks: clicked track first, then remaining after, then before clicked
     let mut reordered_tracks = Vec::new();
@@ -271,4 +272,24 @@ pub fn get_active_queue(state: State<'_, AppState>) -> Result<Option<Queue>, Str
 pub fn delete_queue(queue_id: i64, state: State<'_, AppState>) -> Result<(), String> {
     DbOperations::delete_queue(&state.db, queue_id)
         .map_err(|e| format!("Failed to delete queue: {}", e))
+}
+
+// ===== System Playlists Commands =====
+
+#[tauri::command]
+pub fn get_recent_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, String> {
+    DbOperations::get_recent_tracks(&state.db)
+        .map_err(|e| format!("Failed to get recent tracks: {}", e))
+}
+
+#[tauri::command]
+pub fn get_most_played_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, String> {
+    DbOperations::get_most_played_tracks(&state.db)
+        .map_err(|e| format!("Failed to get most played tracks: {}", e))
+}
+
+#[tauri::command]
+pub fn get_unplayed_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, String> {
+    DbOperations::get_unplayed_tracks(&state.db)
+        .map_err(|e| format!("Failed to get unplayed tracks: {}", e))
 }

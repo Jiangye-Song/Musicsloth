@@ -771,4 +771,131 @@ impl DbOperations {
         
         Ok(())
     }
+
+    // ===== System Playlists =====
+
+    /// Get tracks sorted by recently added
+    pub fn get_recent_tracks(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path, title, artist, album, duration_ms
+             FROM tracks
+             ORDER BY date_added DESC"
+        )?;
+        
+        let tracks = stmt.query_map([], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                duration_ms: row.get(5)?,
+                album_artist: None,
+                year: None,
+                track_number: None,
+                disc_number: None,
+                genre: None,
+                file_size: None,
+                file_format: None,
+                bitrate: None,
+                sample_rate: None,
+                play_count: 0,
+                last_played: None,
+                date_added: 0,
+                date_modified: 0,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+
+    /// Get tracks sorted by most played
+    pub fn get_most_played_tracks(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path, title, artist, album, duration_ms
+             FROM tracks
+             WHERE play_count > 0
+             ORDER BY play_count DESC, last_played DESC"
+        )?;
+        
+        let tracks = stmt.query_map([], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                duration_ms: row.get(5)?,
+                album_artist: None,
+                year: None,
+                track_number: None,
+                disc_number: None,
+                genre: None,
+                file_size: None,
+                file_format: None,
+                bitrate: None,
+                sample_rate: None,
+                play_count: 0,
+                last_played: None,
+                date_added: 0,
+                date_modified: 0,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
+
+    /// Get tracks that have never been played
+    pub fn get_unplayed_tracks(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path, title, artist, album, duration_ms
+             FROM tracks
+             WHERE play_count = 0
+             ORDER BY date_added DESC"
+        )?;
+        
+        let tracks = stmt.query_map([], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                duration_ms: row.get(5)?,
+                album_artist: None,
+                year: None,
+                track_number: None,
+                disc_number: None,
+                genre: None,
+                file_size: None,
+                file_format: None,
+                bitrate: None,
+                sample_rate: None,
+                play_count: 0,
+                last_played: None,
+                date_added: 0,
+                date_modified: 0,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
+    }
 }

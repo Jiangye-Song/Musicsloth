@@ -58,6 +58,9 @@ pub fn run() {
             commands::set_active_queue,
             commands::get_active_queue,
             commands::delete_queue,
+            commands::get_recent_tracks,
+            commands::get_most_played_tracks,
+            commands::get_unplayed_tracks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
