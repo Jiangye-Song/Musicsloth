@@ -83,25 +83,25 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
     {
       id: "all-songs",
       name: "All Songs",
-      icon: <LibraryMusic />,
+      icon: <LibraryMusic sx={{ fontSize: 32 }} />,
       loadTracks: () => libraryApi.getAllTracks(),
     },
     {
       id: "recent-added",
       name: "Recently Added",
-      icon: <InputIcon />,
+      icon: <InputIcon sx={{ fontSize: 32 }} />,
       loadTracks: () => playlistApi.getRecentTracks(),
     },
     {
       id: "most-played",
       name: "Most Played",
-      icon: <ReplayIcon />,
+      icon: <ReplayIcon sx={{ fontSize: 32 }} />,
       loadTracks: () => playlistApi.getMostPlayedTracks(),
     },
     {
       id: "not-played",
       name: "Never Played",
-      icon: <PlayDisabled />,
+      icon: <PlayDisabled sx={{ fontSize: 32 }} />,
       loadTracks: () => playlistApi.getUnplayedTracks(),
     },
   ]);
@@ -160,7 +160,6 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
             onClick={handleBack}
           ><ArrowBackIcon /></IconButton>
           <h2 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "24px" }}>{selectedPlaylist.icon}</span>
             {selectedPlaylist.name} ({tracks.length} tracks)
           </h2>
         </div>

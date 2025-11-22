@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
-import VirtualTrackList from "../components/VirtualTrackList";
+import VirtualTrackList, { VirtualTrackListRef } from "../components/VirtualTrackList";
 import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
+import MyLocationIcon from "@mui/icons-material/MyLocation";
 
 interface QueuesViewProps {
   searchQuery?: string;
@@ -17,6 +18,7 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   const [queueTracks, setQueueTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const trackListRef = useRef<VirtualTrackListRef>(null);
 
   useEffect(() => {
     loadQueues();
@@ -289,20 +291,37 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
               <Typography variant="h5" component="h2">
                 {selectedQueue.name}
               </Typography>
-              <IconButton
-                onClick={handlePlayQueue}
-                sx={{
-                  bgcolor: "primary.main",
-                  color: "white",
-                  width: 48,
-                  height: 48,
-                  "&:hover": {
-                    bgcolor: "primary.light",
-                  },
-                }}
-              >
-                {selectedQueue.is_active && isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-              </IconButton>
+              <Box sx={{ display: "flex", gap: 1.5 }}>
+                <IconButton
+                  onClick={() => trackListRef.current?.scrollToActiveTrack()}
+                  sx={{
+                    bgcolor: "action.hover",
+                    color: "text.primary",
+                    width: 48,
+                    height: 48,
+                    "&:hover": {
+                      bgcolor: "action.selected",
+                    },
+                  }}
+                  title="Locate active track"
+                >
+                  <MyLocationIcon />
+                </IconButton>
+                <IconButton
+                  onClick={handlePlayQueue}
+                  sx={{
+                    bgcolor: "primary.main",
+                    color: "white",
+                    width: 48,
+                    height: 48,
+                    "&:hover": {
+                      bgcolor: "primary.light",
+                    },
+                  }}
+                >
+                  {selectedQueue.is_active && isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                </IconButton>
+              </Box>
             </Box>
             {loading ? (
               <Box sx={{ textAlign: "center", py: 5 }}>
@@ -312,6 +331,7 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
               <>
                 <div style={{ flex: 1, overflow: "hidden" }}>
                   <VirtualTrackList
+                    ref={trackListRef}
                     tracks={queueTracks}
                     contextType="queue"
                     queueId={selectedQueue.id}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { libraryApi, Track, playerApi, queueApi } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
 import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener } from "@mui/material";
@@ -8,6 +8,10 @@ import SearchIcon from "@mui/icons-material/Search";
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
 const MAX_CONCURRENT_LOADS = 3; // Limit concurrent album art loads
+
+export interface VirtualTrackListRef {
+  scrollToActiveTrack: () => void;
+}
 
 interface VirtualTrackListProps {
   tracks: Track[];
@@ -20,7 +24,7 @@ interface VirtualTrackListProps {
   showSearch?: boolean; // Whether to show the search bar
 }
 
-export default function VirtualTrackList({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false }: VirtualTrackListProps) {
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false }, ref) => {
   console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
@@ -385,6 +389,20 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
     setSearchQuery("");
   };
 
+  // Expose scrollToActiveTrack to parent via ref
+  useImperativeHandle(ref, () => ({
+    scrollToActiveTrack: () => {
+      if (contextType === "queue" && !isActiveQueue && queueCurrentIndex >= 0) {
+        scrollToTrack(queueCurrentIndex);
+      } else if (showPlayingIndicator && currentPlayingFile) {
+        const index = tracks.findIndex(t => t.file_path === currentPlayingFile);
+        if (index >= 0) {
+          scrollToTrack(index);
+        }
+      }
+    }
+  }));
+
   const handleSearchResultClick = (index: number) => {
     scrollToTrack(index);
   };
@@ -663,4 +681,8 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
       </div>
     </div>
   );
-}
+});
+
+VirtualTrackList.displayName = "VirtualTrackList";
+
+export default VirtualTrackList;
