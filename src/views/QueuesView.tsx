@@ -3,8 +3,13 @@ import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
 
-export default function QueuesView() {
+interface QueuesViewProps {
+  searchQuery?: string;
+}
+
+export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   const [queues, setQueues] = useState<Queue[]>([]);
+  const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [queueTracks, setQueueTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
@@ -14,6 +19,19 @@ export default function QueuesView() {
   useEffect(() => {
     loadQueues();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredQueues(queues);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredQueues(
+        queues.filter((queue) =>
+          queue.name.toLowerCase().includes(query)
+        )
+      );
+    }
+  }, [searchQuery, queues]);
 
   useEffect(() => {
     if (trackSearchQuery.trim() === "") {
@@ -137,9 +155,13 @@ export default function QueuesView() {
             <br />
             Click any track to create a queue.
           </div>
+        ) : filteredQueues.length === 0 ? (
+          <div style={{ color: "#888", fontSize: "14px", textAlign: "center", padding: "20px" }}>
+            No queues found matching "{searchQuery}"
+          </div>
         ) : (
           <div>
-            {queues.map((queue) => (
+            {filteredQueues.map((queue) => (
               <div
                 key={queue.id}
                 style={{

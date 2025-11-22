@@ -34,9 +34,9 @@ function App() {
       case "nowplaying":
         return <NowPlayingView />;
       case "library":
-        return <LibraryView />;
+        return <LibraryView searchQuery={globalSearchQuery} />;
       case "queues":
-        return <QueuesView />;
+        return <QueuesView searchQuery={globalSearchQuery} />;
       case "playlists":
         return <PlaylistsView searchQuery={globalSearchQuery} />;
       case "artists":
@@ -50,8 +50,10 @@ function App() {
     }
   };
 
-  const showGlobalSearch = activeTab === "artists" || activeTab === "albums" || activeTab === "genres" || activeTab === "playlists";
+  const showGlobalSearch = activeTab === "library" || activeTab === "queues" || activeTab === "artists" || activeTab === "albums" || activeTab === "genres" || activeTab === "playlists";
   const searchPlaceholder = 
+    activeTab === "library" ? "Search tracks..." :
+    activeTab === "queues" ? "Search a queue..." :
     activeTab === "artists" ? "Search an artist..." :
     activeTab === "albums" ? "Search an album..." :
     activeTab === "genres" ? "Search a genre..." :
