@@ -12,7 +12,7 @@ export default function SearchBar({ placeholder, value, onChange }: SearchBarPro
     <Paper
       elevation={0}
       sx={{
-        p: 2,
+        p: 1,
         borderBottom: 1,
         borderColor: "divider",
         bgcolor: "background.paper",
@@ -20,6 +20,7 @@ export default function SearchBar({ placeholder, value, onChange }: SearchBarPro
     >
       <TextField
         fullWidth
+        size="small"
         variant="outlined"
         placeholder={placeholder}
         value={value}
@@ -27,7 +28,7 @@ export default function SearchBar({ placeholder, value, onChange }: SearchBarPro
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <Search />
+              <Search fontSize="small" />
             </InputAdornment>
           ),
         }}

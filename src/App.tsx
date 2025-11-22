@@ -107,6 +107,38 @@ function App() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
+      {/* Mobile Top Navigation */}
+      {isMobile && (
+        <Paper
+          sx={{
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+          elevation={2}
+        >
+          <List sx={{ display: "flex", flexDirection: "row", p: 0, overflowX: "auto" }}>
+            {tabs.map((tab) => (
+              <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
+                <ListItemButton
+                  selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  sx={{
+                    flexDirection: "column",
+                    py: 1,
+                    borderBottom: activeTab === tab.key ? 3 : 0,
+                    borderColor: "success.main",
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 0, color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                    {tab.icon}
+                  </ListItemIcon>
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      )}
+
       {/* Search Bar */}
       {showGlobalSearch && (
         <SearchBar
@@ -167,43 +199,6 @@ function App() {
           </List>
         </Drawer>
 
-        {/* Mobile Bottom Navigation */}
-        {isMobile && (
-          <Paper
-            sx={{
-              position: "fixed",
-              bottom: 80,
-              left: 0,
-              right: 0,
-              zIndex: 1000,
-              borderTop: 1,
-              borderColor: "divider",
-            }}
-            elevation={3}
-          >
-            <List sx={{ display: "flex", flexDirection: "row", p: 0 }}>
-              {tabs.map((tab) => (
-                <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
-                  <ListItemButton
-                    selected={activeTab === tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    sx={{
-                      flexDirection: "column",
-                      py: 1,
-                      borderBottom: activeTab === tab.key ? 3 : 0,
-                      borderColor: "success.main",
-                    }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 0, color: activeTab === tab.key ? "success.main" : "inherit" }}>
-                      {tab.icon}
-                    </ListItemIcon>
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
-        )}
-
         {/* Content Area */}
         <Box
           component="main"
@@ -211,7 +206,6 @@ function App() {
             flexGrow: 1,
             p: 3,
             overflowY: "auto",
-            mb: isMobile ? "140px" : 0,
           }}
         >
           {renderTabContent()}
