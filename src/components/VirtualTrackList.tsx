@@ -323,8 +323,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         // If we're in a queue view, just play the track directly
         // and set this queue as active
         await queueApi.setActiveQueue(queueId);
-        // Immediately update the current playing file for instant visual feedback
+        // Immediately update the current playing file and queue index for instant visual feedback
         setCurrentPlayingFile(track.file_path);
+        setQueueCurrentIndex(index);
         await playerApi.playFile(track.file_path);
         // Update queue position
         await updateQueuePosition(queueId, index);
@@ -576,8 +577,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             const albumArt = albumArtCacheRef.current.get(track.file_path);
             const actualIndex = visibleStart + visibleIndex;
             const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
+            const isQueueCurrentTrack = contextType === "queue" && actualIndex === queueCurrentIndex;
             const isInactiveQueue = contextType === "queue" && !isActiveQueue;
-            const isQueueCurrentTrack = isInactiveQueue && actualIndex === queueCurrentIndex;
             const shouldHighlight = isPlaying || isQueueCurrentTrack;
             const isFlashing = flashingIndex === actualIndex;
             
