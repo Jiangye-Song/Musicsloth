@@ -223,35 +223,33 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
         </Box>
 
         {/* Seekbar */}
-        {playerState.current_file && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
-            <Typography variant="caption" sx={{ minWidth: "45px", textAlign: "right", color: "text.secondary", fontSize: "0.7rem" }}>
-              {formatTime(currentPosition)}
-            </Typography>
-            <Slider
-              min={0}
-              max={duration}
-              value={currentPosition}
-              onMouseDown={handleSeekMouseDown}
-              onChange={(_, value) => setSeekPosition(value as number)}
-              onChangeCommitted={async (_, value) => {
-                try {
-                  await playerApi.seekTo(value as number);
-                } catch (error) {
-                  console.error("Failed to seek:", error);
-                } finally {
-                  setIsSeeking(false);
-                }
-              }}
-              disabled={!playerState.current_file}
-              sx={{ flex: 1, py: 0 }}
-              size="small"
-            />
-            <Typography variant="caption" sx={{ minWidth: "45px", color: "text.secondary", fontSize: "0.7rem" }}>
-              {formatTime(duration)}
-            </Typography>
-          </Box>
-        )}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+          <Typography variant="caption" sx={{ minWidth: "45px", textAlign: "right", color: "text.secondary", fontSize: "0.7rem" }}>
+            {formatTime(currentPosition)}
+          </Typography>
+          <Slider
+            min={0}
+            max={duration || 100}
+            value={currentPosition}
+            onMouseDown={handleSeekMouseDown}
+            onChange={(_, value) => setSeekPosition(value as number)}
+            onChangeCommitted={async (_, value) => {
+              try {
+                await playerApi.seekTo(value as number);
+              } catch (error) {
+                console.error("Failed to seek:", error);
+              } finally {
+                setIsSeeking(false);
+              }
+            }}
+            disabled={!playerState.current_file}
+            sx={{ flex: 1, py: 0 }}
+            size="small"
+          />
+          <Typography variant="caption" sx={{ minWidth: "45px", color: "text.secondary", fontSize: "0.7rem" }}>
+            {formatTime(duration)}
+          </Typography>
+        </Box>
       </Box>
 
       {/* Right Side Controls */}
