@@ -8,6 +8,7 @@ interface LibraryViewProps {
 }
 
 export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
+    console.log(`[LibraryView] Render - searchQuery: "${searchQuery}"`);
     const [tracks, setTracks] = useState<Track[]>([]);
     const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,22 +25,24 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
     };
 
     useEffect(() => {
+        console.log('[LibraryView] Loading tracks useEffect');
         loadTracks();
     }, []);
 
     useEffect(() => {
+        console.log(`[LibraryView] Filter useEffect - searchQuery: "${searchQuery}", tracks: ${tracks.length}`);
         if (searchQuery.trim() === "") {
             setFilteredTracks(tracks);
         } else {
             const query = searchQuery.toLowerCase();
-            setFilteredTracks(
-                tracks.filter(
-                    (track) =>
-                        track.title.toLowerCase().includes(query) ||
-                        track.artist?.toLowerCase().includes(query) ||
-                        track.album?.toLowerCase().includes(query)
-                )
+            const filtered = tracks.filter(
+                (track) =>
+                    track.title.toLowerCase().includes(query) ||
+                    track.artist?.toLowerCase().includes(query) ||
+                    track.album?.toLowerCase().includes(query)
             );
+            console.log(`[LibraryView] Filtered ${filtered.length} tracks`);
+            setFilteredTracks(filtered);
         }
     }, [searchQuery, tracks]);
 
@@ -80,7 +83,7 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
                             </p>
                         </div>
                     ) : (
-                        <VirtualTrackList tracks={filteredTracks} contextType="library" />
+                        <VirtualTrackList tracks={filteredTracks} contextType="library" showSearch={false} />
                     )}
                 </div>
             </div>

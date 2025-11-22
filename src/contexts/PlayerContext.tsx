@@ -14,18 +14,21 @@ interface PlayerContextType {
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
+  console.log('[PlayerContext] Render');
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [albumArt, setAlbumArt] = useState<string | null>(null);
   const [currentQueueId, setCurrentQueueId] = useState<number | null>(null);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
 
   const updateQueuePosition = async (queueId: number, trackIndex: number) => {
+    console.log(`[PlayerContext] updateQueuePosition - queueId: ${queueId}, trackIndex: ${trackIndex}`);
     setCurrentQueueId(queueId);
     setCurrentTrackIndex(trackIndex);
     await queueApi.updateQueueCurrentIndex(queueId, trackIndex);
   };
 
   useEffect(() => {
+    console.log('[PlayerContext] Setting up polling interval');
     // Poll for current track and album art
     const interval = setInterval(async () => {
       try {
@@ -42,6 +45,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
             
             // Only update if track changed
             if (!currentTrack || currentTrack.file_path !== track?.file_path) {
+              console.log(`[PlayerContext] Track changed: ${track?.title}`);
               setCurrentTrack(track);
               
               // Fetch album art

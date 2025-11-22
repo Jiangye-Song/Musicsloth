@@ -52,6 +52,7 @@ const Transition = React.forwardRef(function Transition(
 const drawerWidth = 240;
 
 function App() {
+  console.log('[App] Render');
   const [activeTab, setActiveTab] = useState<Tab>("library");
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
