@@ -111,7 +111,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
-    <Box sx={{ display: "flex", alignItems: "stretch", gap: 2, pr: 2, height: "80px" }}>
+    <Box sx={{ display: "flex", alignItems: "stretch", gap: isMobile ? 0 : 2, pr: isMobile ? 0 : 2, height: "80px" }}>
         {/* Album Art - Full height, no padding/margin */}
         <Box
           onClick={onExpandClick}
@@ -133,43 +133,43 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
           )}
         </Box>
 
-        {/* Track Info */}
-        <Box
-          onClick={onExpandClick}
-          sx={{
-            flex: isMobile ? 1 : "0 0 calc(20% - 80px)",
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            cursor: onExpandClick ? "pointer" : "default",
-            transition: "background-color 0.2s",
-            "&:hover": onExpandClick ? {
-              bgcolor: "action.hover",
-            } : {},
-            py: 1,
-          }}
-        >
-          <Typography
-            variant="body2"
-            fontWeight="bold"
-            noWrap
-            sx={{ color: "text.primary" }}
+        {/* Track Info - Hidden on mobile */}
+        {!isMobile && (
+          <Box
+            onClick={onExpandClick}
+            sx={{
+              flex: "0 0 calc(20% - 80px)",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              cursor: onExpandClick ? "pointer" : "default",
+              transition: "background-color 0.2s",
+              "&:hover": onExpandClick ? {
+                bgcolor: "action.hover",
+              } : {},
+              py: 1,
+            }}
           >
-            {currentTrack ? currentTrack.title : "Track title"}
-          </Typography>
-          <Typography
-            variant="caption"
-            noWrap
-            sx={{ color: "text.secondary" }}
-          >
-            {currentTrack
-              ? `${currentTrack.artist || "Unknown Artist"}${
-                  currentTrack.album && !isMobile ? ` • ${currentTrack.album}` : ""
-                }`
-              : "Track artist"}
-          </Typography>
-        </Box>
+            <Typography
+              variant="body2"
+              fontWeight="bold"
+              noWrap
+              sx={{ color: "text.primary" }}
+            >
+              {currentTrack ? currentTrack.title : "Track title"}
+            </Typography>
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: "text.secondary" }}
+            >
+              {currentTrack
+                ? `${currentTrack.artist || "Unknown Artist"}${currentTrack.album ? ` • ${currentTrack.album}` : ""}`
+                : "Track artist"}
+            </Typography>
+          </Box>
+        )}
 
       {/* Center: Playback Controls with Seekbar */}
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.5, mx: 2 }}>
