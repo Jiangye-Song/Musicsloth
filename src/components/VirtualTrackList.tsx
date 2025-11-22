@@ -187,15 +187,18 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
     }
   }, [tracks, handleScroll]);
 
-  // Load current queue index for inactive queues
+  // Load current queue index for all queues (active and inactive)
   useEffect(() => {
     console.log(`[VirtualTrackList] Queue index useEffect - contextType: ${contextType}, queueId: ${queueId}, isActiveQueue: ${isActiveQueue}`);
-    if (contextType === "queue" && queueId !== undefined && !isActiveQueue) {
+    if (contextType === "queue" && queueId !== undefined) {
       queueApi.getQueueCurrentIndex(queueId)
-        .then(index => setQueueCurrentIndex(index))
+        .then(index => {
+          console.log(`[VirtualTrackList] Loaded queue index: ${index} for queue ${queueId}`);
+          setQueueCurrentIndex(index);
+        })
         .catch(err => console.error("Failed to get queue current index:", err));
     }
-  }, [contextType, queueId, isActiveQueue]);
+  }, [contextType, queueId]);
 
   // Update currently playing track
   useEffect(() => {
