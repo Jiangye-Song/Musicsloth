@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { libraryApi, Genre, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
-import SearchBar from "../components/SearchBar";
 import IconButton from "@mui/material/IconButton";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
@@ -15,8 +14,6 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
   const [loading, setLoading] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
-  const [trackSearchQuery, setTrackSearchQuery] = useState("");
-  const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
 
   useEffect(() => {
     const loadGenres = async () => {
@@ -36,11 +33,9 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
 
   const handleGenreClick = async (genre: Genre) => {
     setSelectedGenre(genre);
-    setTrackSearchQuery("");
     try {
       const tracks = await libraryApi.getTracksByGenre(genre.id);
       setGenreTracks(tracks);
-      setFilteredTracks(tracks);
     } catch (error) {
       console.error("Failed to load genre tracks:", error);
     }
@@ -61,22 +56,6 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
       );
     }
   }, [searchQuery, genres]);
-
-  useEffect(() => {
-    if (trackSearchQuery.trim() === "") {
-      setFilteredTracks(genreTracks);
-    } else {
-      const query = trackSearchQuery.toLowerCase();
-      setFilteredTracks(
-        genreTracks.filter(
-          (track) =>
-            track.title.toLowerCase().includes(query) ||
-            track.artist?.toLowerCase().includes(query) ||
-            track.album?.toLowerCase().includes(query)
-        )
-      );
-    }
-  }, [trackSearchQuery, genreTracks]);
 
   if (selectedGenre) {
     return (
@@ -99,13 +78,8 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
           </h2>
         </div>
         <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-          <VirtualTrackList tracks={filteredTracks} contextType="genre" contextName={selectedGenre?.name} />
+          <VirtualTrackList tracks={genreTracks} contextType="genre" contextName={selectedGenre?.name} showSearch={true} />
         </div>
-        <SearchBar
-          placeholder="Search in this list..."
-          value={trackSearchQuery}
-          onChange={setTrackSearchQuery}
-        />
       </div>
     );
   }

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
-import SearchBar from "../components/SearchBar";
 import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
@@ -17,8 +16,6 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [queueTracks, setQueueTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
-  const [trackSearchQuery, setTrackSearchQuery] = useState("");
-  const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
@@ -52,22 +49,6 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
       );
     }
   }, [searchQuery, queues]);
-
-  useEffect(() => {
-    if (trackSearchQuery.trim() === "") {
-      setFilteredTracks(queueTracks);
-    } else {
-      const query = trackSearchQuery.toLowerCase();
-      setFilteredTracks(
-        queueTracks.filter(
-          (track) =>
-            track.title.toLowerCase().includes(query) ||
-            track.artist?.toLowerCase().includes(query) ||
-            track.album?.toLowerCase().includes(query)
-        )
-      );
-    }
-  }, [trackSearchQuery, queueTracks]);
 
   const loadQueues = async (forceReloadTracks = false) => {
     try {
@@ -105,11 +86,9 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
 
   const loadQueueTracks = async (queueId: number, silent = false) => {
     if (!silent) setLoading(true);
-    setTrackSearchQuery("");
     try {
       const tracks = await queueApi.getQueueTracks(queueId);
       setQueueTracks(tracks);
-      setFilteredTracks(tracks);
     } catch (error) {
       console.error("Failed to load queue tracks:", error);
     } finally {
@@ -208,7 +187,6 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
         style={{
           width: "300px",
           borderRight: "1px solid #333",
-          padding: "20px",
           overflowY: "auto",
         }}
       >
@@ -326,26 +304,24 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
                 {selectedQueue.is_active && isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
               </IconButton>
             </Box>
-            <SearchBar
-              placeholder="Search in this list..."
-              value={trackSearchQuery}
-              onChange={setTrackSearchQuery}
-            />
             {loading ? (
               <Box sx={{ textAlign: "center", py: 5 }}>
                 <CircularProgress />
               </Box>
             ) : queueTracks.length > 0 ? (
-              <div style={{ flex: 1, overflow: "hidden" }}>
-                <VirtualTrackList
-                  tracks={filteredTracks}
-                  contextType="queue"
-                  queueId={selectedQueue.id}
-                  isActiveQueue={selectedQueue.is_active}
-                  showPlayingIndicator={true}
-                  onQueueActivated={() => loadQueues(true)}
-                />
-              </div>
+              <>
+                <div style={{ flex: 1, overflow: "hidden" }}>
+                  <VirtualTrackList
+                    tracks={queueTracks}
+                    contextType="queue"
+                    queueId={selectedQueue.id}
+                    isActiveQueue={selectedQueue.is_active}
+                    showPlayingIndicator={true}
+                    onQueueActivated={() => loadQueues(true)}
+                    showSearch={true}
+                  />
+                </div>
+              </>
             ) : (
               <Typography sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
                 No tracks in this queue.

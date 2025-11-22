@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { libraryApi, playlistApi, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
-import SearchBar from "../components/SearchBar";
+
 import { IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { ReactNode } from "react";
@@ -110,17 +110,13 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
   const [selectedPlaylist, setSelectedPlaylist] = useState<SystemPlaylist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
-  const [trackSearchQuery, setTrackSearchQuery] = useState("");
-  const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
 
   const handlePlaylistClick = async (playlist: SystemPlaylist) => {
     setSelectedPlaylist(playlist);
     setLoading(true);
-    setTrackSearchQuery("");
     try {
       const loadedTracks = await playlist.loadTracks();
       setTracks(loadedTracks);
-      setFilteredTracks(loadedTracks);
     } catch (error) {
       console.error("Failed to load playlist tracks:", error);
     } finally {
@@ -133,21 +129,6 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
     setTracks([]);
   };
 
-  useEffect(() => {
-    if (trackSearchQuery.trim() === "") {
-      setFilteredTracks(tracks);
-    } else {
-      const query = trackSearchQuery.toLowerCase();
-      setFilteredTracks(
-        tracks.filter(
-          (track) =>
-            track.title.toLowerCase().includes(query) ||
-            track.artist?.toLowerCase().includes(query) ||
-            track.album?.toLowerCase().includes(query)
-        )
-      );
-    }
-  }, [trackSearchQuery, tracks]);
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
@@ -188,20 +169,14 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
             Loading tracks...
           </div>
         ) : tracks.length > 0 ? (
-          <>
-            <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-              <VirtualTrackList
-                tracks={filteredTracks}
-                contextType="library"
-                contextName={selectedPlaylist.name}
-              />
-            </div>
-            <SearchBar
-              placeholder="Search in this list..."
-              value={trackSearchQuery}
-              onChange={setTrackSearchQuery}
+          <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
+            <VirtualTrackList
+              tracks={tracks}
+              contextType="library"
+              contextName={selectedPlaylist.name}
+              showSearch={true}
             />
-          </>
+          </div>
         ) : (
           <div
             style={{
@@ -238,19 +213,6 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
       <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
         {/* System Playlists */}
         <div style={{ marginBottom: "30px" }}>
-          <h3
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#888",
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              marginBottom: "12px",
-              paddingLeft: "20px",
-            }}
-          >
-            System
-          </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
             {filteredPlaylists.map((playlist) => (
               <PlaylistItem

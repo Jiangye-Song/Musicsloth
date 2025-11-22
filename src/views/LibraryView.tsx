@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { libraryApi, Track } from "../services/api";
 import LibraryScanner from "../components/LibraryScanner";
 import VirtualTrackList from "../components/VirtualTrackList";
-import { Padding } from "@mui/icons-material";
 
 interface LibraryViewProps {
     searchQuery?: string;

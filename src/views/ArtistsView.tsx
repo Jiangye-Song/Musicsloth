@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { libraryApi, Artist, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
-import SearchBar from "../components/SearchBar";
 import { IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
@@ -15,8 +14,6 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
     const [loading, setLoading] = useState(true);
     const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
     const [artistTracks, setArtistTracks] = useState<Track[]>([]);
-    const [trackSearchQuery, setTrackSearchQuery] = useState("");
-    const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
 
     useEffect(() => {
         const loadArtists = async () => {
@@ -36,11 +33,9 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
 
     const handleArtistClick = async (artist: Artist) => {
         setSelectedArtist(artist);
-        setTrackSearchQuery("");
         try {
             const tracks = await libraryApi.getTracksByArtist(artist.id);
             setArtistTracks(tracks);
-            setFilteredTracks(tracks);
         } catch (error) {
             console.error("Failed to load artist tracks:", error);
         }
@@ -62,22 +57,6 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
         }
     }, [searchQuery, artists]);
 
-    useEffect(() => {
-        if (trackSearchQuery.trim() === "") {
-            setFilteredTracks(artistTracks);
-        } else {
-            const query = trackSearchQuery.toLowerCase();
-            setFilteredTracks(
-                artistTracks.filter(
-                    (track) =>
-                        track.title.toLowerCase().includes(query) ||
-                        track.artist?.toLowerCase().includes(query) ||
-                        track.album?.toLowerCase().includes(query)
-                )
-            );
-        }
-    }, [trackSearchQuery, artistTracks]);
-
     if (selectedArtist) {
         return (
             <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -98,14 +77,9 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
                         {selectedArtist.name} ({artistTracks.length} tracks)
                     </h2>
                 </div>
-                <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-                    <VirtualTrackList tracks={filteredTracks} contextType="artist" contextName={selectedArtist?.name} />
+                <div style={{ flex: 1, overflow: "hidden", height: "80%" }}>
+                    <VirtualTrackList tracks={artistTracks} contextType="artist" contextName={selectedArtist?.name} showSearch={true} />
                 </div>
-                <SearchBar
-                    placeholder="Search in this list..."
-                    value={trackSearchQuery}
-                    onChange={setTrackSearchQuery}
-                />
             </div>
         );
     }

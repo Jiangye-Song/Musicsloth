@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { libraryApi, Album, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
-import SearchBar from "../components/SearchBar";
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import IconButton from "@mui/material/IconButton";
 
@@ -199,8 +198,6 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
     const [loading, setLoading] = useState(true);
     const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
     const [albumTracks, setAlbumTracks] = useState<Track[]>([]);
-    const [trackSearchQuery, setTrackSearchQuery] = useState("");
-    const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
 
     useEffect(() => {
         const loadAlbums = async () => {
@@ -220,11 +217,9 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
 
     const handleAlbumClick = async (album: Album) => {
         setSelectedAlbum(album);
-        setTrackSearchQuery("");
         try {
             const tracks = await libraryApi.getTracksByAlbum(album.name);
             setAlbumTracks(tracks);
-            setFilteredTracks(tracks);
         } catch (error) {
             console.error("Failed to load album tracks:", error);
         }
@@ -250,22 +245,6 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
         }
     }, [searchQuery, albums]);
 
-    useEffect(() => {
-        if (trackSearchQuery.trim() === "") {
-            setFilteredTracks(albumTracks);
-        } else {
-            const query = trackSearchQuery.toLowerCase();
-            setFilteredTracks(
-                albumTracks.filter(
-                    (track) =>
-                        track.title.toLowerCase().includes(query) ||
-                        track.artist?.toLowerCase().includes(query) ||
-                        track.album?.toLowerCase().includes(query)
-                )
-            );
-        }
-    }, [trackSearchQuery, albumTracks]);
-
     if (selectedAlbum) {
         return (
             <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -287,13 +266,8 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
                     </h2>
                 </div>
                 <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-                    <VirtualTrackList tracks={filteredTracks} contextType="album" contextName={selectedAlbum?.name} />
+                    <VirtualTrackList tracks={albumTracks} contextType="album" contextName={selectedAlbum?.name} showSearch={true} />
                 </div>
-                <SearchBar
-                    placeholder="Search in this list..."
-                    value={trackSearchQuery}
-                    onChange={setTrackSearchQuery}
-                />
             </div>
         );
     }

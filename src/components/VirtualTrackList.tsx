@@ -3,6 +3,7 @@ import { libraryApi, Track, playerApi, queueApi } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
 import { Box, Avatar, Typography } from "@mui/material";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import SearchBar from "./SearchBar";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -16,15 +17,18 @@ interface VirtualTrackListProps {
   isActiveQueue?: boolean; // Whether this queue is the active one
   showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
   onQueueActivated?: () => void; // Callback when queue is activated
+  showSearch?: boolean; // Whether to show the search bar
 }
 
-export default function VirtualTrackList({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated }: VirtualTrackListProps) {
+export default function VirtualTrackList({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false }: VirtualTrackListProps) {
   const { updateQueuePosition } = usePlayer();
   const [albumArtCache, setAlbumArtCache] = useState<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(20);
   const [currentPlayingFile, setCurrentPlayingFile] = useState<string | null>(null);
   const [queueCurrentIndex, setQueueCurrentIndex] = useState<number>(-1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredTracks, setFilteredTracks] = useState<Track[]>(tracks);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -47,19 +51,36 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
       
       const start = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN);
       const end = Math.min(
-        tracks.length,
+        filteredTracks.length,
         Math.ceil((scrollTop + viewportHeight) / ITEM_HEIGHT) + OVERSCAN
       );
       
       setVisibleStart(start);
       setVisibleEnd(end);
     }, 50); // Debounce scroll events
-  }, [tracks.length]);
+  }, [filteredTracks.length]);
+
+  // Filter tracks based on search query
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredTracks(tracks);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredTracks(
+        tracks.filter(
+          (track) =>
+            track.title.toLowerCase().includes(query) ||
+            track.artist?.toLowerCase().includes(query) ||
+            track.album?.toLowerCase().includes(query)
+        )
+      );
+    }
+  }, [searchQuery, tracks]);
 
   // Initialize visible range
   useEffect(() => {
     handleScroll();
-  }, [tracks, handleScroll]);
+  }, [filteredTracks, handleScroll]);
 
   // Load current queue index for inactive queues
   useEffect(() => {
@@ -130,7 +151,7 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
   useEffect(() => {
     // Clear queue and add visible tracks
     loadQueueRef.current = [];
-    const visibleTracks = tracks.slice(visibleStart, visibleEnd);
+    const visibleTracks = filteredTracks.slice(visibleStart, visibleEnd);
     visibleTracks.forEach(track => {
       if (!albumArtCache.has(track.file_path) && !loadingArtRef.current.has(track.file_path)) {
         loadQueueRef.current.push(track.file_path);
@@ -138,15 +159,15 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
     });
     
     processLoadQueue();
-  }, [visibleStart, visibleEnd, tracks, albumArtCache, processLoadQueue]);
+  }, [visibleStart, visibleEnd, filteredTracks, albumArtCache, processLoadQueue]);
 
   // Cleanup blob URLs on unmount and when they're far from viewport
   useEffect(() => {
     // Cleanup album art that's far from viewport
     const visibleFilePaths = new Set(
-      tracks.slice(
+      filteredTracks.slice(
         Math.max(0, visibleStart - OVERSCAN * 2),
-        Math.min(tracks.length, visibleEnd + OVERSCAN * 2)
+        Math.min(filteredTracks.length, visibleEnd + OVERSCAN * 2)
       ).map(t => t.file_path)
     );
     
@@ -165,7 +186,7 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
       
       return changed ? newCache : prev;
     });
-  }, [visibleStart, visibleEnd, tracks]);
+  }, [visibleStart, visibleEnd, filteredTracks]);
 
   // Cleanup all blob URLs on unmount
   useEffect(() => {
@@ -199,7 +220,7 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
           ? `Album: ${contextName}`
           : `Genre: ${contextName}`;
         
-        // Get all track IDs
+        // Get all track IDs (use original tracks, not filtered)
         console.log(`[Frontend] Getting track IDs from ${tracks.length} tracks...`);
         const trackIds = tracks.map(t => t.id);
         console.log(`[Frontend] Got ${trackIds.length} track IDs`);
@@ -231,7 +252,7 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const visibleTracks = tracks.slice(visibleStart, visibleEnd);
+  const visibleTracks = filteredTracks.slice(visibleStart, visibleEnd);
 
   if (tracks.length === 0) {
     return (
@@ -242,20 +263,39 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
   }
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      style={{
-        backgroundColor: "#2a2a2a",
-        borderRadius: "8px",
-        overflow: "auto",
-        maxHeight: "calc(100vh - 250px)",
-        minHeight: "calc(100vh - 250px)",
-        position: "relative",
-      }}
-    >
-      {/* Spacer for virtual scrolling */}
-      <div style={{ height: `${tracks.length * ITEM_HEIGHT}px`, minHeight: "100%", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Search Bar */}
+      {showSearch && (
+        <SearchBar
+          placeholder="Search in this list..."
+          value={searchQuery}
+          onChange={setSearchQuery}
+          variant="secondary"
+        />
+      )}
+      
+      {/* Track List */}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        style={{
+          backgroundColor: "#2a2a2a",
+          borderRadius: showSearch ? "0 0 8px 8px" : "8px",
+          overflow: "auto",
+          flex: 1,
+          position: "relative",
+        }}
+      >
+        {filteredTracks.length === 0 ? (
+          <Box sx={{ p: 2.5, textAlign: "center" }}>
+            <Typography sx={{ color: "text.secondary", m: 0 }}>
+              No tracks found matching "{searchQuery}"
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            {/* Spacer for virtual scrolling */}
+            <div style={{ height: `${filteredTracks.length * ITEM_HEIGHT}px`, minHeight: "100%", position: "relative" }}>
         {/* Only render visible items */}
         <div
           style={{
@@ -366,6 +406,9 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
             );
           })}
         </div>
+      </div>
+          </>
+        )}
       </div>
     </div>
   );
