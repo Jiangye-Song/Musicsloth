@@ -1,7 +1,34 @@
 import { useState, useEffect } from "react";
-import { playerApi, PlayerState } from "../services/api";
+import {
+  Box,
+  IconButton,
+  Slider,
+  Typography,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import {
+  PlayArrow,
+  Pause,
+  SkipPrevious,
+  SkipNext,
+  FastRewind,
+  FastForward,
+  Repeat,
+  Shuffle,
+  VolumeUp,
+  Menu,
+  MusicNote,
+} from "@mui/icons-material";
+import { playerApi, PlayerState, libraryApi, Track } from "../services/api";
 
-export default function PlayerControls() {
+interface PlayerControlsProps {
+  onExpandClick?: () => void;
+}
+
+export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [albumArt, setAlbumArt] = useState<string | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,
@@ -9,7 +36,6 @@ export default function PlayerControls() {
     position_ms: 0,
     duration_ms: null,
   });
-  const [volume, setVolume] = useState(0.7);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
 
@@ -20,6 +46,33 @@ export default function PlayerControls() {
         const state = await playerApi.getState();
         if (!isSeeking) {
           setPlayerState(state);
+        }
+        // Fetch current track info
+        if (state.current_file) {
+          try {
+            const track = await libraryApi.getCurrentTrack();
+            setCurrentTrack(track);
+            // Fetch album art
+            if (track && track.file_path) {
+              try {
+                const artBytes = await libraryApi.getAlbumArt(track.file_path);
+                if (artBytes && artBytes.length > 0) {
+                  const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
+                  const url = URL.createObjectURL(blob);
+                  setAlbumArt(url);
+                } else {
+                  setAlbumArt(null);
+                }
+              } catch {
+                setAlbumArt(null);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to fetch track:", err);
+          }
+        } else {
+          setCurrentTrack(null);
+          // Keep album art persistent - don't clear it
         }
       } catch (error) {
         console.error("Failed to get player state:", error);
@@ -41,42 +94,8 @@ export default function PlayerControls() {
     }
   };
 
-  const handleStop = async () => {
-    try {
-      await playerApi.stop();
-    } catch (error) {
-      console.error("Failed to stop playback:", error);
-    }
-  };
-
-  const handleVolumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    try {
-      await playerApi.setVolume(newVolume);
-    } catch (error) {
-      console.error("Failed to set volume:", error);
-    }
-  };
-
   const handleSeekMouseDown = () => {
     setIsSeeking(true);
-  };
-
-  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const position = parseInt(e.target.value);
-    setSeekPosition(position);
-  };
-
-  const handleSeekMouseUp = async (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
-    const position = parseInt((e.target as HTMLInputElement).value);
-    try {
-      await playerApi.seekTo(position);
-    } catch (error) {
-      console.error("Failed to seek:", error);
-    } finally {
-      setIsSeeking(false);
-    }
   };
 
   const formatTime = (ms: number) => {
@@ -88,112 +107,194 @@ export default function PlayerControls() {
 
   const currentPosition = isSeeking ? seekPosition : playerState.position_ms;
   const duration = playerState.duration_ms || 0;
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {/* Seekbar */}
       {playerState.current_file && (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
-          <span style={{ fontSize: "12px", color: "#888", minWidth: "45px", textAlign: "right" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
+          <Typography variant="caption" sx={{ minWidth: "45px", textAlign: "right", color: "text.secondary" }}>
             {formatTime(currentPosition)}
-          </span>
-          <input
-            type="range"
-            min="0"
+          </Typography>
+          <Slider
+            min={0}
             max={duration}
             value={currentPosition}
             onMouseDown={handleSeekMouseDown}
-            onChange={handleSeekChange}
-            onMouseUp={handleSeekMouseUp}
-            onTouchEnd={handleSeekMouseUp}
-            disabled={!playerState.current_file}
-            style={{
-              flex: 1,
-              height: "4px",
-              borderRadius: "2px",
-              outline: "none",
-              cursor: playerState.current_file ? "pointer" : "not-allowed",
-              margin: 0,
-              padding: 0,
+            onChange={(_, value) => setSeekPosition(value as number)}
+            onChangeCommitted={async (_, value) => {
+              try {
+                await playerApi.seekTo(value as number);
+              } catch (error) {
+                console.error("Failed to seek:", error);
+              } finally {
+                setIsSeeking(false);
+              }
             }}
+            disabled={!playerState.current_file}
+            sx={{ flex: 1 }}
           />
-          <span style={{ fontSize: "12px", color: "#888", minWidth: "45px" }}>
+          <Typography variant="caption" sx={{ minWidth: "45px", color: "text.secondary" }}>
             {formatTime(duration)}
-          </span>
-        </div>
+          </Typography>
+        </Box>
       )}
 
       {/* Player Controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-      {/* Track Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {playerState.current_file ? (
-          <div style={{ fontSize: "14px", color: "#ccc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            <strong>Now Playing:</strong> {playerState.current_file.split(/[\\/]/).pop()}
-          </div>
-        ) : (
-          <div style={{ fontSize: "14px", color: "#666" }}>No track loaded</div>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        {/* Track Info with Album Art */}
+        <Box
+          onClick={onExpandClick}
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            cursor: onExpandClick ? "pointer" : "default",
+            borderRadius: 1,
+            p: 1,
+            transition: "background-color 0.2s",
+            "&:hover": onExpandClick ? {
+              bgcolor: "action.hover",
+            } : {},
+          }}
+        >
+          {/* Album Art */}
+          <Box
+            sx={{
+              width: 60,
+              height: 60,
+              bgcolor: "background.default",
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              flexShrink: 0,
+            }}
+          >
+            {albumArt ? (
+              <img src={albumArt} alt="Album" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <MusicNote sx={{ fontSize: 32, opacity: 0.3 }} />
+            )}
+          </Box>
+
+          {/* Track Info */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              fontWeight="bold"
+              noWrap
+              sx={{ color: "text.primary" }}
+            >
+              {currentTrack ? currentTrack.title : "Track title"}
+            </Typography>
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{ color: "text.secondary" }}
+            >
+              {currentTrack
+                ? `${currentTrack.artist || "Unknown Artist"}${
+                    currentTrack.album && !isMobile ? ` • ${currentTrack.album}` : ""
+                  }`
+                : "Track artist"}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Playback Control Buttons */}
+        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+          <IconButton
+            onClick={() => {/* TODO: implement previous track */}}
+            disabled={!playerState.current_file}
+            size="small"
+            title="Previous Track"
+          >
+            <SkipPrevious />
+          </IconButton>
+
+          <IconButton
+            onClick={() => {/* TODO: implement rewind */}}
+            disabled={!playerState.current_file}
+            size="small"
+            title="Rewind"
+          >
+            <FastRewind />
+          </IconButton>
+
+          <IconButton
+            onClick={handlePlayPause}
+            disabled={!playerState.current_file}
+            size="large"
+            title={playerState.is_playing ? "Pause" : "Play"}
+            sx={{ color: "primary.main" }}
+          >
+            {playerState.is_playing ? <Pause /> : <PlayArrow />}
+          </IconButton>
+
+          <IconButton
+            onClick={() => {/* TODO: implement fast forward */}}
+            disabled={!playerState.current_file}
+            size="small"
+            title="Fast Forward"
+          >
+            <FastForward />
+          </IconButton>
+
+          <IconButton
+            onClick={() => {/* TODO: implement next track */}}
+            disabled={!playerState.current_file}
+            size="small"
+            title="Next Track"
+          >
+            <SkipNext />
+          </IconButton>
+        </Box>
+
+        {/* Right Side Controls */}
+        {!isMobile && (
+          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+            <IconButton
+              onClick={() => {/* TODO: implement repeat */}}
+              size="small"
+              title="Repeat"
+            >
+              <Repeat />
+            </IconButton>
+
+            <IconButton
+              onClick={() => {/* TODO: implement shuffle */}}
+              size="small"
+              title="Shuffle"
+            >
+              <Shuffle />
+            </IconButton>
+
+            <IconButton
+              onClick={() => {/* TODO: implement menu */}}
+              size="small"
+              title="Menu"
+            >
+              <Menu />
+            </IconButton>
+
+            <IconButton
+              onClick={() => {/* TODO: implement volume control */}}
+              size="small"
+              title="Volume"
+            >
+              <VolumeUp />
+            </IconButton>
+          </Box>
         )}
-      </div>
-
-      {/* Playback Controls */}
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        <button
-          onClick={handleStop}
-          disabled={!playerState.current_file}
-          style={{
-            padding: "8px 12px",
-            backgroundColor: "#444",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: playerState.current_file ? "pointer" : "not-allowed",
-            opacity: playerState.current_file ? 1 : 0.4,
-            fontSize: "16px",
-          }}
-          title="Stop"
-        >
-          ⏹
-        </button>
-
-        <button
-          onClick={handlePlayPause}
-          disabled={!playerState.current_file}
-          style={{
-            padding: "10px 16px",
-            backgroundColor: playerState.is_playing ? "#ff9800" : "#4CAF50",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: playerState.current_file ? "pointer" : "not-allowed",
-            opacity: playerState.current_file ? 1 : 0.4,
-            fontSize: "16px",
-            fontWeight: "bold",
-          }}
-          title={playerState.is_playing ? "Pause" : "Play"}
-        >
-          {playerState.is_playing ? "⏸" : "▶"}
-        </button>
-      </div>
-
-      {/* Volume Control */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: "150px" }}>
-        <span style={{ fontSize: "16px" }}>🔊</span>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={volume}
-          onChange={handleVolumeChange}
-          style={{ flex: 1, margin: 0, padding: 0 }}
-          title={`Volume: ${Math.round(volume * 100)}%`}
-        />
-        <span style={{ fontSize: "12px", color: "#888", minWidth: "35px" }}>
-          {Math.round(volume * 100)}%
-        </span>
-      </div>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

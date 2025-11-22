@@ -1,4 +1,15 @@
 import { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Paper,
+  Typography,
+  LinearProgress,
+  Alert,
+  AlertTitle,
+  Stack,
+} from "@mui/material";
+import { FolderOpen, DeleteForever } from "@mui/icons-material";
 import { listen } from "@tauri-apps/api/event";
 import { libraryApi, IndexingResult } from "../services/api";
 
@@ -65,142 +76,125 @@ export default function LibraryScanner() {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2 style={{ marginBottom: "20px" }}>Library Scanner</h2>
+    <Box>
+      <Typography variant="h5" component="h2" sx={{ mb: 3 }}>
+        Library Scanner
+      </Typography>
       
-      <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
-        <button
+      <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+        <Button
+          variant="contained"
+          color="success"
+          startIcon={<FolderOpen />}
           onClick={handleScan}
           disabled={scanning}
-          style={{
-            padding: "12px 24px",
-            backgroundColor: scanning ? "#666" : "#4CAF50",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: scanning ? "not-allowed" : "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-          }}
         >
-          {scanning ? "Scanning..." : "📂 Scan Music Folder"}
-        </button>
+          {scanning ? "Scanning..." : "Scan Music Folder"}
+        </Button>
 
-        <button
+        <Button
+          variant="contained"
+          color="error"
+          startIcon={<DeleteForever />}
           onClick={handleClearLibrary}
           disabled={clearing || scanning}
-          style={{
-            padding: "12px 24px",
-            backgroundColor: clearing || scanning ? "#666" : "#f44336",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: clearing || scanning ? "not-allowed" : "pointer",
-            fontSize: "16px",
-            fontWeight: "bold",
-          }}
         >
-          {clearing ? "Clearing..." : "🗑️ Clear Library"}
-        </button>
-      </div>
+          {clearing ? "Clearing..." : "Clear Library"}
+        </Button>
+      </Stack>
 
       {scanning && (
-        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", border: "1px solid #4CAF50" }}>
-          <div style={{ marginBottom: "15px" }}>
-            <p style={{ margin: "0 0 10px 0", fontSize: "14px", fontWeight: "bold" }}>
+        <Paper
+          elevation={2}
+          sx={{
+            p: 3,
+            border: 2,
+            borderColor: "success.main",
+          }}
+        >
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body1" fontWeight="bold" gutterBottom>
               ⏳ Scanning directory and indexing files...
-            </p>
+            </Typography>
             {progress && (
-              <p style={{ margin: "0 0 10px 0", fontSize: "13px", color: "#888" }}>
+              <Typography variant="body2" color="text.secondary">
                 Processing: {progress.current_file}
-              </p>
+              </Typography>
             )}
-          </div>
+          </Box>
           
           {progress && (
-            <>
-              <div style={{
-                width: "100%",
-                height: "24px",
-                backgroundColor: "#1a1a1a",
-                borderRadius: "12px",
-                overflow: "hidden",
-                marginBottom: "10px",
-                border: "1px solid #333",
-              }}>
-                <div style={{
-                  height: "100%",
-                  backgroundColor: "#4CAF50",
-                  width: `${(progress.current / progress.total) * 100}%`,
-                  transition: "width 0.3s ease",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "12px",
-                  fontWeight: "bold",
-                  color: "#fff",
-                }}>
-                  {Math.round((progress.current / progress.total) * 100)}%
-                </div>
-              </div>
-              <p style={{ margin: 0, fontSize: "13px", color: "#888", textAlign: "center" }}>
-                {progress.current} / {progress.total} files
-              </p>
-            </>
+            <Box>
+              <LinearProgress
+                variant="determinate"
+                value={(progress.current / progress.total) * 100}
+                sx={{ height: 8, borderRadius: 1, mb: 1 }}
+              />
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                {progress.current} / {progress.total} files ({Math.round((progress.current / progress.total) * 100)}%)
+              </Typography>
+            </Box>
           )}
-        </div>
+        </Paper>
       )}
 
       {result && (
-        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", border: "1px solid #333" }}>
-          <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
+        <Paper elevation={2} sx={{ p: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2, pb: 1, borderBottom: 1, borderColor: "divider" }}>
             Scan Results
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "150px 1fr", gap: "10px", fontSize: "14px" }}>
-            <span style={{ color: "#888" }}>Total Files:</span>
-            <span style={{ fontWeight: "bold" }}>{result.total_files}</span>
+          </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "150px 1fr",
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            <Typography color="text.secondary">Total Files:</Typography>
+            <Typography fontWeight="bold">{result.total_files}</Typography>
             
-            <span style={{ color: "#888" }}>Successfully Indexed:</span>
-            <span style={{ color: "#4CAF50", fontWeight: "bold" }}>{result.successful}</span>
+            <Typography color="text.secondary">Successfully Indexed:</Typography>
+            <Typography color="success.main" fontWeight="bold">{result.successful}</Typography>
             
-            <span style={{ color: "#888" }}>Failed:</span>
-            <span style={{ color: result.failed > 0 ? "#f44336" : "white", fontWeight: "bold" }}>
+            <Typography color="text.secondary">Failed:</Typography>
+            <Typography
+              color={result.failed > 0 ? "error.main" : "text.primary"}
+              fontWeight="bold"
+            >
               {result.failed}
-            </span>
-          </div>
+            </Typography>
+          </Box>
 
           {result.errors.length > 0 && (
-            <div style={{ marginTop: "15px" }}>
-              <h4 style={{ margin: "0 0 10px 0", fontSize: "16px", color: "#f44336" }}>
-                Errors ({result.errors.length})
-              </h4>
-              <div
-                style={{
+            <Alert severity="error" sx={{ mt: 2 }}>
+              <AlertTitle>Errors ({result.errors.length})</AlertTitle>
+              <Box
+                sx={{
                   maxHeight: "200px",
                   overflowY: "auto",
-                  backgroundColor: "#1a1a1a",
-                  padding: "10px",
-                  borderRadius: "5px",
-                  fontSize: "12px",
+                  mt: 1,
+                  p: 1,
+                  bgcolor: "background.default",
+                  borderRadius: 1,
                   fontFamily: "monospace",
+                  fontSize: "0.75rem",
                 }}
               >
                 {result.errors.map((error, index) => (
-                  <div key={index} style={{ marginBottom: "5px", color: "#ff8a80" }}>
+                  <Box key={index} sx={{ mb: 0.5 }}>
                     {error}
-                  </div>
+                  </Box>
                 ))}
-              </div>
-            </div>
+              </Box>
+            </Alert>
           )}
 
-          <div style={{ marginTop: "20px", fontSize: "14px", color: "#888" }}>
-            <p style={{ margin: 0 }}>
-              ✅ Scan complete! Go to the Queues, Artists, Albums, or Genres tabs to view your library.
-            </p>
-          </div>
-        </div>
+          <Alert severity="success" sx={{ mt: 2 }}>
+            Scan complete! Go to the Queues, Artists, Albums, or Genres tabs to view your library.
+          </Alert>
+        </Paper>
       )}
-    </div>
+    </Box>
   );
 }

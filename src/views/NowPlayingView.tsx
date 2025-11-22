@@ -1,9 +1,24 @@
 import { useState, useEffect } from "react";
+import {
+  Box,
+  IconButton,
+  Typography,
+  Tabs,
+  Tab,
+  Paper,
+} from "@mui/material";
+import { Close, MusicNote } from "@mui/icons-material";
 import { playerApi, libraryApi, Track } from "../services/api";
 
-export default function NowPlayingView() {
+interface NowPlayingViewProps {
+  isNarrow: boolean;
+  onClose: () => void;
+}
+
+export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProps) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [albumArt, setAlbumArt] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
 
   useEffect(() => {
     // Update player state and track metadata periodically
@@ -60,145 +75,193 @@ export default function NowPlayingView() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "40px" }}>
-      {/* Album Art */}
-      <div
-        style={{
-          width: "300px",
-          height: "300px",
-          backgroundColor: "#2a2a2a",
-          borderRadius: "8px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "30px",
-          border: "1px solid #333",
-          overflow: "hidden",
-        }}
-      >
-        {albumArt ? (
-          <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <svg
-            width="80"
-            height="80"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ opacity: 0.3 }}
-          >
-            <path
-              d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-              fill="currentColor"
-            />
-          </svg>
-        )}
-      </div>
-
-      {/* Track Information */}
-      {currentTrack ? (
-        <div style={{ textAlign: "center", maxWidth: "600px", marginBottom: "30px" }}>
-          <h2 style={{ margin: "0 0 10px 0", fontSize: "24px", fontWeight: "bold" }}>
-            {currentTrack.title}
-          </h2>
-          <p style={{ margin: "5px 0", fontSize: "16px", color: "#aaa" }}>
-            {currentTrack.artist || "Unknown Artist"}
-          </p>
-          <p style={{ margin: "5px 0", fontSize: "14px", color: "#888" }}>
-            {currentTrack.album || "Unknown Album"}
-          </p>
-        </div>
+  const renderAlbumArt = () => (
+    <Box
+      sx={{
+        width: isNarrow ? "100%" : 400,
+        height: isNarrow ? 350 : 400,
+        maxWidth: isNarrow ? 400 : 400,
+        margin: isNarrow ? "0 auto" : 0,
+        bgcolor: "background.default",
+        borderRadius: 2,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        border: 1,
+        borderColor: "divider",
+        overflow: "hidden",
+      }}
+    >
+      {albumArt ? (
+        <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       ) : (
-        <div style={{ textAlign: "center", marginBottom: "30px" }}>
-          <h2 style={{ margin: "0 0 10px 0", fontSize: "24px", color: "#666" }}>
-            No track playing
-          </h2>
-          <p style={{ margin: "5px 0", fontSize: "14px", color: "#666" }}>
-            Use "Open File" to start playback
-          </p>
-        </div>
+        <MusicNote sx={{ fontSize: 80, opacity: 0.3 }} />
       )}
+    </Box>
+  );
 
-      {/* Tag Information Section */}
-      {currentTrack && (
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "600px",
-            backgroundColor: "#2a2a2a",
-            borderRadius: "8px",
-            padding: "20px",
-            marginBottom: "20px",
-            border: "1px solid #333",
+  const renderTrackInfo = () => (
+    currentTrack ? (
+      <Box sx={{ textAlign: isNarrow ? "center" : "left", p: 3 }}>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+          {currentTrack.title}
+        </Typography>
+        <Typography variant="h6" color="text.secondary" gutterBottom>
+          {currentTrack.artist || "Unknown Artist"}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" gutterBottom>
+          {currentTrack.album || "Unknown Album"}
+        </Typography>
+        <Typography variant="body2" color="text.disabled">
+          {formatDuration(currentTrack.duration_ms)}
+        </Typography>
+      </Box>
+    ) : (
+      <Box sx={{ textAlign: "center", p: 5 }}>
+        <Typography variant="h5" color="text.disabled">
+          No track playing
+        </Typography>
+      </Box>
+    )
+  );
+
+  const renderLyrics = () => (
+    <Box
+      sx={{
+        p: 3,
+        textAlign: "center",
+        color: "text.secondary",
+      }}
+    >
+      <Typography variant="body2">
+        Lyrics will appear here when available
+      </Typography>
+    </Box>
+  );
+
+  const renderDetails = () => (
+    currentTrack && (
+      <Box sx={{ p: 3 }}>
+        <Typography
+          variant="h6"
+          sx={{ mb: 2, pb: 1, borderBottom: 1, borderColor: "divider" }}
+        >
+          Track Information
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "120px 1fr",
+            gap: 1,
           }}
         >
-          <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-            Track Information
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "10px", fontSize: "14px" }}>
-            <span style={{ color: "#888" }}>Title:</span>
-            <span>{currentTrack.title}</span>
-            
-            <span style={{ color: "#888" }}>Artist:</span>
-            <span>{currentTrack.artist || "—"}</span>
-            
-            <span style={{ color: "#888" }}>Album Artist:</span>
-            <span>{currentTrack.album_artist || "—"}</span>
-            
-            <span style={{ color: "#888" }}>Album:</span>
-            <span>{currentTrack.album || "—"}</span>
-            
-            <span style={{ color: "#888" }}>Year:</span>
-            <span>{currentTrack.year || "—"}</span>
-            
-            <span style={{ color: "#888" }}>Genre:</span>
-            <span>{currentTrack.genre || "—"}</span>
-            
-            <span style={{ color: "#888" }}>Track:</span>
-            <span>{currentTrack.track_number ? `${currentTrack.track_number}${currentTrack.disc_number ? ` (Disc ${currentTrack.disc_number})` : ""}` : "—"}</span>
-            
-            <span style={{ color: "#888" }}>Duration:</span>
-            <span>{formatDuration(currentTrack.duration_ms)}</span>
-            
-            <span style={{ color: "#888" }}>Format:</span>
-            <span>{currentTrack.file_format?.toUpperCase() || "—"}</span>
-            
-            <span style={{ color: "#888" }}>Bitrate:</span>
-            <span>{currentTrack.bitrate ? `${Math.round(currentTrack.bitrate / 1000)} kbps` : "—"}</span>
-            
-            <span style={{ color: "#888" }}>Sample Rate:</span>
-            <span>{currentTrack.sample_rate ? `${currentTrack.sample_rate} Hz` : "—"}</span>
-          </div>
-        </div>
-      )}
+          <Typography color="text.secondary">Title:</Typography>
+          <Typography>{currentTrack.title}</Typography>
+          
+          <Typography color="text.secondary">Artist:</Typography>
+          <Typography>{currentTrack.artist || "—"}</Typography>
+          
+          <Typography color="text.secondary">Album Artist:</Typography>
+          <Typography>{currentTrack.album_artist || "—"}</Typography>
+          
+          <Typography color="text.secondary">Album:</Typography>
+          <Typography>{currentTrack.album || "—"}</Typography>
+          
+          <Typography color="text.secondary">Year:</Typography>
+          <Typography>{currentTrack.year || "—"}</Typography>
+          
+          <Typography color="text.secondary">Genre:</Typography>
+          <Typography>{currentTrack.genre || "—"}</Typography>
+          
+          <Typography color="text.secondary">Track:</Typography>
+          <Typography>{currentTrack.track_number ? `${currentTrack.track_number}${currentTrack.disc_number ? ` (Disc ${currentTrack.disc_number})` : ""}` : "—"}</Typography>
+          
+          <Typography color="text.secondary">Duration:</Typography>
+          <Typography>{formatDuration(currentTrack.duration_ms)}</Typography>
+          
+          <Typography color="text.secondary">Format:</Typography>
+          <Typography>{currentTrack.file_format?.toUpperCase() || "—"}</Typography>
+          
+          <Typography color="text.secondary">Bitrate:</Typography>
+          <Typography>{currentTrack.bitrate ? `${Math.round(currentTrack.bitrate / 1000)} kbps` : "—"}</Typography>
+          
+          <Typography color="text.secondary">Sample Rate:</Typography>
+          <Typography>{currentTrack.sample_rate ? `${currentTrack.sample_rate} Hz` : "—"}</Typography>
+        </Box>
+      </Box>
+    )
+  );
 
-      {/* Lyrics Section */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "600px",
-          backgroundColor: "#2a2a2a",
-          borderRadius: "8px",
-          padding: "20px",
-          border: "1px solid #333",
-        }}
-      >
-        <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-          Lyrics
-        </h3>
-        <div
-          style={{
-            fontSize: "14px",
-            color: "#888",
-            lineHeight: "1.8",
-            textAlign: "center",
-            padding: "20px",
-          }}
-        >
-          Lyrics will appear here when available
-        </div>
-      </div>
-    </div>
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
+      {/* Close Button */}
+      <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
+        <IconButton onClick={onClose} size="large">
+          <Close />
+        </IconButton>
+      </Box>
+
+      {/* Content */}
+      {isNarrow ? (
+        /* Narrow Layout: 3 tabs */
+        <Box sx={{ flex: 1, overflowY: "auto" }}>
+          {/* Tab Navigation */}
+          <Tabs
+            value={activeTab}
+            onChange={(_, newValue) => setActiveTab(newValue)}
+            centered
+            sx={{ px: 2, pb: 2 }}
+          >
+            <Tab label="Album Art" value="albumart" />
+            <Tab label="Lyrics" value="lyrics" />
+            <Tab label="Details" value="details" />
+          </Tabs>
+
+          {/* Tab Content */}
+          <Box sx={{ px: 2, pb: 2 }}>
+            {activeTab === "albumart" && (
+              <>
+                {renderAlbumArt()}
+                {renderTrackInfo()}
+              </>
+            )}
+            {activeTab === "lyrics" && renderLyrics()}
+            {activeTab === "details" && renderDetails()}
+          </Box>
+        </Box>
+      ) : (
+        /* Wide Layout: 2 columns */
+        <Box sx={{ display: "flex", flex: 1, p: 3, gap: 4, overflowY: "auto" }}>
+          {/* Left: Album Art */}
+          <Box sx={{ flex: "0 0 400px" }}>
+            {renderAlbumArt()}
+            {renderTrackInfo()}
+          </Box>
+
+          {/* Right: Tabs */}
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            <Tabs
+              value={activeTab === "albumart" ? "lyrics" : activeTab}
+              onChange={(_, newValue) => setActiveTab(newValue)}
+              sx={{ mb: 2 }}
+            >
+              <Tab label="Lyrics" value="lyrics" />
+              <Tab label="Details" value="details" />
+            </Tabs>
+
+            <Paper
+              elevation={2}
+              sx={{
+                flex: 1,
+                overflowY: "auto",
+              }}
+            >
+              {activeTab === "lyrics" && renderLyrics()}
+              {activeTab === "details" && renderDetails()}
+            </Paper>
+          </Box>
+        </Box>
+      )}
+    </Box>
   );
 }

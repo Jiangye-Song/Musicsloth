@@ -1,4 +1,29 @@
 import { useState } from "react";
+import {
+  Box,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Paper,
+  useMediaQuery,
+  useTheme,
+  Button,
+  Dialog,
+  Slide,
+} from "@mui/material";
+import {
+  LibraryMusic,
+  QueueMusic,
+  PlaylistPlay,
+  Person,
+  Album,
+  MusicNote,
+  FolderOpen,
+} from "@mui/icons-material";
+import { TransitionProps } from "@mui/material/transitions";
 import "./App.css";
 import PlayerControls from "./components/PlayerControls";
 import SearchBar from "./components/SearchBar";
@@ -10,15 +35,29 @@ import ArtistsView from "./views/ArtistsView";
 import AlbumsView from "./views/AlbumsView";
 import GenresView from "./views/GenresView";
 import { playerApi } from "./services/api";
+import React from "react";
 
 type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres";
 
+const Transition = React.forwardRef(function Transition(
+  props: TransitionProps & {
+    children: React.ReactElement;
+  },
+  ref: React.Ref<unknown>,
+) {
+  return <Slide direction="up" ref={ref} {...props} />;
+});
+
+const drawerWidth = 240;
+
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("nowplaying");
+  const [activeTab, setActiveTab] = useState<Tab>("library");
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
+  const [showNowPlaying, setShowNowPlaying] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const handleFileSelect = async () => {
-    // Prompt user to enter file path (temporary solution)
     const filePath = prompt("Enter the full path to an audio file:");
     if (filePath) {
       try {
@@ -31,8 +70,6 @@ function App() {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case "nowplaying":
-        return <NowPlayingView />;
       case "library":
         return <LibraryView searchQuery={globalSearchQuery} />;
       case "queues":
@@ -46,7 +83,7 @@ function App() {
       case "genres":
         return <GenresView searchQuery={globalSearchQuery} />;
       default:
-        return <NowPlayingView />;
+        return <LibraryView searchQuery={globalSearchQuery} />;
     }
   };
 
@@ -59,9 +96,18 @@ function App() {
     activeTab === "genres" ? "Search a genre..." :
     activeTab === "playlists" ? "Search a playlist..." : "";
 
+  const tabs: { key: Tab; label: string; icon: React.ReactElement }[] = [
+    { key: "library", label: "Library", icon: <LibraryMusic /> },
+    { key: "queues", label: "Queues", icon: <QueueMusic /> },
+    { key: "playlists", label: "Playlists", icon: <PlaylistPlay /> },
+    { key: "artists", label: "Artists", icon: <Person /> },
+    { key: "albums", label: "Albums", icon: <Album /> },
+    { key: "genres", label: "Genres", icon: <MusicNote /> },
+  ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#1a1a1a", color: "white" }}>
-      {/* Global Search Bar */}
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
+      {/* Search Bar */}
       {showGlobalSearch && (
         <SearchBar
           placeholder={searchPlaceholder}
@@ -70,62 +116,135 @@ function App() {
         />
       )}
 
-      {/* Main Content Area */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Tab Navigation */}
-        <nav style={{ width: "200px", backgroundColor: "#252525", padding: "20px 0", borderRight: "1px solid #333" }}>
-          <button
-            onClick={handleFileSelect}
-            style={{
-              width: "calc(100% - 20px)",
-              margin: "0 10px 20px 10px",
-              padding: "10px",
-              backgroundColor: "#4CAF50",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: "bold"
-            }}
-          >
-            📂 Open File
-          </button>
-
-          {(["nowplaying", "library", "queues", "playlists", "artists", "albums", "genres"] as Tab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "12px 20px",
-                backgroundColor: activeTab === tab ? "#333" : "transparent",
-                color: activeTab === tab ? "white" : "#aaa",
-                border: "none",
-                borderLeft: activeTab === tab ? "3px solid #4CAF50" : "3px solid transparent",
-                textAlign: "left",
-                cursor: "pointer",
-                fontSize: "14px",
-                transition: "all 0.2s"
-              }}
+      {/* Main Layout */}
+      <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* Sidebar Navigation */}
+        <Drawer
+          variant="permanent"
+          sx={{
+            width: isMobile ? 0 : drawerWidth,
+            flexShrink: 0,
+            display: isMobile ? "none" : "block",
+            "& .MuiDrawer-paper": {
+              width: drawerWidth,
+              boxSizing: "border-box",
+              bgcolor: "background.paper",
+              borderRight: 1,
+              borderColor: "divider",
+              position: "relative",
+            },
+          }}
+        >
+          <Box sx={{ p: 2 }}>
+            <Button
+              variant="contained"
+              color="success"
+              fullWidth
+              startIcon={<FolderOpen />}
+              onClick={handleFileSelect}
             >
-              {tab === "nowplaying" ? "Now Playing" : tab === "library" ? "Library" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
-        </nav>
+              Open File
+            </Button>
+          </Box>
+          <List>
+            {tabs.map((tab) => (
+              <ListItem key={tab.key} disablePadding>
+                <ListItemButton
+                  selected={activeTab === tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  sx={{
+                    borderLeft: activeTab === tab.key ? 3 : 0,
+                    borderColor: "success.main",
+                  }}
+                >
+                  <ListItemIcon sx={{ color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                    {tab.icon}
+                  </ListItemIcon>
+                  <ListItemText primary={tab.label} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Drawer>
+
+        {/* Mobile Bottom Navigation */}
+        {isMobile && (
+          <Paper
+            sx={{
+              position: "fixed",
+              bottom: 80,
+              left: 0,
+              right: 0,
+              zIndex: 1000,
+              borderTop: 1,
+              borderColor: "divider",
+            }}
+            elevation={3}
+          >
+            <List sx={{ display: "flex", flexDirection: "row", p: 0 }}>
+              {tabs.map((tab) => (
+                <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
+                  <ListItemButton
+                    selected={activeTab === tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    sx={{
+                      flexDirection: "column",
+                      py: 1,
+                      borderBottom: activeTab === tab.key ? 3 : 0,
+                      borderColor: "success.main",
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 0, color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                      {tab.icon}
+                    </ListItemIcon>
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
+        )}
 
         {/* Content Area */}
-        <main style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            p: 3,
+            overflowY: "auto",
+            mb: isMobile ? "140px" : 0,
+          }}
+        >
           {renderTabContent()}
-        </main>
-      </div>
+        </Box>
+      </Box>
 
-      {/* Player Controls (Footer) */}
-      <footer style={{ backgroundColor: "#2a2a2a", borderTop: "1px solid #333", padding: "15px 20px" }}>
-        <PlayerControls />
-      </footer>
-    </div>
+      {/* Player Controls Footer */}
+      <Paper
+        elevation={3}
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          p: 2,
+          borderTop: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
+        <PlayerControls onExpandClick={() => setShowNowPlaying(true)} />
+      </Paper>
+
+      {/* Now Playing Dialog */}
+      <Dialog
+        fullScreen
+        open={showNowPlaying}
+        onClose={() => setShowNowPlaying(false)}
+        TransitionComponent={Transition}
+      >
+        <NowPlayingView isNarrow={isMobile} onClose={() => setShowNowPlaying(false)} />
+      </Dialog>
+    </Box>
   );
 }
 
