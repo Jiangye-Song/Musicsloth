@@ -83,25 +83,25 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
     {
       id: "all-songs",
       name: "All Songs",
-      icon: <LibraryMusic sx={{ fontSize: 32 }} />,
+      icon: <LibraryMusic />,
       loadTracks: () => libraryApi.getAllTracks(),
     },
     {
       id: "recent-added",
       name: "Recently Added",
-      icon: <InputIcon sx={{ fontSize: 32 }} />,
+      icon: <InputIcon />,
       loadTracks: () => playlistApi.getRecentTracks(),
     },
     {
       id: "most-played",
       name: "Most Played",
-      icon: <ReplayIcon sx={{ fontSize: 32 }} />,
+      icon: <ReplayIcon />,
       loadTracks: () => playlistApi.getMostPlayedTracks(),
     },
     {
       id: "not-played",
       name: "Never Played",
-      icon: <PlayDisabled sx={{ fontSize: 32 }} />,
+      icon: <PlayDisabled />,
       loadTracks: () => playlistApi.getUnplayedTracks(),
     },
   ]);
