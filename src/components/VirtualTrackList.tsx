@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { libraryApi, Track, playerApi, queueApi } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
+import { Box, Avatar, Typography } from "@mui/material";
+import MusicNoteIcon from "@mui/icons-material/MusicNote";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -233,9 +235,9 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
 
   if (tracks.length === 0) {
     return (
-      <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
-        <p style={{ color: "#888", margin: 0 }}>No tracks found.</p>
-      </div>
+      <Box sx={{ p: 2.5, bgcolor: "background.paper", borderRadius: 1, textAlign: "center" }}>
+        <Typography sx={{ color: "text.secondary", m: 0 }}>No tracks found.</Typography>
+      </Box>
     );
   }
 
@@ -272,74 +274,47 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
             const shouldHighlight = isPlaying || isQueueCurrentTrack;
             
             return (
-              <div
+              <Box
                 key={track.id}
                 onClick={() => handlePlayTrack(track, actualIndex)}
-                style={{
-                  height: `${ITEM_HEIGHT}px`,
+                sx={{
+                  height: ITEM_HEIGHT,
                   display: "flex",
                   alignItems: "center",
-                  padding: "10px 15px",
-                  borderBottom: "1px solid #333",
+                  px: 2,
+                  py: 1.25,
+                  borderBottom: 1,
+                  borderColor: "divider",
                   cursor: "pointer",
                   transition: "background-color 0.2s",
-                  backgroundColor: shouldHighlight ? "#333" : "transparent",
-                  borderLeft: shouldHighlight ? "3px solid #4CAF50" : "3px solid transparent",
+                  bgcolor: shouldHighlight ? "action.selected" : "transparent",
+                  borderLeft: 3,
+                  borderLeftColor: shouldHighlight ? "primary.main" : "transparent",
                   opacity: isInactiveQueue ? 0.6 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!shouldHighlight) e.currentTarget.style.backgroundColor = "#333";
-                }}
-                onMouseLeave={(e) => {
-                  if (!shouldHighlight) e.currentTarget.style.backgroundColor = "transparent";
+                  "&:hover": {
+                    bgcolor: shouldHighlight ? "action.selected" : "action.hover",
+                  },
                 }}
               >
                 {/* Album Art */}
-                <div
-                  style={{
-                    width: "60px",
-                    height: "60px",
-                    backgroundColor: "#1a1a1a",
-                    borderRadius: "4px",
-                    marginRight: "15px",
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
+                <Avatar
+                  src={albumArt || undefined}
+                  alt={track.album || "Album"}
+                  variant="rounded"
+                  sx={{
+                    width: 60,
+                    height: 60,
+                    mr: 2,
+                    bgcolor: "background.default",
                   }}
                 >
-                  {albumArt ? (
-                    <img
-                      src={albumArt}
-                      alt={track.album || "Album"}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
-                  ) : (
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{ opacity: 0.3 }}
-                    >
-                      <path
-                        d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  )}
-                </div>
+                  <MusicNoteIcon sx={{ opacity: 0.3 }} />
+                </Avatar>
 
                 {/* Track Info */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <div
-                    style={{
+                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25 }}>
+                  <Typography
+                    sx={{
                       fontSize: "15px",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
@@ -349,11 +324,11 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                     }}
                   >
                     {track.title}
-                  </div>
-                  <div
-                    style={{
+                  </Typography>
+                  <Typography
+                    sx={{
                       fontSize: "13px",
-                      color: isInactiveQueue ? "#777" : "#aaa",
+                      color: "text.secondary",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -361,11 +336,11 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                     }}
                   >
                     {track.artist || "Unknown Artist"}
-                  </div>
-                  <div
-                    style={{
+                  </Typography>
+                  <Typography
+                    sx={{
                       fontSize: "13px",
-                      color: isInactiveQueue ? "#666" : "#888",
+                      color: "text.disabled",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -373,21 +348,21 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                     }}
                   >
                     {track.album || "Unknown Album"}
-                  </div>
-                </div>
+                  </Typography>
+                </Box>
 
                 {/* Duration */}
-                <div
-                  style={{
+                <Typography
+                  sx={{
                     fontSize: "14px",
-                    color: "#888",
-                    marginLeft: "15px",
+                    color: "text.disabled",
+                    ml: 2,
                     flexShrink: 0,
                   }}
                 >
                   {formatDuration(track.duration_ms)}
-                </div>
-              </div>
+                </Typography>
+              </Box>
             );
           })}
         </div>

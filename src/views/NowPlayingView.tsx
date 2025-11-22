@@ -201,30 +201,28 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
 
       {/* Playback Controls */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-        <IconButton size="small" disabled={!currentTrack}>
+        <IconButton size="small" disabled={!currentTrack} sx={{ color: "text.secondary" }}>
           <Shuffle />
         </IconButton>
-        <IconButton onClick={handlePrevious} disabled={!currentTrack}>
+        <IconButton onClick={handlePrevious} disabled={!currentTrack} sx={{ color: "text.primary" }}>
           <SkipPrevious fontSize="large" />
         </IconButton>
         <IconButton
           onClick={handlePlayPause}
           disabled={!currentTrack}
           sx={{
-            bgcolor: "primary.main",
-            color: "white",
+            color: "primary.main",
             width: 56,
             height: 56,
-            "&:hover": { bgcolor: "primary.dark" },
-            "&.Mui-disabled": { bgcolor: "action.disabledBackground" },
+            "&:hover": { bgcolor: "action.hover" },
           }}
         >
           {isPlaying ? <Pause fontSize="large" /> : <PlayArrow fontSize="large" />}
         </IconButton>
-        <IconButton onClick={handleNext} disabled={!currentTrack}>
+        <IconButton onClick={handleNext} disabled={!currentTrack} sx={{ color: "text.primary" }}>
           <SkipNext fontSize="large" />
         </IconButton>
-        <IconButton size="small" disabled={!currentTrack}>
+        <IconButton size="small" disabled={!currentTrack} sx={{ color: "text.secondary" }}>
           <Repeat />
         </IconButton>
       </Box>
@@ -232,7 +230,7 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
       {/* Bottom Controls - Volume & Queue */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "space-between" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, maxWidth: 200 }}>
-          <VolumeUp fontSize="small" />
+          <VolumeUp fontSize="small" sx={{ color: "text.secondary" }} />
           <Slider
             min={0}
             max={100}
@@ -242,7 +240,7 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
             sx={{ flex: 1 }}
           />
         </Box>
-        <IconButton size="small">
+        <IconButton size="small" sx={{ color: "text.secondary" }}>
           <QueueMusic />
         </IconButton>
       </Box>
@@ -320,7 +318,7 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default", overflow: "hidden" }}>
       {/* Close Button */}
       <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
-        <IconButton onClick={onClose} size="large">
+        <IconButton onClick={onClose} size="large" sx={{ color: "text.secondary" }}>
           <Close />
         </IconButton>
       </Box>

@@ -207,6 +207,7 @@ function App() {
           sx={{
             flexGrow: 1,
             p: 3,
+            pb: 12,
             overflowY: "auto",
           }}
         >

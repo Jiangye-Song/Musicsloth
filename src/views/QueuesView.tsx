@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
+import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress } from "@mui/material";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
+import CloseIcon from "@mui/icons-material/Close";
 
 interface QueuesViewProps {
   searchQuery?: string;
@@ -211,100 +215,80 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
         <h2 style={{ marginTop: 0, marginBottom: "20px" }}>Queues</h2>
         
         {queues.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "14px", textAlign: "center", padding: "20px" }}>
+          <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
             No queues yet.
             <br />
             Click any track to create a queue.
-          </div>
+          </Box>
         ) : filteredQueues.length === 0 ? (
-          <div style={{ color: "#888", fontSize: "14px", textAlign: "center", padding: "20px" }}>
+          <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
             No queues found matching "{searchQuery}"
-          </div>
+          </Box>
         ) : (
-          <div>
+          <List disablePadding>
             {filteredQueues.map((queue) => (
-              <div
+              <ListItem
                 key={queue.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px",
-                  marginBottom: "8px",
-                  backgroundColor:
-                    selectedQueue?.id === queue.id ? "#444" : "#2a2a2a",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                }}
-                onClick={() => handleSelectQueue(queue)}
+                disablePadding
+                sx={{ mb: 1 }}
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteQueue(queue.id);
+                    }}
+                    sx={{ color: "text.secondary" }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                }
               >
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div
-                    style={{
-                      width: "24px",
-                      height: "24px",
+                <ListItemButton
+                  onClick={() => handleSelectQueue(queue)}
+                  selected={selectedQueue?.id === queue.id}
+                  sx={{
+                    borderRadius: "6px",
+                    gap: 1.5,
+                    "&.Mui-selected": {
+                      bgcolor: "action.selected",
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 24,
+                      height: 24,
                       borderRadius: "50%",
-                      border: `2px solid ${queue.is_active ? "#1db954" : "#666"}`,
-                      backgroundColor: queue.is_active ? "#1db954" : "transparent",
+                      border: 2,
+                      borderColor: queue.is_active ? "primary.main" : "grey.700",
+                      bgcolor: queue.is_active ? "primary.main" : "transparent",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
                     {queue.is_active && (
-                      <div
-                        style={{
-                          width: "8px",
-                          height: "8px",
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
                           borderRadius: "50%",
-                          backgroundColor: "white",
+                          bgcolor: "white",
                         }}
                       />
                     )}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: "500", marginBottom: "2px" }}>
-                      {queue.name}
-                    </div>
-                    {queue.is_active && (
-                      <div style={{ fontSize: "11px", color: "#1db954" }}>
-                        ▶ Playing
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteQueue(queue.id);
-                  }}
-                  style={{
-                    width: "32px",
-                    height: "32px",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    borderRadius: "4px",
-                    color: "#888",
-                    cursor: "pointer",
-                    fontSize: "20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#444";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                    e.currentTarget.style.color = "#888";
-                  }}
-                >
-                  ×
-                </button>
-              </div>
+                  </Box>
+                  <ListItemText
+                    primary={queue.name}
+                    secondary={queue.is_active ? "▶ Playing" : null}
+                    primaryTypographyProps={{ fontWeight: 500 }}
+                    secondaryTypographyProps={{ color: "primary.main", fontSize: "11px" }}
+                  />
+                </ListItemButton>
+              </ListItem>
             ))}
-          </div>
+          </List>
         )}
       </div>
 
@@ -312,40 +296,34 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
       <div style={{ flex: 1, padding: "20px", display: "flex", flexDirection: "column" }}>
         {selectedQueue ? (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <h2 style={{ margin: 0 }}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
+              <Typography variant="h5" component="h2">
                 {selectedQueue.name}
-              </h2>
-              <button
+              </Typography>
+              <IconButton
                 onClick={handlePlayQueue}
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  backgroundColor: "#1db954",
-                  border: "none",
-                  borderRadius: "50%",
+                sx={{
+                  bgcolor: "primary.main",
                   color: "white",
-                  cursor: "pointer",
-                  fontSize: "20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: 48,
+                  height: 48,
+                  "&:hover": {
+                    bgcolor: "primary.light",
+                  },
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1ed760")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1db954")}
               >
-                {selectedQueue.is_active && isPlaying ? "⏸" : "▶"}
-              </button>
-            </div>
+                {selectedQueue.is_active && isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+              </IconButton>
+            </Box>
             <SearchBar
               placeholder="Search in this list..."
               value={trackSearchQuery}
               onChange={setTrackSearchQuery}
             />
             {loading ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
-                Loading tracks...
-              </div>
+              <Box sx={{ textAlign: "center", py: 5 }}>
+                <CircularProgress />
+              </Box>
             ) : queueTracks.length > 0 ? (
               <div style={{ flex: 1, overflow: "hidden" }}>
                 <VirtualTrackList
@@ -358,15 +336,15 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
                 />
               </div>
             ) : (
-              <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
+              <Typography sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
                 No tracks in this queue.
-              </div>
+              </Typography>
             )}
           </>
         ) : (
-          <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
+          <Typography sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
             Select a queue to view tracks
-          </div>
+          </Typography>
         )}
       </div>
     </div>

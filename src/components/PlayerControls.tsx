@@ -154,6 +154,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             disabled={!playerState.current_file}
             size="small"
             title="Previous Track"
+            sx={{ color: "text.primary" }}
           >
             <SkipPrevious />
           </IconButton>
@@ -163,6 +164,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             disabled={!playerState.current_file}
             size="small"
             title="Rewind"
+            sx={{ color: "text.secondary" }}
           >
             <FastRewind />
           </IconButton>
@@ -172,7 +174,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             disabled={!playerState.current_file}
             size="medium"
             title={playerState.is_playing ? "Pause" : "Play"}
-            sx={{ bgcolor: "action.hover" }}
+            sx={{ color: "primary.main", "&:hover": { bgcolor: "action.hover" } }}
           >
             {playerState.is_playing ? <Pause /> : <PlayArrow />}
           </IconButton>
@@ -182,6 +184,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             disabled={!playerState.current_file}
             size="small"
             title="Fast Forward"
+            sx={{ color: "text.secondary" }}
           >
             <FastForward />
           </IconButton>
@@ -191,6 +194,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             disabled={!playerState.current_file}
             size="small"
             title="Next Track"
+            sx={{ color: "text.primary" }}
           >
             <SkipNext />
           </IconButton>
@@ -233,6 +237,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             onClick={() => {/* TODO: implement repeat */}}
             size="small"
             title="Repeat"
+            sx={{ color: "text.secondary" }}
           >
             <Repeat />
           </IconButton>
@@ -241,6 +246,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             onClick={() => {/* TODO: implement shuffle */}}
             size="small"
             title="Shuffle"
+            sx={{ color: "text.secondary" }}
           >
             <Shuffle />
           </IconButton>
@@ -249,6 +255,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             onClick={() => {/* TODO: implement menu */}}
             size="small"
             title="Menu"
+            sx={{ color: "text.secondary" }}
           >
             <Menu />
           </IconButton>
@@ -257,6 +264,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             onClick={() => {/* TODO: implement volume control */}}
             size="small"
             title="Volume"
+            sx={{ color: "text.secondary" }}
           >
             <VolumeUp />
           </IconButton>

@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { libraryApi, playlistApi, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
+import { Box, IconButton } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 type SystemPlaylist = {
   id: string;
@@ -171,20 +173,9 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
             gap: "15px",
           }}
         >
-          <button
+          <IconButton
             onClick={handleBack}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#333",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "14px",
-            }}
-          >
-            ← Back
-          </button>
+          ><ArrowBackIcon /></IconButton>
           <h2 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "24px" }}>{selectedPlaylist.icon}</span>
             {selectedPlaylist.name} ({tracks.length} tracks)

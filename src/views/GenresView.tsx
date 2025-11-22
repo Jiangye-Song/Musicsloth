@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { libraryApi, Genre, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
+import IconButton from "@mui/material/IconButton";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 interface GenresViewProps {
   searchQuery?: string;
@@ -89,20 +91,9 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
             gap: "15px",
           }}
         >
-          <button
+          <IconButton
             onClick={handleBack}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#333",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "14px",
-            }}
-          >
-            ← Back
-          </button>
+          ><ArrowBackIcon /></IconButton>
           <h2 style={{ margin: 0, fontSize: "18px" }}>
             {selectedGenre.name} ({genreTracks.length} tracks)
           </h2>
@@ -120,7 +111,18 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
   }
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "15px 20px",
+          backgroundColor: "#1a1a1a",
+          borderBottom: "1px solid #333",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: "18px" }}>Genres</h2>
+      </div>
       {/* Genres List */}
       <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
         {loading ? (
