@@ -61,6 +61,11 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
         await playerApi.pause();
       } else if (playerState.is_paused) {
         await playerApi.resume();
+      } else if (currentTrack && !playerState.current_file) {
+        // No file playing but we have a track loaded from active queue
+        // Play the loaded track
+        console.log(`[PlayerControls] Playing loaded track from active queue: ${currentTrack.file_path}`);
+        await playerApi.playFile(currentTrack.file_path);
       }
     } catch (error) {
       console.error("Failed to toggle playback:", error);
@@ -171,7 +176,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
 
           <IconButton
             onClick={handlePlayPause}
-            disabled={!playerState.current_file}
+            disabled={!playerState.current_file && !currentTrack}
             size="medium"
             title={playerState.is_playing ? "Pause" : "Play"}
             sx={{ color: "primary.main", "&:hover": { bgcolor: "action.hover" } }}

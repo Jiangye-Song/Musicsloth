@@ -27,6 +27,65 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     await queueApi.updateQueueCurrentIndex(queueId, trackIndex);
   };
 
+  // Load active queue's current track on startup
+  useEffect(() => {
+    const loadActiveQueueTrack = async () => {
+      try {
+        console.log('[PlayerContext] Loading active queue track on startup');
+        const queues = await queueApi.getAllQueues();
+        const activeQueue = queues.find(q => q.is_active);
+        
+        if (activeQueue) {
+          console.log(`[PlayerContext] Found active queue: ${activeQueue.name} (ID: ${activeQueue.id})`);
+          setCurrentQueueId(activeQueue.id);
+          
+          // Get the saved position in this queue
+          const currentIndex = await queueApi.getQueueCurrentIndex(activeQueue.id);
+          console.log(`[PlayerContext] Active queue current index: ${currentIndex}`);
+          setCurrentTrackIndex(currentIndex);
+          
+          // Get the track at that position
+          const track = await queueApi.getQueueTrackAtPosition(activeQueue.id, currentIndex);
+          
+          if (track) {
+            console.log(`[PlayerContext] Loaded track metadata: ${track.title}`);
+            setCurrentTrack(track);
+            
+            // Load album art
+            try {
+              const artBytes = await libraryApi.getAlbumArt(track.file_path);
+              if (artBytes && artBytes.length > 0) {
+                const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
+                const url = URL.createObjectURL(blob);
+                setAlbumArt(url);
+                
+                // Update media session
+                if ("mediaSession" in navigator) {
+                  navigator.mediaSession.metadata = new MediaMetadata({
+                    title: track.title,
+                    artist: track.artist || "Unknown Artist",
+                    album: track.album || "Unknown Album",
+                    artwork: [
+                      { src: url, sizes: "512x512", type: "image/jpeg" },
+                    ],
+                  });
+                }
+              }
+            } catch (error) {
+              console.error("Failed to load album art:", error);
+            }
+          }
+        } else {
+          console.log('[PlayerContext] No active queue found');
+        }
+      } catch (error) {
+        console.error("Failed to load active queue track:", error);
+      }
+    };
+    
+    loadActiveQueueTrack();
+  }, []); // Run only once on mount
+
   useEffect(() => {
     console.log('[PlayerContext] Setting up polling interval');
     // Poll for current track and album art

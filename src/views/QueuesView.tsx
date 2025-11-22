@@ -139,7 +139,7 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   };
 
   const handleDeleteQueue = async (queueId: number) => {
-    if (!confirm("Are you sure you want to delete this queue?")) return;
+    // if (!confirm("Are you sure you want to delete this queue?")) return;
     
     try {
       // Check if this is the active queue
