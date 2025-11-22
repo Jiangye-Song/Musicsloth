@@ -77,10 +77,7 @@ export default function LibraryScanner() {
 
   return (
     <Box>
-      <Typography variant="h5" component="h2" sx={{ mb: 3 }}>
-        Library Scanner
-      </Typography>
-      
+      {/* Header */}
       <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
         <Button
           variant="contained"

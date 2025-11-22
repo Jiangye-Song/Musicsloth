@@ -212,7 +212,18 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
           overflowY: "auto",
         }}
       >
-        <h2 style={{ marginTop: 0, marginBottom: "20px" }}>Queues</h2>
+        {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "15px 20px",
+          backgroundColor: "#1a1a1a",
+          borderBottom: "1px solid #333",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
+      </div>
         
         {queues.length === 0 ? (
           <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>

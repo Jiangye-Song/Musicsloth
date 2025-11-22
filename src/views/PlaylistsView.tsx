@@ -4,11 +4,13 @@ import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
 import { IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { ReactNode } from "react";
+import { LibraryMusic, Input as InputIcon, Replay as ReplayIcon, PlayDisabled } from "@mui/icons-material";
 
 type SystemPlaylist = {
   id: string;
   name: string;
-  icon: string;
+  icon: ReactNode;
   loadTracks: () => Promise<Track[]>;
 };
 
@@ -81,25 +83,25 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
     {
       id: "all-songs",
       name: "All Songs",
-      icon: "🎵",
+      icon: <LibraryMusic sx={{ fontSize: 32 }} />,
       loadTracks: () => libraryApi.getAllTracks(),
     },
     {
       id: "recent-added",
       name: "Recently Added",
-      icon: "🆕",
+      icon: <InputIcon sx={{ fontSize: 32 }} />,
       loadTracks: () => playlistApi.getRecentTracks(),
     },
     {
       id: "most-played",
       name: "Most Played",
-      icon: "🔥",
+      icon: <ReplayIcon sx={{ fontSize: 32 }} />,
       loadTracks: () => playlistApi.getMostPlayedTracks(),
     },
     {
       id: "not-played",
       name: "Never Played",
-      icon: "💤",
+      icon: <PlayDisabled sx={{ fontSize: 32 }} />,
       loadTracks: () => playlistApi.getUnplayedTracks(),
     },
   ]);
