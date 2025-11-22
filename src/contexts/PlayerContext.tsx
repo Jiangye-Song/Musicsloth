@@ -1,11 +1,14 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { playerApi, libraryApi, Track } from "../services/api";
+import { playerApi, libraryApi, queueApi, Track } from "../services/api";
 
 interface PlayerContextType {
   currentTrack: Track | null;
   albumArt: string | null;
+  currentQueueId: number | null;
+  currentTrackIndex: number | null;
   setCurrentTrack: (track: Track | null) => void;
   setAlbumArt: (art: string | null) => void;
+  updateQueuePosition: (queueId: number, trackIndex: number) => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -13,6 +16,14 @@ const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [albumArt, setAlbumArt] = useState<string | null>(null);
+  const [currentQueueId, setCurrentQueueId] = useState<number | null>(null);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
+
+  const updateQueuePosition = async (queueId: number, trackIndex: number) => {
+    setCurrentQueueId(queueId);
+    setCurrentTrackIndex(trackIndex);
+    await queueApi.updateQueueCurrentIndex(queueId, trackIndex);
+  };
 
   useEffect(() => {
     // Poll for current track and album art
@@ -120,7 +131,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [currentTrack?.file_path]);
 
   return (
-    <PlayerContext.Provider value={{ currentTrack, albumArt, setCurrentTrack, setAlbumArt }}>
+    <PlayerContext.Provider value={{ 
+      currentTrack, 
+      albumArt, 
+      currentQueueId, 
+      currentTrackIndex, 
+      setCurrentTrack, 
+      setAlbumArt,
+      updateQueuePosition
+    }}>
       {children}
     </PlayerContext.Provider>
   );

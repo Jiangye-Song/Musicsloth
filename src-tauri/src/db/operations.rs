@@ -1,4 +1,4 @@
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use crate::db::models::{Track, Album, Artist};
 use crate::db::connection::DatabaseConnection;
 
@@ -576,15 +576,24 @@ impl DbOperations {
         track_ids: &[i64],
     ) -> Result<(), anyhow::Error> {
         let conn = db.get_connection();
-        let conn = conn.lock().unwrap();
+        let mut conn = conn.lock().unwrap();
         
-        for (index, track_id) in track_ids.iter().enumerate() {
-            conn.execute(
-                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
-                params![queue_id, track_id, index as i32],
-            )?;
+        // Use a transaction for batch inserts - much faster and safer
+        let tx = conn.transaction()?;
+        
+        // Insert in batches to avoid stack overflow with huge track lists
+        const BATCH_SIZE: usize = 500;
+        for chunk in track_ids.chunks(BATCH_SIZE) {
+            for (index_in_chunk, track_id) in chunk.iter().enumerate() {
+                let global_index = track_ids.iter().position(|&id| id == *track_id).unwrap_or(0);
+                tx.execute(
+                    "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
+                    params![queue_id, track_id, global_index as i32],
+                )?;
+            }
         }
         
+        tx.commit()?;
         Ok(())
     }
 
@@ -596,15 +605,19 @@ impl DbOperations {
         start_position: usize,
     ) -> Result<(), anyhow::Error> {
         let conn = db.get_connection();
-        let conn = conn.lock().unwrap();
+        let mut conn = conn.lock().unwrap();
+        
+        // Use a transaction for batch inserts
+        let tx = conn.transaction()?;
         
         for (index, track_id) in track_ids.iter().enumerate() {
-            conn.execute(
+            tx.execute(
                 "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
                 params![queue_id, track_id, (start_position + index) as i32],
             )?;
         }
         
+        tx.commit()?;
         Ok(())
     }
 
@@ -770,6 +783,111 @@ impl DbOperations {
         conn.execute("DELETE FROM queues WHERE id = ?1", params![queue_id])?;
         
         Ok(())
+    }
+
+    /// Update current track index in queue
+    pub fn update_queue_current_index(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_index: i32,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute(
+            "UPDATE queues SET current_track_index = ?1 WHERE id = ?2",
+            params![track_index, queue_id],
+        )?;
+        
+        Ok(())
+    }
+
+    /// Get current track index from queue
+    pub fn get_queue_current_index(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<i32, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let index: i32 = conn.query_row(
+            "SELECT current_track_index FROM queues WHERE id = ?1",
+            params![queue_id],
+            |row| row.get(0)
+        )?;
+        
+        Ok(index)
+    }
+
+    /// Get the next available queue (by ID order) excluding the given queue
+    pub fn get_next_queue(
+        db: &DatabaseConnection,
+        excluded_queue_id: i64,
+    ) -> Result<Option<crate::db::models::Queue>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, name, is_active, track_hash
+             FROM queues
+             WHERE id != ?1
+             ORDER BY id DESC
+             LIMIT 1"
+        )?;
+        
+        let queue = stmt.query_row([excluded_queue_id], |row| {
+            Ok(crate::db::models::Queue {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                is_active: row.get(2)?,
+                track_hash: row.get(3)?,
+            })
+        }).optional()?;
+        
+        Ok(queue)
+    }
+
+    /// Get track at specific position in queue
+    pub fn get_queue_track_at_position(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        position: i32,
+    ) -> Result<Option<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.duration_ms
+             FROM tracks t
+             INNER JOIN queue_tracks qt ON qt.track_id = t.id
+             WHERE qt.queue_id = ?1 AND qt.position = ?2"
+        )?;
+        
+        let track = stmt.query_row(params![queue_id, position], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                duration_ms: row.get(5)?,
+                album_artist: None,
+                year: None,
+                track_number: None,
+                disc_number: None,
+                genre: None,
+                file_size: None,
+                file_format: None,
+                bitrate: None,
+                sample_rate: None,
+                play_count: 0,
+                last_played: None,
+                date_added: 0,
+                date_modified: 0,
+            })
+        }).optional()?;
+        
+        Ok(track)
     }
 
     // ===== System Playlists =====

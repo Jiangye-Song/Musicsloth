@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { libraryApi, Track, playerApi, queueApi } from "../services/api";
+import { usePlayer } from "../contexts/PlayerContext";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -10,15 +11,18 @@ interface VirtualTrackListProps {
   contextType: "library" | "artist" | "album" | "genre" | "queue";
   contextName?: string; // Artist name, album name, or genre name
   queueId?: number; // Queue ID if contextType is "queue"
+  isActiveQueue?: boolean; // Whether this queue is the active one
   showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
   onQueueActivated?: () => void; // Callback when queue is activated
 }
 
-export default function VirtualTrackList({ tracks, contextType, contextName, queueId, showPlayingIndicator = false, onQueueActivated }: VirtualTrackListProps) {
+export default function VirtualTrackList({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated }: VirtualTrackListProps) {
+  const { updateQueuePosition } = usePlayer();
   const [albumArtCache, setAlbumArtCache] = useState<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(20);
   const [currentPlayingFile, setCurrentPlayingFile] = useState<string | null>(null);
+  const [queueCurrentIndex, setQueueCurrentIndex] = useState<number>(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -54,6 +58,15 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
   useEffect(() => {
     handleScroll();
   }, [tracks, handleScroll]);
+
+  // Load current queue index for inactive queues
+  useEffect(() => {
+    if (contextType === "queue" && queueId !== undefined && !isActiveQueue) {
+      queueApi.getQueueCurrentIndex(queueId)
+        .then(index => setQueueCurrentIndex(index))
+        .catch(err => console.error("Failed to get queue current index:", err));
+    }
+  }, [contextType, queueId, isActiveQueue]);
 
   // Update currently playing track
   useEffect(() => {
@@ -168,6 +181,8 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
         // Immediately update the current playing file for instant visual feedback
         setCurrentPlayingFile(track.file_path);
         await playerApi.playFile(track.file_path);
+        // Update queue position
+        await updateQueuePosition(queueId, index);
         // Notify parent to refresh queue status
         if (onQueueActivated) {
           onQueueActivated();
@@ -189,13 +204,16 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
         
         // Create or reuse queue (backend handles duplicate detection and returns immediately after first batch)
         console.log(`[Frontend] Creating queue "${queueName}"...`);
-        await queueApi.createQueueFromTracks(queueName, trackIds, index);
-        console.log(`[Frontend] Queue created successfully`);
+        const newQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, index);
+        console.log(`[Frontend] Queue created successfully with ID: ${newQueueId}`);
         
         // Play the clicked track immediately (don't wait for full queue to load)
         console.log(`[Frontend] Playing track: ${track.file_path}`);
         await playerApi.playFile(track.file_path);
         console.log(`[Frontend] Track playback started`);
+        
+        // Update queue position for new queue
+        await updateQueuePosition(newQueueId, index);
       }
     } catch (error) {
       console.error("Failed to play track:", error);
@@ -249,6 +267,9 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
             const albumArt = albumArtCache.get(track.file_path);
             const actualIndex = visibleStart + visibleIndex;
             const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
+            const isInactiveQueue = contextType === "queue" && !isActiveQueue;
+            const isQueueCurrentTrack = isInactiveQueue && actualIndex === queueCurrentIndex;
+            const shouldHighlight = isPlaying || isQueueCurrentTrack;
             
             return (
               <div
@@ -262,14 +283,15 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                   borderBottom: "1px solid #333",
                   cursor: "pointer",
                   transition: "background-color 0.2s",
-                  backgroundColor: isPlaying ? "#333" : "transparent",
-                  borderLeft: isPlaying ? "3px solid #4CAF50" : "3px solid transparent",
+                  backgroundColor: shouldHighlight ? "#333" : "transparent",
+                  borderLeft: shouldHighlight ? "3px solid #4CAF50" : "3px solid transparent",
+                  opacity: isInactiveQueue ? 0.6 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!isPlaying) e.currentTarget.style.backgroundColor = "#333";
+                  if (!shouldHighlight) e.currentTarget.style.backgroundColor = "#333";
                 }}
                 onMouseLeave={(e) => {
-                  if (!isPlaying) e.currentTarget.style.backgroundColor = "transparent";
+                  if (!shouldHighlight) e.currentTarget.style.backgroundColor = "transparent";
                 }}
               >
                 {/* Album Art */}
@@ -323,6 +345,7 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      fontStyle: isInactiveQueue ? "italic" : "normal",
                     }}
                   >
                     {track.title}
@@ -330,10 +353,11 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                   <div
                     style={{
                       fontSize: "13px",
-                      color: "#aaa",
+                      color: isInactiveQueue ? "#777" : "#aaa",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      fontStyle: isInactiveQueue ? "italic" : "normal",
                     }}
                   >
                     {track.artist || "Unknown Artist"}
@@ -341,10 +365,11 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
                   <div
                     style={{
                       fontSize: "13px",
-                      color: "#888",
+                      color: isInactiveQueue ? "#666" : "#888",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      fontStyle: isInactiveQueue ? "italic" : "normal",
                     }}
                   >
                     {track.album || "Unknown Album"}

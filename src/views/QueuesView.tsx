@@ -15,9 +15,25 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   const [loading, setLoading] = useState(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     loadQueues();
+  }, []);
+
+  useEffect(() => {
+    const updatePlayingState = async () => {
+      try {
+        const state = await playerApi.getState();
+        setIsPlaying(state.is_playing);
+      } catch (error) {
+        console.error("Failed to get player state:", error);
+      }
+    };
+
+    updatePlayingState();
+    const interval = setInterval(updatePlayingState, 500);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -106,12 +122,28 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
     if (!selectedQueue) return;
     
     try {
-      // Set as active queue
+      // If this queue is active and playing, just pause
+      if (selectedQueue.is_active && isPlaying) {
+        await playerApi.pause();
+        return;
+      }
+      
+      // If this queue is active but paused, resume
+      if (selectedQueue.is_active && !isPlaying) {
+        await playerApi.resume();
+        return;
+      }
+      
+      // If this queue is not active, switch to it
       await queueApi.setActiveQueue(selectedQueue.id);
       
-      // Play first track
+      // Get the saved position in this queue
+      const currentIndex = await queueApi.getQueueCurrentIndex(selectedQueue.id);
+      
+      // Play from that position (or first track if index is 0)
       if (queueTracks.length > 0) {
-        await playerApi.playFile(queueTracks[0].file_path);
+        const trackIndex = Math.max(0, Math.min(currentIndex, queueTracks.length - 1));
+        await playerApi.playFile(queueTracks[trackIndex].file_path);
       }
       
       // Refresh queue list to update active status
@@ -125,7 +157,36 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
     if (!confirm("Are you sure you want to delete this queue?")) return;
     
     try {
+      // Check if this is the active queue
+      const deletingActiveQueue = queues.find(q => q.id === queueId)?.is_active;
+      
+      if (deletingActiveQueue) {
+        // Stop playback
+        await playerApi.stop();
+        
+        // Find next queue to switch to
+        const nextQueue = await queueApi.getNextQueue(queueId);
+        
+        if (nextQueue) {
+          // Get the current track index from the next queue
+          const currentIndex = await queueApi.getQueueCurrentIndex(nextQueue.id);
+          
+          // Get the track at that position
+          const trackToPlay = await queueApi.getQueueTrackAtPosition(nextQueue.id, currentIndex);
+          
+          // Set the next queue as active
+          await queueApi.setActiveQueue(nextQueue.id);
+          
+          // Resume playback from that track
+          if (trackToPlay) {
+            await playerApi.playFile(trackToPlay.file_path);
+          }
+        }
+      }
+      
+      // Delete the queue
       await queueApi.deleteQueue(queueId);
+      
       if (selectedQueue?.id === queueId) {
         setSelectedQueue(null);
         setQueueTracks([]);
@@ -258,22 +319,22 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
               <button
                 onClick={handlePlayQueue}
                 style={{
-                  padding: "10px 20px",
+                  width: "48px",
+                  height: "48px",
                   backgroundColor: "#1db954",
                   border: "none",
-                  borderRadius: "20px",
+                  borderRadius: "50%",
                   color: "white",
                   cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: "500",
+                  fontSize: "20px",
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
+                  justifyContent: "center",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1ed760")}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1db954")}
               >
-                ▶ Play Queue
+                {selectedQueue.is_active && isPlaying ? "⏸" : "▶"}
               </button>
             </div>
             <SearchBar
@@ -291,6 +352,7 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
                   tracks={filteredTracks}
                   contextType="queue"
                   queueId={selectedQueue.id}
+                  isActiveQueue={selectedQueue.is_active}
                   showPlayingIndicator={true}
                   onQueueActivated={() => loadQueues(true)}
                 />

@@ -288,6 +288,30 @@ pub fn delete_queue(queue_id: i64, state: State<'_, AppState>) -> Result<(), Str
         .map_err(|e| format!("Failed to delete queue: {}", e))
 }
 
+#[tauri::command]
+pub fn update_queue_current_index(queue_id: i64, track_index: i32, state: State<'_, AppState>) -> Result<(), String> {
+    DbOperations::update_queue_current_index(&state.db, queue_id, track_index)
+        .map_err(|e| format!("Failed to update queue current index: {}", e))
+}
+
+#[tauri::command]
+pub fn get_queue_current_index(queue_id: i64, state: State<'_, AppState>) -> Result<i32, String> {
+    DbOperations::get_queue_current_index(&state.db, queue_id)
+        .map_err(|e| format!("Failed to get queue current index: {}", e))
+}
+
+#[tauri::command]
+pub fn get_next_queue(excluded_queue_id: i64, state: State<'_, AppState>) -> Result<Option<Queue>, String> {
+    DbOperations::get_next_queue(&state.db, excluded_queue_id)
+        .map_err(|e| format!("Failed to get next queue: {}", e))
+}
+
+#[tauri::command]
+pub fn get_queue_track_at_position(queue_id: i64, position: i32, state: State<'_, AppState>) -> Result<Option<Track>, String> {
+    DbOperations::get_queue_track_at_position(&state.db, queue_id, position)
+        .map_err(|e| format!("Failed to get queue track at position: {}", e))
+}
+
 // ===== System Playlists Commands =====
 
 #[tauri::command]

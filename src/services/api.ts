@@ -185,6 +185,22 @@ export const queueApi = {
   deleteQueue: async (queueId: number): Promise<void> => {
     return await invoke("delete_queue", { queueId });
   },
+
+  updateQueueCurrentIndex: async (queueId: number, trackIndex: number): Promise<void> => {
+    return await invoke("update_queue_current_index", { queueId, trackIndex });
+  },
+
+  getQueueCurrentIndex: async (queueId: number): Promise<number> => {
+    return await invoke("get_queue_current_index", { queueId });
+  },
+
+  getNextQueue: async (excludedQueueId: number): Promise<Queue | null> => {
+    return await invoke("get_next_queue", { excludedQueueId });
+  },
+
+  getQueueTrackAtPosition: async (queueId: number, position: number): Promise<Track | null> => {
+    return await invoke("get_queue_track_at_position", { queueId, position });
+  },
 };
 
 export const playlistApi = {
