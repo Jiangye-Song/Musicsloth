@@ -35,6 +35,7 @@ import ArtistsView from "./views/ArtistsView";
 import AlbumsView from "./views/AlbumsView";
 import GenresView from "./views/GenresView";
 import { playerApi } from "./services/api";
+import { PlayerProvider } from "./contexts/PlayerContext";
 import React from "react";
 
 type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres";
@@ -106,7 +107,8 @@ function App() {
   ];
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
+    <PlayerProvider>
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
       {/* Mobile Top Navigation */}
       {isMobile && (
         <Paper
@@ -239,6 +241,7 @@ function App() {
         <NowPlayingView isNarrow={isMobile} onClose={() => setShowNowPlaying(false)} />
       </Dialog>
     </Box>
+    </PlayerProvider>
   );
 }
 

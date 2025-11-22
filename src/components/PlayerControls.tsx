@@ -20,15 +20,15 @@ import {
   Menu,
   MusicNote,
 } from "@mui/icons-material";
-import { playerApi, PlayerState, libraryApi, Track } from "../services/api";
+import { playerApi, PlayerState } from "../services/api";
+import { usePlayer } from "../contexts/PlayerContext";
 
 interface PlayerControlsProps {
   onExpandClick?: () => void;
 }
 
 export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [albumArt, setAlbumArt] = useState<string | null>(null);
+  const { currentTrack, albumArt } = usePlayer();
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,
@@ -46,33 +46,6 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
         const state = await playerApi.getState();
         if (!isSeeking) {
           setPlayerState(state);
-        }
-        // Fetch current track info
-        if (state.current_file) {
-          try {
-            const track = await libraryApi.getCurrentTrack();
-            setCurrentTrack(track);
-            // Fetch album art
-            if (track && track.file_path) {
-              try {
-                const artBytes = await libraryApi.getAlbumArt(track.file_path);
-                if (artBytes && artBytes.length > 0) {
-                  const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
-                  const url = URL.createObjectURL(blob);
-                  setAlbumArt(url);
-                } else {
-                  setAlbumArt(null);
-                }
-              } catch {
-                setAlbumArt(null);
-              }
-            }
-          } catch (err) {
-            console.error("Failed to fetch track:", err);
-          }
-        } else {
-          setCurrentTrack(null);
-          // Keep album art persistent - don't clear it
         }
       } catch (error) {
         console.error("Failed to get player state:", error);
@@ -111,7 +84,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   return (
-    <Box sx={{ display: "flex", alignItems: "stretch", gap: isMobile ? 0 : 2, pr: isMobile ? 0 : 2, height: "80px" }}>
+    <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isMobile ? 0 : 2, height: "80px" }}>
         {/* Album Art - Full height, no padding/margin */}
         <Box
           onClick={onExpandClick}
@@ -148,6 +121,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
               "&:hover": onExpandClick ? {
                 bgcolor: "action.hover",
               } : {},
+              px: 2,
               py: 1,
             }}
           >

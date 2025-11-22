@@ -6,9 +6,24 @@ import {
   Tabs,
   Tab,
   Paper,
+  Slider,
+  useMediaQuery,
 } from "@mui/material";
-import { Close, MusicNote } from "@mui/icons-material";
-import { playerApi, libraryApi, Track } from "../services/api";
+import {
+  Close,
+  MusicNote,
+  PlayArrow,
+  Pause,
+  SkipNext,
+  SkipPrevious,
+  Shuffle,
+  Repeat,
+  VolumeUp,
+  QueueMusic,
+} from "@mui/icons-material";
+import { playerApi, queueApi, Track } from "../services/api";
+import { audioPlayer } from "../services/audioPlayer";
+import { usePlayer } from "../contexts/PlayerContext";
 
 interface NowPlayingViewProps {
   isNarrow: boolean;
@@ -16,43 +31,43 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProps) {
-  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
-  const [albumArt, setAlbumArt] = useState<string | null>(null);
+  const isShortHeight = useMediaQuery('(max-height:600px)');
+  const { currentTrack, albumArt } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentPosition, setCurrentPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(100);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPosition, setSeekPosition] = useState(0);
+  const [queueTracks, setQueueTracks] = useState<Track[]>([]);
 
   useEffect(() => {
-    // Update player state and track metadata periodically
+    // Load active queue
+    const loadQueue = async () => {
+      try {
+        const activeQueue = await queueApi.getActiveQueue();
+        if (activeQueue) {
+          const tracks = await queueApi.getQueueTracks(activeQueue.id);
+          setQueueTracks(tracks);
+        }
+      } catch (error) {
+        console.error("Failed to load queue:", error);
+      }
+    };
+    loadQueue();
+
+    // Update player state periodically
     const interval = setInterval(async () => {
       try {
         const state = await playerApi.getState();
-
-        // Fetch track metadata if a file is playing
-        if (state.current_file) {
-          const track = await libraryApi.getCurrentTrack();
-          setCurrentTrack(track);
-
-          // Fetch album art
-          if (track) {
-            try {
-              const artData = await libraryApi.getAlbumArt(track.file_path);
-              if (artData && artData.length > 0) {
-                const blob = new Blob([new Uint8Array(artData)], { type: "image/jpeg" });
-                const url = URL.createObjectURL(blob);
-                setAlbumArt((prevUrl) => {
-                  if (prevUrl) URL.revokeObjectURL(prevUrl);
-                  return url;
-                });
-              } else {
-                setAlbumArt(null);
-              }
-            } catch (err) {
-              console.error("Failed to load album art:", err);
-              setAlbumArt(null);
-            }
-          }
-        } else {
-          setCurrentTrack(null);
-          setAlbumArt(null);
+        
+        setIsPlaying(state.is_playing);
+        setVolume(Math.round(state.position_ms > 0 ? (audioPlayer.getState().volume * 100) : 100));
+        
+        if (!isSeeking) {
+          setCurrentPosition(state.position_ms);
+          setDuration(state.duration_ms || 0);
         }
       } catch (error) {
         console.error("Failed to get player state:", error);
@@ -61,9 +76,8 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
 
     return () => {
       clearInterval(interval);
-      if (albumArt) URL.revokeObjectURL(albumArt);
     };
-  }, []);
+  }, [isSeeking]);
 
 
 
@@ -75,54 +89,193 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const renderAlbumArt = () => (
-    <Box
-      sx={{
-        width: isNarrow ? "100%" : 400,
-        height: isNarrow ? 350 : 400,
-        maxWidth: isNarrow ? 400 : 400,
-        margin: isNarrow ? "0 auto" : 0,
-        bgcolor: "background.default",
-        borderRadius: 2,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        border: 1,
-        borderColor: "divider",
-        overflow: "hidden",
-      }}
-    >
-      {albumArt ? (
-        <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-      ) : (
-        <MusicNote sx={{ fontSize: 80, opacity: 0.3 }} />
-      )}
-    </Box>
-  );
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  const handlePlayPause = async () => {
+    try {
+      if (isPlaying) {
+        await playerApi.pause();
+      } else {
+        await playerApi.resume();
+      }
+    } catch (error) {
+      console.error("Failed to toggle play/pause:", error);
+    }
+  };
+
+  const handleNext = async () => {
+    try {
+      if (!currentTrack || queueTracks.length === 0) return;
+      const currentIndex = queueTracks.findIndex(t => t.file_path === currentTrack.file_path);
+      if (currentIndex < queueTracks.length - 1) {
+        await playerApi.playFile(queueTracks[currentIndex + 1].file_path);
+      }
+    } catch (error) {
+      console.error("Failed to skip to next track:", error);
+    }
+  };
+
+  const handlePrevious = async () => {
+    try {
+      if (!currentTrack || queueTracks.length === 0) return;
+      const currentIndex = queueTracks.findIndex(t => t.file_path === currentTrack.file_path);
+      if (currentIndex > 0) {
+        await playerApi.playFile(queueTracks[currentIndex - 1].file_path);
+      }
+    } catch (error) {
+      console.error("Failed to go to previous track:", error);
+    }
+  };
+
+  const handleSeekMouseDown = () => {
+    setIsSeeking(true);
+  };
+
+  const handleVolumeChange = async (_: Event, value: number | number[]) => {
+    const newVolume = value as number;
+    setVolume(newVolume);
+    try {
+      await playerApi.setVolume(newVolume / 100);
+    } catch (error) {
+      console.error("Failed to set volume:", error);
+    }
+  };
+
+  const renderAlbumArt = () => {
+    const size = isShortHeight ? 150 : (isNarrow ? 250 : 300);
+    const maxSize = isShortHeight ? 150 : (isNarrow ? 300 : 300);
+    
+    return (
+      <Box
+        sx={{
+          width: isNarrow ? "100%" : size,
+          height: size,
+          maxWidth: isNarrow ? maxSize : size,
+          margin: isNarrow ? "0 auto" : 0,
+          bgcolor: "background.default",
+          borderRadius: 2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          border: 1,
+          borderColor: "divider",
+          overflow: "hidden",
+        }}
+      >
+        {albumArt ? (
+          <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <MusicNote sx={{ fontSize: isShortHeight ? 40 : 60, opacity: 0.3 }} />
+        )}
+      </Box>
+    );
+  };
 
   const renderTrackInfo = () => (
     currentTrack ? (
-      <Box sx={{ textAlign: isNarrow ? "center" : "left", p: 3 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
+      <Box sx={{ textAlign: isNarrow ? "center" : "left", mt: 2 }}>
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
           {currentTrack.title}
         </Typography>
-        <Typography variant="h6" color="text.secondary" gutterBottom>
+        <Typography variant="body1" color="text.secondary" gutterBottom>
           {currentTrack.artist || "Unknown Artist"}
         </Typography>
-        <Typography variant="body1" color="text.secondary" gutterBottom>
+        <Typography variant="body2" color="text.secondary">
           {currentTrack.album || "Unknown Album"}
-        </Typography>
-        <Typography variant="body2" color="text.disabled">
-          {formatDuration(currentTrack.duration_ms)}
         </Typography>
       </Box>
     ) : (
-      <Box sx={{ textAlign: "center", p: 5 }}>
-        <Typography variant="h5" color="text.disabled">
+      <Box sx={{ textAlign: "center", mt: 2 }}>
+        <Typography variant="body1" color="text.disabled">
           No track playing
         </Typography>
       </Box>
     )
+  );
+
+  const renderControls = () => (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, px: isNarrow ? 2 : 0 }}>
+      {/* Time and Seekbar */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography variant="caption" sx={{ minWidth: "45px", textAlign: "right", color: "text.secondary" }}>
+          {formatTime(isSeeking ? seekPosition : currentPosition)}
+        </Typography>
+        <Slider
+          min={0}
+          max={duration || 100}
+          value={isSeeking ? seekPosition : currentPosition}
+          onMouseDown={handleSeekMouseDown}
+          onChange={(_, value) => setSeekPosition(value as number)}
+          onChangeCommitted={async (_, value) => {
+            try {
+              await playerApi.seekTo(value as number);
+            } catch (error) {
+              console.error("Failed to seek:", error);
+            } finally {
+              setIsSeeking(false);
+            }
+          }}
+          disabled={!currentTrack}
+          sx={{ flex: 1 }}
+        />
+        <Typography variant="caption" sx={{ minWidth: "45px", color: "text.secondary" }}>
+          {formatTime(duration)}
+        </Typography>
+      </Box>
+
+      {/* Playback Controls */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+        <IconButton size="small" disabled={!currentTrack}>
+          <Shuffle />
+        </IconButton>
+        <IconButton onClick={handlePrevious} disabled={!currentTrack}>
+          <SkipPrevious fontSize="large" />
+        </IconButton>
+        <IconButton
+          onClick={handlePlayPause}
+          disabled={!currentTrack}
+          sx={{
+            bgcolor: "primary.main",
+            color: "white",
+            width: 56,
+            height: 56,
+            "&:hover": { bgcolor: "primary.dark" },
+            "&.Mui-disabled": { bgcolor: "action.disabledBackground" },
+          }}
+        >
+          {isPlaying ? <Pause fontSize="large" /> : <PlayArrow fontSize="large" />}
+        </IconButton>
+        <IconButton onClick={handleNext} disabled={!currentTrack}>
+          <SkipNext fontSize="large" />
+        </IconButton>
+        <IconButton size="small" disabled={!currentTrack}>
+          <Repeat />
+        </IconButton>
+      </Box>
+
+      {/* Bottom Controls - Volume & Queue */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "space-between" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, maxWidth: 200 }}>
+          <VolumeUp fontSize="small" />
+          <Slider
+            min={0}
+            max={100}
+            value={volume}
+            onChange={handleVolumeChange}
+            size="small"
+            sx={{ flex: 1 }}
+          />
+        </Box>
+        <IconButton size="small">
+          <QueueMusic />
+        </IconButton>
+      </Box>
+    </Box>
   );
 
   const renderLyrics = () => (
@@ -193,7 +346,7 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
   );
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default", overflow: "hidden" }}>
       {/* Close Button */}
       <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
         <IconButton onClick={onClose} size="large">
@@ -203,14 +356,14 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
 
       {/* Content */}
       {isNarrow ? (
-        /* Narrow Layout: 3 tabs */
-        <Box sx={{ flex: 1, overflowY: "auto" }}>
+        /* Narrow Layout: Album art, track info, controls stacked */
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", px: 2, pb: 2, overflow: "hidden" }}>
           {/* Tab Navigation */}
           <Tabs
             value={activeTab}
             onChange={(_, newValue) => setActiveTab(newValue)}
             centered
-            sx={{ px: 2, pb: 2 }}
+            sx={{ pb: 2, flexShrink: 0 }}
           >
             <Tab label="Album Art" value="albumart" />
             <Tab label="Lyrics" value="lyrics" />
@@ -218,47 +371,64 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
           </Tabs>
 
           {/* Tab Content */}
-          <Box sx={{ px: 2, pb: 2 }}>
-            {activeTab === "albumart" && (
-              <>
-                {renderAlbumArt()}
-                {renderTrackInfo()}
-              </>
-            )}
-            {activeTab === "lyrics" && renderLyrics()}
-            {activeTab === "details" && renderDetails()}
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+            <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+              {activeTab === "albumart" && (
+                <>
+                  {renderAlbumArt()}
+                  {renderTrackInfo()}
+                </>
+              )}
+              {activeTab === "lyrics" && renderLyrics()}
+              {activeTab === "details" && renderDetails()}
+            </Box>
+            
+            {/* Controls always at bottom */}
+            <Box sx={{ pt: 3, flexShrink: 0 }}>
+              {renderControls()}
+            </Box>
           </Box>
         </Box>
       ) : (
-        /* Wide Layout: 2 columns */
-        <Box sx={{ display: "flex", flex: 1, p: 3, gap: 4, overflowY: "auto" }}>
-          {/* Left: Album Art */}
-          <Box sx={{ flex: "0 0 400px" }}>
-            {renderAlbumArt()}
-            {renderTrackInfo()}
+        /* Wide Layout: Left album art/info, right tabs, controls at bottom */
+        <Box sx={{ display: "flex", flexDirection: "column", flex: 1, p: 3, overflow: "hidden" }}>
+          <Box sx={{ display: "flex", flex: 1, gap: 4, mb: 3, minHeight: 0 }}>
+            {/* Left: Album Art & Track Info */}
+            <Box sx={{ flex: isShortHeight ? "0 0 150px" : "0 0 300px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <Box sx={{ flexShrink: 0 }}>
+                {renderAlbumArt()}
+                {renderTrackInfo()}
+              </Box>
+            </Box>
+
+            {/* Right: Tabs */}
+            <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              <Tabs
+                value={activeTab === "albumart" ? "lyrics" : activeTab}
+                onChange={(_, newValue) => setActiveTab(newValue)}
+                sx={{ mb: 2, flexShrink: 0 }}
+              >
+                <Tab label="Lyrics" value="lyrics" />
+                <Tab label="Details" value="details" />
+              </Tabs>
+
+              <Paper
+                elevation={2}
+                sx={{
+                  flex: 1,
+                  overflowY: "auto",
+                  minHeight: 0,
+                }}
+              >
+                {activeTab === "lyrics" && renderLyrics()}
+                {activeTab === "details" && renderDetails()}
+              </Paper>
+            </Box>
           </Box>
 
-          {/* Right: Tabs */}
-          <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <Tabs
-              value={activeTab === "albumart" ? "lyrics" : activeTab}
-              onChange={(_, newValue) => setActiveTab(newValue)}
-              sx={{ mb: 2 }}
-            >
-              <Tab label="Lyrics" value="lyrics" />
-              <Tab label="Details" value="details" />
-            </Tabs>
-
-            <Paper
-              elevation={2}
-              sx={{
-                flex: 1,
-                overflowY: "auto",
-              }}
-            >
-              {activeTab === "lyrics" && renderLyrics()}
-              {activeTab === "details" && renderDetails()}
-            </Paper>
+          {/* Controls at Bottom */}
+          <Box sx={{ pt: 2, borderTop: 1, borderColor: "divider", flexShrink: 0 }}>
+            {renderControls()}
           </Box>
         </Box>
       )}
