@@ -163,7 +163,7 @@ function App() {
               bgcolor: "background.paper",
               borderRight: 1,
               borderColor: "divider",
-              position: "relative",
+              position: "static",
             },
           }}
         >
@@ -220,7 +220,7 @@ function App() {
           bottom: 0,
           left: 0,
           right: 0,
-          p: 2,
+          p: 0,
           borderTop: 1,
           borderColor: "divider",
           bgcolor: "background.paper",
