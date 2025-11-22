@@ -240,41 +240,17 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
                   selected={selectedQueue?.id === queue.id}
                   sx={{
                     borderRadius: "6px",
-                    gap: 1.5,
                     "&.Mui-selected": {
                       bgcolor: "action.selected",
                     },
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      border: 2,
-                      borderColor: queue.is_active ? "primary.main" : "grey.700",
-                      bgcolor: queue.is_active ? "primary.main" : "transparent",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {queue.is_active && (
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          bgcolor: "white",
-                        }}
-                      />
-                    )}
-                  </Box>
                   <ListItemText
-                    primary={queue.name}
-                    secondary={queue.is_active ? "▶ Playing" : null}
-                    primaryTypographyProps={{ fontWeight: 500 }}
-                    secondaryTypographyProps={{ color: "primary.main", fontSize: "11px" }}
+                    primary={queue.is_active ? `▶ ${queue.name}` : queue.name}
+                    primaryTypographyProps={{ 
+                      fontWeight: queue.is_active ? 700 : 500,
+                      color: queue.is_active ? "primary.main" : "text.primary"
+                    }}
                   />
                 </ListItemButton>
               </ListItem>
