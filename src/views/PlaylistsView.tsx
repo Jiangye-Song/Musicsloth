@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { libraryApi, playlistApi, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import SearchBar from "../components/SearchBar";
-import { Box, IconButton } from "@mui/material";
+import { IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 type SystemPlaylist = {
