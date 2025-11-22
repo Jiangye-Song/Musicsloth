@@ -40,23 +40,8 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
   const [volume, setVolume] = useState(100);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
-  const [queueTracks, setQueueTracks] = useState<Track[]>([]);
 
   useEffect(() => {
-    // Load active queue
-    const loadQueue = async () => {
-      try {
-        const activeQueue = await queueApi.getActiveQueue();
-        if (activeQueue) {
-          const tracks = await queueApi.getQueueTracks(activeQueue.id);
-          setQueueTracks(tracks);
-        }
-      } catch (error) {
-        console.error("Failed to load queue:", error);
-      }
-    };
-    loadQueue();
-
     // Update player state periodically
     const interval = setInterval(async () => {
       try {
@@ -109,27 +94,13 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
   };
 
   const handleNext = async () => {
-    try {
-      if (!currentTrack || queueTracks.length === 0) return;
-      const currentIndex = queueTracks.findIndex(t => t.file_path === currentTrack.file_path);
-      if (currentIndex < queueTracks.length - 1) {
-        await playerApi.playFile(queueTracks[currentIndex + 1].file_path);
-      }
-    } catch (error) {
-      console.error("Failed to skip to next track:", error);
-    }
+    // TODO: Implement with backend queue navigation
+    console.log("Next track - needs backend implementation");
   };
 
   const handlePrevious = async () => {
-    try {
-      if (!currentTrack || queueTracks.length === 0) return;
-      const currentIndex = queueTracks.findIndex(t => t.file_path === currentTrack.file_path);
-      if (currentIndex > 0) {
-        await playerApi.playFile(queueTracks[currentIndex - 1].file_path);
-      }
-    } catch (error) {
-      console.error("Failed to go to previous track:", error);
-    }
+    // TODO: Implement with backend queue navigation
+    console.log("Previous track - needs backend implementation");
   };
 
   const handleSeekMouseDown = () => {

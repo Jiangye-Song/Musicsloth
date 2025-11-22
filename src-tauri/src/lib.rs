@@ -14,8 +14,33 @@ use db::connection::DatabaseConnection;
 use state::AppState;
 use tauri::Manager;
 
+#[cfg(target_os = "windows")]
+fn set_app_user_model_id() {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    
+    // Set Windows App User Model ID for proper media control display
+    let app_id = "Musicsloth.MusicPlayer";
+    let wide: Vec<u16> = OsStr::new(app_id)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    
+    unsafe {
+        // Use SetCurrentProcessExplicitAppUserModelID from shell32.dll
+        #[link(name = "shell32")]
+        extern "system" {
+            fn SetCurrentProcessExplicitAppUserModelID(appid: *const u16) -> i32;
+        }
+        SetCurrentProcessExplicitAppUserModelID(wide.as_ptr());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    set_app_user_model_id();
+    
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {

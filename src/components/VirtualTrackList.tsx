@@ -183,13 +183,19 @@ export default function VirtualTrackList({ tracks, contextType, contextName, que
           : `Genre: ${contextName}`;
         
         // Get all track IDs
+        console.log(`[Frontend] Getting track IDs from ${tracks.length} tracks...`);
         const trackIds = tracks.map(t => t.id);
+        console.log(`[Frontend] Got ${trackIds.length} track IDs`);
         
         // Create or reuse queue (backend handles duplicate detection and returns immediately after first batch)
+        console.log(`[Frontend] Creating queue "${queueName}"...`);
         await queueApi.createQueueFromTracks(queueName, trackIds, index);
+        console.log(`[Frontend] Queue created successfully`);
         
         // Play the clicked track immediately (don't wait for full queue to load)
+        console.log(`[Frontend] Playing track: ${track.file_path}`);
         await playerApi.playFile(track.file_path);
+        console.log(`[Frontend] Track playback started`);
       }
     } catch (error) {
       console.error("Failed to play track:", error);

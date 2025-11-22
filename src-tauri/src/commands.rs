@@ -190,22 +190,32 @@ pub fn create_queue_from_tracks(
     clicked_index: usize,
     state: State<'_, AppState>,
 ) -> Result<i64, String> {
+    println!("[Queue] Starting queue creation with {} tracks", track_ids.len());
+    
     // Check if queue with same tracks already exists
+    println!("[Queue] Checking for existing queue...");
     if let Some(existing_queue_id) = DbOperations::find_queue_with_tracks(&state.db, &track_ids)
         .map_err(|e| format!("Failed to check for existing queue: {}", e))? 
     {
+        println!("[Queue] Found existing queue ID: {}", existing_queue_id);
         // Set as active and return existing queue ID
         DbOperations::set_active_queue(&state.db, existing_queue_id)
             .map_err(|e| format!("Failed to set active queue: {}", e))?;
+        println!("[Queue] Reusing existing queue");
         return Ok(existing_queue_id);
     }
+    
+    println!("[Queue] No existing queue found, creating new one");
     
     // Generate unique queue name (Windows-style: name, name (2), name (3), etc.)
     let mut queue_name = name.clone();
     let mut counter = 2;
     let queue_id: Result<i64, String> = loop {
         match DbOperations::create_queue(&state.db, &queue_name) {
-            Ok(queue_id) => break Ok(queue_id),
+            Ok(queue_id) => {
+                println!("[Queue] Created queue '{}' with ID: {}", queue_name, queue_id);
+                break Ok(queue_id);
+            },
             Err(e) => {
                 // Check if it's a UNIQUE constraint error
                 if e.to_string().contains("UNIQUE constraint failed") {
@@ -219,6 +229,7 @@ pub fn create_queue_from_tracks(
     };
     let queue_id = queue_id?;
     
+    println!("[Queue] Reordering tracks (clicked index: {})...", clicked_index);
     // Reorder tracks: clicked track first, then remaining after, then before clicked
     let mut reordered_tracks = Vec::new();
     reordered_tracks.push(track_ids[clicked_index]);
@@ -233,14 +244,17 @@ pub fn create_queue_from_tracks(
         reordered_tracks.push(track_ids[i]);
     }
     
+    println!("[Queue] Adding {} tracks to queue...", reordered_tracks.len());
     // Add all tracks immediately - only inserting IDs is fast
     DbOperations::add_tracks_to_queue(&state.db, queue_id, &reordered_tracks)
         .map_err(|e| format!("Failed to add tracks to queue: {}", e))?;
     
+    println!("[Queue] Updating queue hash...");
     // Update queue hash for duplicate detection
     DbOperations::update_queue_track_hash(&state.db, queue_id, &reordered_tracks)
         .map_err(|e| format!("Failed to update queue track hash: {}", e))?;
     
+    println!("[Queue] Queue creation complete, ID: {}", queue_id);
     Ok(queue_id)
 }
 
