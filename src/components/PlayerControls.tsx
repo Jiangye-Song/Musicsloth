@@ -50,7 +50,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
       } catch (error) {
         console.error("Failed to get player state:", error);
       }
-    }, 100);
+    }, 250);
 
     return () => clearInterval(interval);
   }, [isSeeking]);

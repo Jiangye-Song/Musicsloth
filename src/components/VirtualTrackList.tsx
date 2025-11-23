@@ -25,7 +25,7 @@ interface VirtualTrackListProps {
 }
 
 const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false }, ref) => {
-  console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
+// console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
@@ -185,7 +185,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
     if (containerRef.current && containerRef.current.clientHeight > 0) {
       handleScroll();
     }
-  }, [tracks, handleScroll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracks.length]);
 
   // Load current queue index for all queues (active and inactive)
   useEffect(() => {
@@ -315,7 +316,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
       });
       setDropdownAlbumArtCache(new Map());
     }
-  }, [showDropdown, dropdownAlbumArtCache]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDropdown]);
 
   const handlePlayTrack = async (track: Track, index: number) => {
     try {
