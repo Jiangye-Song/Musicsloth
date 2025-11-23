@@ -416,13 +416,13 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT DISTINCT t.album, 
+            "SELECT t.album, 
                     COALESCE(t.album_artist, t.artist) as artist,
-                    t.year,
+                    MIN(t.year) as year,
                     COUNT(DISTINCT t.id) as song_count
              FROM tracks t
              WHERE t.album IS NOT NULL
-             GROUP BY t.album, COALESCE(t.album_artist, t.artist), t.year
+             GROUP BY t.album, COALESCE(t.album_artist, t.artist)
              ORDER BY t.album"
         )?;
         
