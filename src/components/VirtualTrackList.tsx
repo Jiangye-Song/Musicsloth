@@ -644,21 +644,24 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 }}
               >
                 {/* Album Art */}
-                <Avatar
-                  src={albumArt || undefined}
-                  alt={track.album || "Album"}
-                  variant="rounded"
+                <Box
                   sx={{
                     width: 60,
                     height: 60,
                     mr: 2,
+                    borderRadius: 1,
                     bgcolor: "background.default",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundImage: albumArt ? `url(${albumArt})` : "none",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    overflow: "hidden",
                   }}
                 >
-                  {!albumArt && (
-                    <MusicNoteIcon sx={{ opacity: 0.3 }} />
-                  )}
-                </Avatar>
+                  {!albumArt && <MusicNoteIcon sx={{ opacity: 0.3, fontSize: 28 }} />}
+                </Box>
 
                 {/* Track Info */}
                 <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25 }}>
