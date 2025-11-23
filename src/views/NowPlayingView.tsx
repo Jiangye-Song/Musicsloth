@@ -21,7 +21,7 @@ import {
   VolumeUp,
   QueueMusic,
 } from "@mui/icons-material";
-import { playerApi, queueApi, Track } from "../services/api";
+import { playerApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import { usePlayer } from "../contexts/PlayerContext";
 

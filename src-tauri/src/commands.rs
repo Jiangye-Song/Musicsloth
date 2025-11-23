@@ -312,6 +312,12 @@ pub fn get_queue_track_at_position(queue_id: i64, position: i32, state: State<'_
         .map_err(|e| format!("Failed to get queue track at position: {}", e))
 }
 
+#[tauri::command]
+pub fn get_queue_length(queue_id: i64, state: State<'_, AppState>) -> Result<i32, String> {
+    DbOperations::get_queue_length(&state.db, queue_id)
+        .map_err(|e| format!("Failed to get queue length: {}", e))
+}
+
 // ===== System Playlists Commands =====
 
 #[tauri::command]

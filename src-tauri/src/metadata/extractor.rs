@@ -13,7 +13,8 @@ impl MetadataExtractor {
         // Try to read the file with lofty
         let tagged_file = match Probe::open(file_path)?.guess_file_type()?.read() {
             Ok(f) => f,
-            Err(_) => {
+            Err(e) => {
+                eprintln!("Failed to read file with lofty: {:?}, error: {}", file_path, e);
                 // Fallback: return minimal track info if file can't be read
                 return Self::create_minimal_track(file_path);
             }
@@ -21,6 +22,16 @@ impl MetadataExtractor {
 
         let tag = tagged_file.primary_tag().or(tagged_file.first_tag());
         let properties = tagged_file.properties();
+
+        // Debug logging for problematic files
+        if let Some(t) = tag {
+            eprintln!("DEBUG - File: {:?}", file_path.file_name());
+            eprintln!("  Tag type: {:?}", t.tag_type());
+            eprintln!("  Title: {:?}", t.title());
+            eprintln!("  Artist: {:?}", t.artist());
+            eprintln!("  Album: {:?}", t.album());
+            eprintln!("  Genre: {:?}", t.genre());
+        }
 
         let title = tag
             .and_then(|t| t.title().map(|s| s.to_string()))
@@ -36,8 +47,26 @@ impl MetadataExtractor {
         let album = tag.and_then(|t| t.album().map(|s| s.to_string()));
         let album_artist = tag.and_then(|t| t.get_string(&ItemKey::AlbumArtist).map(|s| s.to_string()));
         
-        // Try to get year - if the tag parsing fails (invalid timestamp), return None
-        let year = tag.and_then(|t| t.year());
+        // Try to get year - safely handle parsing errors for malformed year tags
+        let year = tag.and_then(|t| {
+            // First try the standard year() method
+            if let Some(y) = t.year() {
+                return Some(y);
+            }
+            // Try to parse from raw TYER or DATE tags if year() fails
+            if let Some(year_str) = t.get_string(&ItemKey::Year)
+                .or_else(|| t.get_string(&ItemKey::RecordingDate)) {
+                // Extract just the year part (first 4 digits)
+                if let Some(captures) = year_str.chars()
+                    .take(4)
+                    .collect::<String>()
+                    .parse::<u32>()
+                    .ok() {
+                    return Some(captures);
+                }
+            }
+            None
+        });
         
         let track_number = tag.and_then(|t| t.track());
         let genre = tag.and_then(|t| t.genre().map(|s| s.to_string()));

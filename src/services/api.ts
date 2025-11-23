@@ -201,6 +201,10 @@ export const queueApi = {
   getQueueTrackAtPosition: async (queueId: number, position: number): Promise<Track | null> => {
     return await invoke("get_queue_track_at_position", { queueId, position });
   },
+
+  getQueueLength: async (queueId: number): Promise<number> => {
+    return await invoke("get_queue_length", { queueId });
+  },
 };
 
 export const playlistApi = {

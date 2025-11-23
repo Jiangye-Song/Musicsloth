@@ -28,7 +28,7 @@ interface PlayerControlsProps {
 }
 
 export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
-  const { currentTrack, albumArt } = usePlayer();
+  const { currentTrack, albumArt, playNext, playPrevious } = usePlayer();
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,
@@ -155,8 +155,8 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
         {/* Control Buttons */}
         <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center" }}>
           <IconButton
-            onClick={() => {/* TODO: implement previous track */}}
-            disabled={!playerState.current_file}
+            onClick={playPrevious}
+            disabled={!playerState.current_file && !currentTrack}
             size="small"
             title="Previous Track"
             sx={{ color: "text.primary" }}
@@ -195,8 +195,8 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
           </IconButton>
 
           <IconButton
-            onClick={() => {/* TODO: implement next track */}}
-            disabled={!playerState.current_file}
+            onClick={playNext}
+            disabled={!playerState.current_file && !currentTrack}
             size="small"
             title="Next Track"
             sx={{ color: "text.primary" }}

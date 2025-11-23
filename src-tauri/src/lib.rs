@@ -87,6 +87,7 @@ pub fn run() {
             commands::get_queue_current_index,
             commands::get_next_queue,
             commands::get_queue_track_at_position,
+            commands::get_queue_length,
             commands::get_recent_tracks,
             commands::get_most_played_tracks,
             commands::get_unplayed_tracks,

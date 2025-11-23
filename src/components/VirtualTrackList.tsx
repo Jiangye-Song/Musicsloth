@@ -26,7 +26,7 @@ interface VirtualTrackListProps {
 
 const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false }, ref) => {
 // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
-  const { updateQueuePosition } = usePlayer();
+  const { updateQueuePosition, currentQueueId, currentTrackIndex } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(20);
@@ -209,17 +209,25 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   }, [tracks.length]);
 
   // Load current queue index for all queues (active and inactive)
+  // Also update when PlayerContext's currentTrackIndex changes
   useEffect(() => {
     console.log(`[VirtualTrackList] Queue index useEffect - contextType: ${contextType}, queueId: ${queueId}, isActiveQueue: ${isActiveQueue}`);
     if (contextType === "queue" && queueId !== undefined) {
-      queueApi.getQueueCurrentIndex(queueId)
-        .then(index => {
-          console.log(`[VirtualTrackList] Loaded queue index: ${index} for queue ${queueId}`);
-          setQueueCurrentIndex(index);
-        })
-        .catch(err => console.error("Failed to get queue current index:", err));
+      // If this is the active queue and we have a currentTrackIndex from PlayerContext, use it
+      if (isActiveQueue && currentQueueId === queueId && currentTrackIndex !== null) {
+        console.log(`[VirtualTrackList] Using PlayerContext index: ${currentTrackIndex} for active queue ${queueId}`);
+        setQueueCurrentIndex(currentTrackIndex);
+      } else {
+        // Otherwise, fetch from database
+        queueApi.getQueueCurrentIndex(queueId)
+          .then(index => {
+            console.log(`[VirtualTrackList] Loaded queue index: ${index} for queue ${queueId}`);
+            setQueueCurrentIndex(index);
+          })
+          .catch(err => console.error("Failed to get queue current index:", err));
+      }
     }
-  }, [contextType, queueId]);
+  }, [contextType, queueId, isActiveQueue, currentQueueId, currentTrackIndex]);
 
   // Update currently playing track
   useEffect(() => {

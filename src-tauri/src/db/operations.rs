@@ -1016,4 +1016,21 @@ impl DbOperations {
         
         Ok(tracks)
     }
+
+    /// Get the number of tracks in a queue
+    pub fn get_queue_length(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<i32, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT COUNT(*) FROM queue_tracks WHERE queue_id = ?1"
+        )?;
+        
+        let count: i32 = stmt.query_row([queue_id], |row| row.get(0))?;
+        
+        Ok(count)
+    }
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { playerApi, libraryApi, queueApi, Track } from "../services/api";
 
 interface PlayerContextType {
@@ -9,6 +9,8 @@ interface PlayerContextType {
   setCurrentTrack: (track: Track | null) => void;
   setAlbumArt: (art: string | null) => void;
   updateQueuePosition: (queueId: number, trackIndex: number) => Promise<void>;
+  playNext: () => Promise<void>;
+  playPrevious: () => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -26,6 +28,99 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setCurrentTrackIndex(trackIndex);
     await queueApi.updateQueueCurrentIndex(queueId, trackIndex);
   };
+
+  const playNext = useCallback(async () => {
+    if (currentQueueId === null || currentTrackIndex === null) {
+      console.log('[PlayerContext] playNext - no active queue or track index');
+      return;
+    }
+
+    try {
+      const queueLength = await queueApi.getQueueLength(currentQueueId);
+      const nextIndex = currentTrackIndex + 1;
+
+      if (nextIndex >= queueLength) {
+        console.log('[PlayerContext] playNext - reached end of queue');
+        return;
+      }
+
+      const nextTrack = await queueApi.getQueueTrackAtPosition(currentQueueId, nextIndex);
+      if (nextTrack) {
+        console.log(`[PlayerContext] playNext - playing track at index ${nextIndex}: ${nextTrack.title}`);
+        await updateQueuePosition(currentQueueId, nextIndex);
+        setCurrentTrack(nextTrack);
+        
+        // Load album art
+        try {
+          const artBytes = await libraryApi.getAlbumArt(nextTrack.file_path);
+          if (artBytes && artBytes.length > 0) {
+            const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
+            const url = URL.createObjectURL(blob);
+            if (albumArt) {
+              URL.revokeObjectURL(albumArt);
+            }
+            setAlbumArt(url);
+          } else {
+            setAlbumArt(null);
+          }
+        } catch (error) {
+          console.error("Failed to load album art:", error);
+          setAlbumArt(null);
+        }
+
+        // Play the track
+        await playerApi.playFile(nextTrack.file_path);
+      }
+    } catch (error) {
+      console.error('Failed to play next track:', error);
+    }
+  }, [currentQueueId, currentTrackIndex, albumArt, updateQueuePosition]);
+
+  const playPrevious = useCallback(async () => {
+    if (currentQueueId === null || currentTrackIndex === null) {
+      console.log('[PlayerContext] playPrevious - no active queue or track index');
+      return;
+    }
+
+    try {
+      const prevIndex = currentTrackIndex - 1;
+
+      if (prevIndex < 0) {
+        console.log('[PlayerContext] playPrevious - at start of queue');
+        return;
+      }
+
+      const prevTrack = await queueApi.getQueueTrackAtPosition(currentQueueId, prevIndex);
+      if (prevTrack) {
+        console.log(`[PlayerContext] playPrevious - playing track at index ${prevIndex}: ${prevTrack.title}`);
+        await updateQueuePosition(currentQueueId, prevIndex);
+        setCurrentTrack(prevTrack);
+        
+        // Load album art
+        try {
+          const artBytes = await libraryApi.getAlbumArt(prevTrack.file_path);
+          if (artBytes && artBytes.length > 0) {
+            const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
+            const url = URL.createObjectURL(blob);
+            if (albumArt) {
+              URL.revokeObjectURL(albumArt);
+            }
+            setAlbumArt(url);
+          } else {
+            setAlbumArt(null);
+          }
+        } catch (error) {
+          console.error("Failed to load album art:", error);
+          setAlbumArt(null);
+        }
+
+        // Play the track
+        await playerApi.playFile(prevTrack.file_path);
+      }
+    } catch (error) {
+      console.error('Failed to play previous track:', error);
+    }
+  }, [currentQueueId, currentTrackIndex, albumArt, updateQueuePosition]);
 
   // Load active queue's current track on startup
   useEffect(() => {
@@ -180,9 +275,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      // TODO: Implement next/previous with queue support
-      navigator.mediaSession.setActionHandler("previoustrack", null);
-      navigator.mediaSession.setActionHandler("nexttrack", null);
+      navigator.mediaSession.setActionHandler("previoustrack", async () => {
+        try {
+          await playPrevious();
+        } catch (error) {
+          console.error("Failed to play previous track:", error);
+        }
+      });
+
+      navigator.mediaSession.setActionHandler("nexttrack", async () => {
+        try {
+          await playNext();
+        } catch (error) {
+          console.error("Failed to play next track:", error);
+        }
+      });
     }
 
     return () => {
@@ -191,7 +298,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         URL.revokeObjectURL(albumArt);
       }
     };
-  }, [currentTrack?.file_path]);
+  }, [currentTrack?.file_path, playNext, playPrevious]);
 
   return (
     <PlayerContext.Provider value={{ 
@@ -201,7 +308,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrackIndex, 
       setCurrentTrack, 
       setAlbumArt,
-      updateQueuePosition
+      updateQueuePosition,
+      playNext,
+      playPrevious
     }}>
       {children}
     </PlayerContext.Provider>
