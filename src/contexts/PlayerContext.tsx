@@ -56,10 +56,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           if (artBytes && artBytes.length > 0) {
             const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
             const url = URL.createObjectURL(blob);
-            if (albumArt) {
-              URL.revokeObjectURL(albumArt);
-            }
-            setAlbumArt(url);
+            setAlbumArt(prevArt => {
+              if (prevArt) {
+                URL.revokeObjectURL(prevArt);
+              }
+              return url;
+            });
           } else {
             setAlbumArt(null);
           }
@@ -102,10 +104,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           if (artBytes && artBytes.length > 0) {
             const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
             const url = URL.createObjectURL(blob);
-            if (albumArt) {
-              URL.revokeObjectURL(albumArt);
-            }
-            setAlbumArt(url);
+            setAlbumArt(prevArt => {
+              if (prevArt) {
+                URL.revokeObjectURL(prevArt);
+              }
+              return url;
+            });
           } else {
             setAlbumArt(null);
           }
@@ -210,12 +214,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                     const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
                     const url = URL.createObjectURL(blob);
                     
-                    // Clean up old URL
-                    if (albumArt) {
-                      URL.revokeObjectURL(albumArt);
-                    }
-                    
-                    setAlbumArt(url);
+                    setAlbumArt(prevArt => {
+                      // Clean up old URL
+                      if (prevArt) {
+                        URL.revokeObjectURL(prevArt);
+                      }
+                      return url;
+                    });
                     
                     // Update media session
                     if ("mediaSession" in navigator && track) {
@@ -294,11 +299,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     return () => {
       clearInterval(interval);
+    };
+  }, [currentTrack?.file_path, playNext, playPrevious]);
+
+  // Cleanup blob URLs only on unmount
+  useEffect(() => {
+    return () => {
       if (albumArt) {
         URL.revokeObjectURL(albumArt);
       }
     };
-  }, [currentTrack?.file_path, playNext, playPrevious]);
+  }, []);
 
   return (
     <PlayerContext.Provider value={{ 

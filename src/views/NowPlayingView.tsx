@@ -16,6 +16,8 @@ import {
   Pause,
   SkipNext,
   SkipPrevious,
+  FastRewind,
+  FastForward,
   Shuffle,
   Repeat,
   VolumeUp,
@@ -31,8 +33,7 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProps) {
-  const isShortHeight = useMediaQuery('(max-height:600px)');
-  const { currentTrack, albumArt } = usePlayer();
+  const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -94,13 +95,37 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
   };
 
   const handleNext = async () => {
-    // TODO: Implement with backend queue navigation
-    console.log("Next track - needs backend implementation");
+    try {
+      await playNext();
+    } catch (error) {
+      console.error("Failed to play next track:", error);
+    }
   };
 
   const handlePrevious = async () => {
-    // TODO: Implement with backend queue navigation
-    console.log("Previous track - needs backend implementation");
+    try {
+      await playPrevious();
+    } catch (error) {
+      console.error("Failed to play previous track:", error);
+    }
+  };
+
+  const handleRewind = async () => {
+    try {
+      const newPosition = Math.max(0, currentPosition - 5000); // 5 seconds back
+      await playerApi.seekTo(newPosition);
+    } catch (error) {
+      console.error("Failed to rewind:", error);
+    }
+  };
+
+  const handleFastForward = async () => {
+    try {
+      const newPosition = Math.min(duration, currentPosition + 15000); // 15 seconds forward
+      await playerApi.seekTo(newPosition);
+    } catch (error) {
+      console.error("Failed to fast forward:", error);
+    }
   };
 
   const handleSeekMouseDown = () => {
@@ -139,7 +164,11 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
         }}
       >
         {albumArt ? (
-          <img src={albumArt} alt="Album Art" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img 
+            src={albumArt} 
+            alt="Album Art" 
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
         ) : (
           <MusicNote sx={{ fontSize: isShortHeight ? 40 : 60, opacity: 0.3 }} />
         )}
@@ -204,8 +233,11 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
         <IconButton size="small" disabled={!currentTrack} sx={{ color: "text.secondary" }}>
           <Shuffle />
         </IconButton>
-        <IconButton onClick={handlePrevious} disabled={!currentTrack} sx={{ color: "text.primary" }}>
+        <IconButton onClick={handlePrevious} disabled={!currentTrack} sx={{ color: "text.primary" }} title="Previous Track">
           <SkipPrevious fontSize="large" />
+        </IconButton>
+        <IconButton onClick={handleRewind} disabled={!currentTrack} sx={{ color: "text.secondary" }} title="Rewind 5s">
+          <FastRewind />
         </IconButton>
         <IconButton
           onClick={handlePlayPause}
@@ -219,7 +251,10 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
         >
           {isPlaying ? <Pause fontSize="large" /> : <PlayArrow fontSize="large" />}
         </IconButton>
-        <IconButton onClick={handleNext} disabled={!currentTrack} sx={{ color: "text.primary" }}>
+        <IconButton onClick={handleFastForward} disabled={!currentTrack} sx={{ color: "text.secondary" }} title="Fast Forward 15s">
+          <FastForward />
+        </IconButton>
+        <IconButton onClick={handleNext} disabled={!currentTrack} sx={{ color: "text.primary" }} title="Next Track">
           <SkipNext fontSize="large" />
         </IconButton>
         <IconButton size="small" disabled={!currentTrack} sx={{ color: "text.secondary" }}>
