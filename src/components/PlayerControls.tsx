@@ -76,6 +76,25 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
     setIsSeeking(true);
   };
 
+  const handleRewind = async () => {
+    try {
+      const newPosition = Math.max(0, playerState.position_ms - 5000); // 5 seconds back
+      await playerApi.seekTo(newPosition);
+    } catch (error) {
+      console.error("Failed to rewind:", error);
+    }
+  };
+
+  const handleFastForward = async () => {
+    try {
+      const maxPosition = playerState.duration_ms || playerState.position_ms;
+      const newPosition = Math.min(maxPosition, playerState.position_ms + 15000); // 15 seconds forward
+      await playerApi.seekTo(newPosition);
+    } catch (error) {
+      console.error("Failed to fast forward:", error);
+    }
+  };
+
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -165,10 +184,10 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
           </IconButton>
 
           <IconButton
-            onClick={() => {/* TODO: implement rewind */}}
+            onClick={handleRewind}
             disabled={!playerState.current_file}
             size="small"
-            title="Rewind"
+            title="Rewind 5s"
             sx={{ color: "text.secondary" }}
           >
             <FastRewind />
@@ -185,10 +204,10 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
           </IconButton>
 
           <IconButton
-            onClick={() => {/* TODO: implement fast forward */}}
+            onClick={handleFastForward}
             disabled={!playerState.current_file}
             size="small"
-            title="Fast Forward"
+            title="Fast Forward 15s"
             sx={{ color: "text.secondary" }}
           >
             <FastForward />
