@@ -44,6 +44,12 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
 
         if (itemRef.current) {
             observer.observe(itemRef.current);
+            // Check initial visibility immediately
+            const rect = itemRef.current.getBoundingClientRect();
+            const isInitiallyVisible = rect.top < window.innerHeight + 200 && rect.bottom > -200;
+            if (isInitiallyVisible) {
+                setIsVisible(true);
+            }
         }
 
         return () => {

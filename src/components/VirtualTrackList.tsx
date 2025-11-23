@@ -32,6 +32,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [visibleEnd, setVisibleEnd] = useState(20);
   const [currentPlayingFile, setCurrentPlayingFile] = useState<string | null>(null);
   const [queueCurrentIndex, setQueueCurrentIndex] = useState<number>(-1);
+  const [, setAlbumArtVersion] = useState(0); // Force re-render when album art loads
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Array<{ track: Track; index: number; albumArt?: string }>>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -48,7 +49,10 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   // Calculate visible range on scroll with debounce
   const scrollTimeoutRef = useRef<number | null>(null);
   const handleScroll = useCallback(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) {
+      console.log(`[VirtualTrackList] handleScroll - no containerRef`);
+      return;
+    }
     
     if (scrollTimeoutRef.current !== null) {
       clearTimeout(scrollTimeoutRef.current);
@@ -59,6 +63,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
       
       const scrollTop = containerRef.current.scrollTop;
       const viewportHeight = containerRef.current.clientHeight;
+      
+      console.log(`[VirtualTrackList] handleScroll - scrollTop: ${scrollTop}, viewportHeight: ${viewportHeight}`);
       
       // Don't calculate if container not properly sized yet
       if (viewportHeight === 0) {
@@ -72,7 +78,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         Math.ceil((scrollTop + viewportHeight) / ITEM_HEIGHT) + OVERSCAN
       );
       
-      console.log(`[VirtualTrackList] Scroll - range: ${start}-${end}, total: ${tracks.length}`);
+      console.log(`[VirtualTrackList] Scroll - calculated range: ${start}-${end}, total: ${tracks.length}`);
       setVisibleStart(start);
       setVisibleEnd(end);
     }, 50); // Debounce scroll events
@@ -180,11 +186,25 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
 
   // Initialize visible range
   useEffect(() => {
-    console.log(`[VirtualTrackList] Initialize visible range - tracks: ${tracks.length}`);
-    // Only calculate if container is properly sized
-    if (containerRef.current && containerRef.current.clientHeight > 0) {
-      handleScroll();
-    }
+    console.log(`[VirtualTrackList] Initialize visible range useEffect - tracks: ${tracks.length}`);
+    let attempts = 0;
+    // Use requestAnimationFrame to ensure DOM is ready
+    const initializeVisibleRange = () => {
+      attempts++;
+      console.log(`[VirtualTrackList] Initialize attempt ${attempts}, containerRef exists: ${!!containerRef.current}, clientHeight: ${containerRef.current?.clientHeight || 0}`);
+      if (containerRef.current && containerRef.current.clientHeight > 0) {
+        console.log(`[VirtualTrackList] Container ready, calling handleScroll`);
+        handleScroll();
+      } else if (attempts < 60) { // Max 60 attempts (~1 second)
+        // Retry after a short delay if container not ready
+        console.log(`[VirtualTrackList] Container not ready, retrying...`);
+        requestAnimationFrame(initializeVisibleRange);
+      } else {
+        console.log(`[VirtualTrackList] Container initialization timeout after ${attempts} attempts`);
+      }
+    };
+    
+    requestAnimationFrame(initializeVisibleRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks.length]);
 
@@ -243,11 +263,12 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             const blob = new Blob([new Uint8Array(artData)], { type: "image/jpeg" });
             const url = URL.createObjectURL(blob);
             albumArtCacheRef.current.set(filePath, url);
-            console.log(`[VirtualTrackList] Loaded album art for: ${filePath.substring(filePath.lastIndexOf('/') + 1)}`);
-            // Note: Album art will appear on next natural re-render (scroll, interaction, etc.)
+            console.log(`[VirtualTrackList] Loaded album art for: ${filePath.substring(filePath.lastIndexOf('/') + 1)}, URL: ${url.substring(0, 50)}`);
+            // Force re-render by updating version counter
+            setAlbumArtVersion(v => v + 1);
           }
         } catch (error) {
-          // Silently ignore errors during scrolling
+          console.error(`[VirtualTrackList] Failed to load album art for: ${filePath}`, error);
         } finally {
           loadingArtRef.current.delete(filePath);
           activeLoadsRef.current--;
@@ -259,15 +280,19 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
 
   // Load album art for visible tracks
   useEffect(() => {
-    console.log(`[VirtualTrackList] Load visible tracks useEffect - range: ${visibleStart}-${visibleEnd}`);
+    console.log(`[VirtualTrackList] Load visible tracks useEffect - range: ${visibleStart}-${visibleEnd}, total tracks: ${tracks.length}`);
     // Clear queue and add visible tracks
     loadQueueRef.current = [];
     const visibleTracks = tracks.slice(visibleStart, visibleEnd);
+    console.log(`[VirtualTrackList] Visible tracks count: ${visibleTracks.length}`);
+    let queuedCount = 0;
     visibleTracks.forEach(track => {
       if (!albumArtCacheRef.current.has(track.file_path) && !loadingArtRef.current.has(track.file_path)) {
         loadQueueRef.current.push(track.file_path);
+        queuedCount++;
       }
     });
+    console.log(`[VirtualTrackList] Queued ${queuedCount} tracks for album art loading`);
     
     processLoadQueue();
   }, [visibleStart, visibleEnd, tracks, processLoadQueue]);
@@ -584,6 +609,11 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             const shouldHighlight = isPlaying || isQueueCurrentTrack;
             const isFlashing = flashingIndex === actualIndex;
             
+            // Debug log for first few tracks
+            if (actualIndex < 3) {
+              console.log(`[VirtualTrackList] Track ${actualIndex}: ${track.title}, albumArt exists: ${!!albumArt}, albumArt value: ${albumArt?.substring(0, 50)}`);
+            }
+            
             return (
               <Box
                 key={track.id}
@@ -625,7 +655,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                     bgcolor: "background.default",
                   }}
                 >
-                  <MusicNoteIcon sx={{ opacity: 0.3 }} />
+                  {!albumArt && (
+                    <MusicNoteIcon sx={{ opacity: 0.3 }} />
+                  )}
                 </Avatar>
 
                 {/* Track Info */}
