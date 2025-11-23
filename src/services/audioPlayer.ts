@@ -11,11 +11,13 @@ interface PlayerState {
 }
 
 type StateChangeCallback = (state: PlayerState) => void;
+type TrackEndedCallback = () => void;
 
 class AudioPlayer {
   private audio: HTMLAudioElement | null = null;
   private currentFile: string | null = null;
   private stateCallbacks: Set<StateChangeCallback> = new Set();
+  private trackEndedCallbacks: Set<TrackEndedCallback> = new Set();
   private updateInterval: number | null = null;
 
   constructor() {
@@ -26,7 +28,10 @@ class AudioPlayer {
     // Set up event listeners
     this.audio.addEventListener('play', () => this.notifyStateChange());
     this.audio.addEventListener('pause', () => this.notifyStateChange());
-    this.audio.addEventListener('ended', () => this.notifyStateChange());
+    this.audio.addEventListener('ended', () => {
+      this.notifyStateChange();
+      this.notifyTrackEnded();
+    });
     this.audio.addEventListener('loadedmetadata', () => this.notifyStateChange());
     this.audio.addEventListener('timeupdate', () => this.notifyStateChange());
     this.audio.addEventListener('error', (e) => {
@@ -121,9 +126,21 @@ class AudioPlayer {
     };
   }
 
+  onTrackEnded(callback: TrackEndedCallback): () => void {
+    this.trackEndedCallbacks.add(callback);
+    // Return unsubscribe function
+    return () => {
+      this.trackEndedCallbacks.delete(callback);
+    };
+  }
+
   private notifyStateChange(): void {
     const state = this.getState();
     this.stateCallbacks.forEach(callback => callback(state));
+  }
+
+  private notifyTrackEnded(): void {
+    this.trackEndedCallbacks.forEach(callback => callback());
   }
 
   destroy(): void {
@@ -136,6 +153,7 @@ class AudioPlayer {
       this.audio = null;
     }
     this.stateCallbacks.clear();
+    this.trackEndedCallbacks.clear();
   }
 }
 

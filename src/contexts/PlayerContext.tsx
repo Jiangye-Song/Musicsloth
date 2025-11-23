@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { playerApi, libraryApi, queueApi, Track } from "../services/api";
+import { audioPlayer } from "../services/audioPlayer";
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -184,6 +185,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     
     loadActiveQueueTrack();
   }, []); // Run only once on mount
+
+  // Set up track ended listener to auto-play next track
+  useEffect(() => {
+    const unsubscribe = audioPlayer.onTrackEnded(() => {
+      console.log('[PlayerContext] Track ended, playing next track');
+      playNext();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [playNext]);
 
   useEffect(() => {
     console.log('[PlayerContext] Setting up polling interval');
