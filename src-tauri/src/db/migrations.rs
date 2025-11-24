@@ -124,6 +124,19 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    // Migration: Add shuffle_seed column to existing queues table if it doesn't exist
+    let shuffle_seed_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('queues') WHERE name='shuffle_seed'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = shuffle_seed_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE queues ADD COLUMN shuffle_seed INTEGER", [])?;
+        }
+    }
+
     // Create queue_tracks junction table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS queue_tracks (

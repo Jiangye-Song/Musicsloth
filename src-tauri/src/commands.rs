@@ -313,9 +313,27 @@ pub fn get_queue_track_at_position(queue_id: i64, position: i32, state: State<'_
 }
 
 #[tauri::command]
+pub fn get_queue_track_at_shuffled_position(queue_id: i64, shuffled_position: i32, shuffle_seed: i64, state: State<'_, AppState>) -> Result<Option<Track>, String> {
+    DbOperations::get_queue_track_at_shuffled_position(&state.db, queue_id, shuffled_position, shuffle_seed)
+        .map_err(|e| format!("Failed to get queue track at shuffled position: {}", e))
+}
+
+#[tauri::command]
 pub fn get_queue_length(queue_id: i64, state: State<'_, AppState>) -> Result<i32, String> {
     DbOperations::get_queue_length(&state.db, queue_id)
         .map_err(|e| format!("Failed to get queue length: {}", e))
+}
+
+#[tauri::command]
+pub fn toggle_queue_shuffle(queue_id: i64, state: State<'_, AppState>) -> Result<i64, String> {
+    DbOperations::toggle_queue_shuffle(&state.db, queue_id)
+        .map_err(|e| format!("Failed to toggle queue shuffle: {}", e))
+}
+
+#[tauri::command]
+pub fn find_shuffled_position(original_index: i32, seed: i64, queue_length: i32) -> Result<i32, String> {
+    DbOperations::find_shuffled_position(original_index, seed, queue_length)
+        .map_err(|e| format!("Failed to find shuffled position: {}", e))
 }
 
 // ===== System Playlists Commands =====

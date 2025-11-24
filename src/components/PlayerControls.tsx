@@ -30,7 +30,7 @@ interface PlayerControlsProps {
 }
 
 export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerControlsProps) {
-  const { currentTrack, albumArt, playNext, playPrevious } = usePlayer();
+  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle } = usePlayer();
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,
@@ -279,10 +279,10 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
                 <Repeat />
               </IconButton>
               <IconButton
-                onClick={() => {/* TODO: implement shuffle */ }}
+                onClick={toggleShuffle}
                 size="small"
-                title="Shuffle"
-                sx={{ color: "text.primary" }}
+                title={isShuffled ? "Shuffle On" : "Shuffle Off"}
+                sx={{ color: isShuffled ? "primary.main" : "text.primary" }}
               >
                 <Shuffle />
               </IconButton>

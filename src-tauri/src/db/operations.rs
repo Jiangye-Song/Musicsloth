@@ -541,9 +541,9 @@ impl DbOperations {
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
         
-        // Create new queue
+        // Create new queue with shuffle_seed = 1 (sequential by default)
         conn.execute(
-            "INSERT INTO queues (name, is_active, current_track_index, date_created, date_modified) VALUES (?1, 1, 0, ?2, ?3)",
+            "INSERT INTO queues (name, is_active, current_track_index, date_created, date_modified, shuffle_seed) VALUES (?1, 1, 0, ?2, ?3, 1)",
             params![name, now, now],
         )?;
         
@@ -584,7 +584,7 @@ impl DbOperations {
         // Insert in batches to avoid stack overflow with huge track lists
         const BATCH_SIZE: usize = 500;
         for chunk in track_ids.chunks(BATCH_SIZE) {
-            for (index_in_chunk, track_id) in chunk.iter().enumerate() {
+            for (_index_in_chunk, track_id) in chunk.iter().enumerate() {
                 let global_index = track_ids.iter().position(|&id| id == *track_id).unwrap_or(0);
                 tx.execute(
                     "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
@@ -629,7 +629,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, track_hash FROM queues ORDER BY id DESC"
+            "SELECT id, name, is_active, track_hash, shuffle_seed FROM queues ORDER BY id DESC"
         )?;
         
         let queues = stmt.query_map([], |row| {
@@ -638,6 +638,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 is_active: row.get(2)?,
                 track_hash: row.get(3)?,
+                shuffle_seed: row.get::<_, Option<i64>>(4)?.unwrap_or(1),
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -754,7 +755,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, track_hash FROM queues WHERE is_active = 1 LIMIT 1"
+            "SELECT id, name, is_active, track_hash, shuffle_seed FROM queues WHERE is_active = 1 LIMIT 1"
         )?;
         
         let mut rows = stmt.query([])?;
@@ -765,6 +766,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 is_active: row.get(2)?,
                 track_hash: row.get(3)?,
+                shuffle_seed: row.get::<_, Option<i64>>(4)?.unwrap_or(1),
             }))
         } else {
             Ok(None)
@@ -828,7 +830,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, track_hash
+            "SELECT id, name, is_active, track_hash, shuffle_seed
              FROM queues
              WHERE id != ?1
              ORDER BY id DESC
@@ -841,6 +843,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 is_active: row.get(2)?,
                 track_hash: row.get(3)?,
+                shuffle_seed: row.get::<_, Option<i64>>(4)?.unwrap_or(1),
             })
         }).optional()?;
         
@@ -888,6 +891,54 @@ impl DbOperations {
         }).optional()?;
         
         Ok(track)
+    }
+
+    /// Get track at a shuffled position in the queue
+    /// This applies the shuffle algorithm to map the shuffled position to the original position
+    pub fn get_queue_track_at_shuffled_position(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        shuffled_position: i32,
+        shuffle_seed: i64,
+    ) -> Result<Option<Track>, anyhow::Error> {
+        // If seed is 1 (sequential), just use the regular position
+        if shuffle_seed == 1 {
+            return Self::get_queue_track_at_position(db, queue_id, shuffled_position);
+        }
+
+        // Get the queue length
+        let queue_length = Self::get_queue_length(db, queue_id)?;
+        
+        if queue_length == 0 {
+            return Ok(None);
+        }
+
+        // Generate the shuffled order and find the original position
+        let step = (shuffle_seed.abs() % queue_length as i64) as i32;
+        let step = if step == 0 { 1 } else { step };
+        
+        let mut current_pos = 0;
+        let mut used = std::collections::HashSet::new();
+        
+        // Generate shuffled order until we reach the desired shuffled position
+        for i in 0..queue_length {
+            // Skip already used positions
+            while used.contains(&current_pos) {
+                current_pos = (current_pos + 1) % queue_length;
+            }
+            
+            // Check if this is the shuffled position we're looking for
+            if i == shuffled_position {
+                // current_pos is the original position for this shuffled position
+                return Self::get_queue_track_at_position(db, queue_id, current_pos);
+            }
+            
+            used.insert(current_pos);
+            current_pos = (current_pos + step) % queue_length;
+        }
+        
+        // Shouldn't reach here, but return None as fallback
+        Ok(None)
     }
 
     // ===== System Playlists =====
@@ -1032,5 +1083,118 @@ impl DbOperations {
         let count: i32 = stmt.query_row([queue_id], |row| row.get(0))?;
         
         Ok(count)
+    }
+
+    /// Toggle shuffle for a queue
+    /// If shuffle_seed is 1 (sequential), generate a random seed and enable shuffle
+    /// If shuffle_seed is not 1, set it to 1 and disable shuffle
+    pub fn toggle_queue_shuffle(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<i64, anyhow::Error> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Get current shuffle_seed (default to 1 if NULL)
+        let current_seed: Option<i64> = conn.query_row(
+            "SELECT shuffle_seed FROM queues WHERE id = ?1",
+            [queue_id],
+            |row| row.get(0)
+        )?;
+        
+        let current_seed = current_seed.unwrap_or(1);
+        
+        let new_seed = if current_seed == 1 {
+            // Enable shuffle - generate random seed (ensure it's not 1)
+            let mut seed = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as i64;
+            if seed == 1 {
+                seed = 2; // Avoid seed of 1
+            }
+            seed
+        } else {
+            // Disable shuffle - set to 1 (sequential)
+            1
+        };
+        
+        // Update the queue
+        conn.execute(
+            "UPDATE queues SET shuffle_seed = ?1 WHERE id = ?2",
+            rusqlite::params![new_seed, queue_id]
+        )?;
+        
+        Ok(new_seed)
+    }
+
+    /// Calculate shuffled index using seed-based algorithm
+    /// Given current index, seed, and queue length, calculate next/previous index
+    pub fn calculate_shuffled_index(
+        current_index: i32,
+        seed: i64,
+        queue_length: i32,
+        direction: i32, // 1 for next, -1 for previous
+    ) -> i32 {
+        if queue_length <= 1 {
+            return 0;
+        }
+        
+        // Use seed modulo queue_length as the step size
+        let step = (seed.abs() % queue_length as i64) as i32;
+        let step = if step == 0 { 1 } else { step }; // Ensure step is at least 1
+        
+        let next_index = if direction > 0 {
+            (current_index + step) % queue_length
+        } else {
+            (current_index - step + queue_length) % queue_length
+        };
+        
+        next_index
+    }
+
+    /// Find what position an original track index ends up at after shuffling
+    /// This is needed when toggling shuffle to maintain the current track position
+    pub fn find_shuffled_position(
+        original_index: i32,
+        seed: i64,
+        queue_length: i32,
+    ) -> Result<i32, Box<dyn std::error::Error>> {
+        if queue_length <= 1 {
+            return Ok(0);
+        }
+        
+        if seed == 1 {
+            // No shuffle, position stays the same
+            return Ok(original_index);
+        }
+        
+        // Generate the same shuffled order and find where original_index ends up
+        let step = (seed.abs() % queue_length as i64) as i32;
+        let step = if step == 0 { 1 } else { step };
+        
+        let mut current_pos = 0;
+        let mut used = std::collections::HashSet::new();
+        
+        // Generate shuffled order until we find the original index
+        for new_position in 0..queue_length {
+            // Skip already used positions
+            while used.contains(&current_pos) {
+                current_pos = (current_pos + 1) % queue_length;
+            }
+            
+            // Check if this is the position we're looking for
+            if current_pos == original_index {
+                return Ok(new_position);
+            }
+            
+            used.insert(current_pos);
+            current_pos = (current_pos + step) % queue_length;
+        }
+        
+        // Shouldn't reach here, but return original index as fallback
+        Ok(original_index)
     }
 }

@@ -34,7 +34,7 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowPlayingViewProps) {
-  const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious } = usePlayer();
+  const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -231,7 +231,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowP
 
       {/* Playback Controls */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-        <IconButton size="small" disabled={!currentTrack} sx={{ color: "text.secondary" }}>
+        <IconButton 
+          onClick={toggleShuffle}
+          size="small" 
+          disabled={!currentTrack} 
+          title={isShuffled ? "Shuffle On" : "Shuffle Off"}
+          sx={{ color: isShuffled ? "primary.main" : "text.secondary" }}
+        >
           <Shuffle />
         </IconButton>
         <IconButton onClick={handlePrevious} disabled={!currentTrack} sx={{ color: "text.primary" }} title="Previous Track">

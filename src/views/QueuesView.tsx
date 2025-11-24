@@ -6,6 +6,8 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
+import ShuffleIcon from "@mui/icons-material/Shuffle";
+import { usePlayer } from "../contexts/PlayerContext";
 
 interface QueuesViewProps {
   searchQuery?: string;
@@ -16,6 +18,7 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "" }, ref) => {
+  const { currentQueueId, shuffleSeed, currentTrack } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -48,6 +51,14 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
     loadQueues();
   }, []);
 
+  // Reload queue tracks when shuffle state changes for the active queue
+  useEffect(() => {
+    if (selectedQueue && selectedQueue.id === currentQueueId) {
+      console.log(`[QueuesView] Shuffle seed changed to ${shuffleSeed}, reloading tracks`);
+      loadQueueTracks(selectedQueue.id, true);
+    }
+  }, [shuffleSeed]);
+
   useEffect(() => {
     const updatePlayingState = async () => {
       try {
@@ -62,6 +73,8 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
     const interval = setInterval(updatePlayingState, 500);
     return () => clearInterval(interval);
   }, []);
+
+
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
@@ -113,8 +126,42 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
   const loadQueueTracks = async (queueId: number, silent = false) => {
     if (!silent) setLoading(true);
     try {
+      // Refresh queue data to get latest shuffle_seed
+      const allQueues = await queueApi.getAllQueues();
+      const queue = allQueues.find(q => q.id === queueId);
+      
+      // Update selectedQueue if it's the one being loaded
+      if (selectedQueue?.id === queueId && queue) {
+        setSelectedQueue(queue);
+      }
+      
       const tracks = await queueApi.getQueueTracks(queueId);
-      setQueueTracks(tracks);
+      
+      // Apply shuffle if the queue has a shuffle seed that's not 1
+      if (queue && queue.shuffle_seed !== null && queue.shuffle_seed !== 1) {
+        // Create shuffled order based on seed
+        const shuffled = [...tracks];
+        const seed = queue.shuffle_seed;
+        const step = Math.abs(seed) % tracks.length || 1;
+        
+        const newOrder: typeof tracks = [];
+        const used = new Set<number>();
+        let currentIndex = 0;
+        
+        // Generate shuffled order by following the step pattern
+        for (let i = 0; i < tracks.length; i++) {
+          while (used.has(currentIndex)) {
+            currentIndex = (currentIndex + 1) % tracks.length;
+          }
+          newOrder.push(shuffled[currentIndex]);
+          used.add(currentIndex);
+          currentIndex = (currentIndex + step) % tracks.length;
+        }
+        
+        setQueueTracks(newOrder);
+      } else {
+        setQueueTracks(tracks);
+      }
     } catch (error) {
       console.error("Failed to load queue tracks:", error);
     } finally {
@@ -361,9 +408,14 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
         {selectedQueue ? (
           <>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
-              <Typography variant="h5" component="h2">
-                {selectedQueue.name}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography variant="h5" component="h2">
+                  {selectedQueue.name}
+                </Typography>
+                {selectedQueue.shuffle_seed !== 1 && (
+                  <ShuffleIcon sx={{ color: "primary.main", fontSize: 20 }} />
+                )}
+              </Box>
               <Box sx={{ display: "flex", gap: 1.5 }}>
                 <IconButton
                   onClick={() => trackListRef.current?.scrollToActiveTrack()}
@@ -406,6 +458,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                     showPlayingIndicator={true}
                     onQueueActivated={() => loadQueues(true)}
                     showSearch={true}
+                    activeTrackFilePath={selectedQueue.is_active ? currentTrack?.file_path : null}
                   />
                 </div>
               </>

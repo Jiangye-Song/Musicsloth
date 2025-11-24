@@ -60,4 +60,10 @@ pub struct Queue {
     pub name: String,
     pub is_active: bool,
     pub track_hash: Option<String>,
+    #[serde(default = "default_shuffle_seed")]
+    pub shuffle_seed: i64,
+}
+
+fn default_shuffle_seed() -> i64 {
+    1
 }

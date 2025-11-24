@@ -22,9 +22,10 @@ interface VirtualTrackListProps {
   showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
   onQueueActivated?: () => void; // Callback when queue is activated
   showSearch?: boolean; // Whether to show the search bar
+  activeTrackFilePath?: string | null; // File path of the currently active track in the queue
 }
 
-const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false }, ref) => {
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false, activeTrackFilePath }, ref) => {
 // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
@@ -612,7 +613,10 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             const albumArt = albumArtCacheRef.current.get(track.file_path);
             const actualIndex = visibleStart + visibleIndex;
             const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
-            const isQueueCurrentTrack = contextType === "queue" && actualIndex === queueCurrentIndex;
+            // For active queue in queue view, check by file path instead of index to handle shuffle
+            const isQueueCurrentTrack = contextType === "queue" && isActiveQueue && activeTrackFilePath 
+              ? track.file_path === activeTrackFilePath 
+              : contextType === "queue" && actualIndex === queueCurrentIndex;
             const isInactiveQueue = contextType === "queue" && !isActiveQueue;
             const shouldHighlight = isPlaying || isQueueCurrentTrack;
             const isFlashing = flashingIndex === actualIndex;
