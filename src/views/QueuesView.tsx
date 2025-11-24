@@ -18,7 +18,7 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "" }, ref) => {
-  const { currentQueueId, shuffleSeed, currentTrack } = usePlayer();
+  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -139,23 +139,40 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       
       // Apply shuffle if the queue has a shuffle seed that's not 1
       if (queue && queue.shuffle_seed !== null && queue.shuffle_seed !== 1) {
-        // Create shuffled order based on seed
+        // Get current index to use as anchor
+        const currentIndex = queue.is_active && currentQueueId === queueId && currentTrackIndex !== null 
+          ? currentTrackIndex 
+          : await queueApi.getQueueCurrentIndex(queueId);
+        
+        // Create shuffled order based on seed, anchored at current track
         const shuffled = [...tracks];
         const seed = queue.shuffle_seed;
         const step = Math.abs(seed) % tracks.length || 1;
+        const anchor = currentIndex;
         
         const newOrder: typeof tracks = [];
         const used = new Set<number>();
-        let currentIndex = 0;
+        let currentPos = anchor;
         
-        // Generate shuffled order by following the step pattern
+        // First, place the anchor track at its position
+        used.add(anchor);
+        
+        // Generate shuffled order by following the step pattern from anchor
         for (let i = 0; i < tracks.length; i++) {
-          while (used.has(currentIndex)) {
-            currentIndex = (currentIndex + 1) % tracks.length;
+          if (i === anchor) {
+            // Anchor stays at its position
+            newOrder.push(shuffled[anchor]);
+            continue;
           }
-          newOrder.push(shuffled[currentIndex]);
-          used.add(currentIndex);
-          currentIndex = (currentIndex + step) % tracks.length;
+          
+          // Find next unused position using step pattern
+          currentPos = (currentPos + step) % tracks.length;
+          while (used.has(currentPos)) {
+            currentPos = (currentPos + 1) % tracks.length;
+          }
+          
+          newOrder.push(shuffled[currentPos]);
+          used.add(currentPos);
         }
         
         setQueueTracks(newOrder);

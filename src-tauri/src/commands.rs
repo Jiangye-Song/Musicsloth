@@ -313,8 +313,8 @@ pub fn get_queue_track_at_position(queue_id: i64, position: i32, state: State<'_
 }
 
 #[tauri::command]
-pub fn get_queue_track_at_shuffled_position(queue_id: i64, shuffled_position: i32, shuffle_seed: i64, state: State<'_, AppState>) -> Result<Option<Track>, String> {
-    DbOperations::get_queue_track_at_shuffled_position(&state.db, queue_id, shuffled_position, shuffle_seed)
+pub fn get_queue_track_at_shuffled_position(queue_id: i64, shuffled_position: i32, shuffle_seed: i64, anchor_position: i32, state: State<'_, AppState>) -> Result<Option<Track>, String> {
+    DbOperations::get_queue_track_at_shuffled_position(&state.db, queue_id, shuffled_position, shuffle_seed, anchor_position)
         .map_err(|e| format!("Failed to get queue track at shuffled position: {}", e))
 }
 
@@ -331,8 +331,8 @@ pub fn toggle_queue_shuffle(queue_id: i64, state: State<'_, AppState>) -> Result
 }
 
 #[tauri::command]
-pub fn find_shuffled_position(original_index: i32, seed: i64, queue_length: i32) -> Result<i32, String> {
-    DbOperations::find_shuffled_position(original_index, seed, queue_length)
+pub fn find_shuffled_position(original_index: i32, seed: i64, queue_length: i32, anchor_position: i32) -> Result<i32, String> {
+    DbOperations::find_shuffled_position(original_index, seed, queue_length, anchor_position)
         .map_err(|e| format!("Failed to find shuffled position: {}", e))
 }
 

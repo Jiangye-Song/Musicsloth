@@ -23,15 +23,15 @@ impl MetadataExtractor {
         let tag = tagged_file.primary_tag().or(tagged_file.first_tag());
         let properties = tagged_file.properties();
 
-        // Debug logging for problematic files
-        if let Some(t) = tag {
-            eprintln!("DEBUG - File: {:?}", file_path.file_name());
-            eprintln!("  Tag type: {:?}", t.tag_type());
-            eprintln!("  Title: {:?}", t.title());
-            eprintln!("  Artist: {:?}", t.artist());
-            eprintln!("  Album: {:?}", t.album());
-            eprintln!("  Genre: {:?}", t.genre());
-        }
+        // // Debug logging for problematic files
+        // if let Some(t) = tag {
+        //     eprintln!("DEBUG - File: {:?}", file_path.file_name());
+        //     eprintln!("  Tag type: {:?}", t.tag_type());
+        //     eprintln!("  Title: {:?}", t.title());
+        //     eprintln!("  Artist: {:?}", t.artist());
+        //     eprintln!("  Album: {:?}", t.album());
+        //     eprintln!("  Genre: {:?}", t.genre());
+        // }
 
         let title = tag
             .and_then(|t| t.title().map(|s| s.to_string()))

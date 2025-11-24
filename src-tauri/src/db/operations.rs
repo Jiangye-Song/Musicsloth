@@ -895,11 +895,13 @@ impl DbOperations {
 
     /// Get track at a shuffled position in the queue
     /// This applies the shuffle algorithm to map the shuffled position to the original position
+    /// The shuffle pattern is anchored at the anchor_position (typically the currently playing track)
     pub fn get_queue_track_at_shuffled_position(
         db: &DatabaseConnection,
         queue_id: i64,
         shuffled_position: i32,
         shuffle_seed: i64,
+        anchor_position: i32,
     ) -> Result<Option<Track>, anyhow::Error> {
         // If seed is 1 (sequential), just use the regular position
         if shuffle_seed == 1 {
@@ -913,16 +915,28 @@ impl DbOperations {
             return Ok(None);
         }
 
-        // Generate the shuffled order and find the original position
+        // If this is the anchor position, return the track at anchor position
+        if shuffled_position == anchor_position {
+            return Self::get_queue_track_at_position(db, queue_id, anchor_position);
+        }
+
+        // Generate the shuffled order starting from anchor position
         let step = (shuffle_seed.abs() % queue_length as i64) as i32;
         let step = if step == 0 { 1 } else { step };
         
-        let mut current_pos = 0;
+        let mut current_pos = anchor_position; // Start from anchor
         let mut used = std::collections::HashSet::new();
+        used.insert(anchor_position); // Anchor is always at its own position
         
         // Generate shuffled order until we reach the desired shuffled position
         for i in 0..queue_length {
-            // Skip already used positions
+            // If we're at the anchor position in the shuffled order, skip it
+            if i == anchor_position {
+                continue;
+            }
+            
+            // Find next unused position using step pattern
+            current_pos = (current_pos + step) % queue_length;
             while used.contains(&current_pos) {
                 current_pos = (current_pos + 1) % queue_length;
             }
@@ -934,7 +948,6 @@ impl DbOperations {
             }
             
             used.insert(current_pos);
-            current_pos = (current_pos + step) % queue_length;
         }
         
         // Shouldn't reach here, but return None as fallback
@@ -1157,10 +1170,12 @@ impl DbOperations {
 
     /// Find what position an original track index ends up at after shuffling
     /// This is needed when toggling shuffle to maintain the current track position
+    /// The shuffle pattern is anchored at the anchor_position (typically the currently playing track)
     pub fn find_shuffled_position(
         original_index: i32,
         seed: i64,
         queue_length: i32,
+        anchor_position: i32,
     ) -> Result<i32, Box<dyn std::error::Error>> {
         if queue_length <= 1 {
             return Ok(0);
@@ -1171,27 +1186,38 @@ impl DbOperations {
             return Ok(original_index);
         }
         
-        // Generate the same shuffled order and find where original_index ends up
+        // If this is the anchor position, it stays in place
+        if original_index == anchor_position {
+            return Ok(anchor_position);
+        }
+        
+        // Generate the same shuffled order starting from anchor position
         let step = (seed.abs() % queue_length as i64) as i32;
         let step = if step == 0 { 1 } else { step };
         
-        let mut current_pos = 0;
+        let mut current_pos = anchor_position; // Start from anchor
         let mut used = std::collections::HashSet::new();
+        used.insert(anchor_position); // Anchor is always at its own position
         
         // Generate shuffled order until we find the original index
-        for new_position in 0..queue_length {
-            // Skip already used positions
+        for i in 0..queue_length {
+            // Skip the anchor position in the iteration
+            if i == anchor_position {
+                continue;
+            }
+            
+            // Find next unused position using step pattern
+            current_pos = (current_pos + step) % queue_length;
             while used.contains(&current_pos) {
                 current_pos = (current_pos + 1) % queue_length;
             }
             
             // Check if this is the position we're looking for
             if current_pos == original_index {
-                return Ok(new_position);
+                return Ok(i);
             }
             
             used.insert(current_pos);
-            current_pos = (current_pos + step) % queue_length;
         }
         
         // Shouldn't reach here, but return original index as fallback

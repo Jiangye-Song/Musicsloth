@@ -27,6 +27,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number | null>(null);
   const [shuffleSeed, setShuffleSeed] = useState<number>(1);
   const [isShuffled, setIsShuffled] = useState<boolean>(false);
+  const [shuffleAnchor, setShuffleAnchor] = useState<number>(0); // The position where shuffle was activated
 
   const updateQueuePosition = async (queueId: number, trackIndex: number) => {
     console.log(`[PlayerContext] updateQueuePosition - queueId: ${queueId}, trackIndex: ${trackIndex}`);
@@ -52,7 +53,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
 
       // Use shuffled position function to respect shuffle state
-      const nextTrack = await queueApi.getQueueTrackAtShuffledPosition(currentQueueId, nextIndex, shuffleSeed);
+      const nextTrack = await queueApi.getQueueTrackAtShuffledPosition(currentQueueId, nextIndex, shuffleSeed, shuffleAnchor);
       if (nextTrack) {
         console.log(`[PlayerContext] playNext - playing track at shuffled index ${nextIndex}: ${nextTrack.title}`);
         await updateQueuePosition(currentQueueId, nextIndex);
@@ -84,7 +85,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to play next track:', error);
     }
-  }, [currentQueueId, currentTrackIndex, shuffleSeed, updateQueuePosition]);
+  }, [currentQueueId, currentTrackIndex, shuffleSeed, shuffleAnchor, updateQueuePosition]);
 
   const playPrevious = useCallback(async () => {
     if (currentQueueId === null || currentTrackIndex === null) {
@@ -102,7 +103,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
 
       // Use shuffled position function to respect shuffle state
-      const prevTrack = await queueApi.getQueueTrackAtShuffledPosition(currentQueueId, prevIndex, shuffleSeed);
+      const prevTrack = await queueApi.getQueueTrackAtShuffledPosition(currentQueueId, prevIndex, shuffleSeed, shuffleAnchor);
       if (prevTrack) {
         console.log(`[PlayerContext] playPrevious - playing track at shuffled index ${prevIndex}: ${prevTrack.title}`);
         await updateQueuePosition(currentQueueId, prevIndex);
@@ -134,11 +135,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to play previous track:', error);
     }
-  }, [currentQueueId, currentTrackIndex, shuffleSeed, updateQueuePosition]);
+  }, [currentQueueId, currentTrackIndex, shuffleSeed, shuffleAnchor, updateQueuePosition]);
 
   const toggleShuffle = useCallback(async () => {
-    if (currentQueueId === null || currentTrackIndex === null) {
-      console.log('[PlayerContext] toggleShuffle - no active queue or track index');
+    if (currentQueueId === null || currentTrackIndex === null || !currentTrack) {
+      console.log('[PlayerContext] toggleShuffle - no active queue, track index, or track');
       return;
     }
 
@@ -148,16 +149,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // Get queue length
       const queueLength = await queueApi.getQueueLength(currentQueueId);
       
+      // Get all tracks to find the original position of current track
+      const allTracks = await queueApi.getQueueTracks(currentQueueId);
+      const originalPosition = allTracks.findIndex(t => t.file_path === currentTrack.file_path);
+      
+      if (originalPosition === -1) {
+        console.error('[PlayerContext] Could not find current track in queue');
+        return;
+      }
+      
+      console.log(`[PlayerContext] Current track "${currentTrack.title}" is at original position ${originalPosition}`);
+      
       // Toggle shuffle and get new seed
       const newSeed = await queueApi.toggleQueueShuffle(currentQueueId);
       
-      // Find where the current track ends up in the new order
-      const newPosition = await queueApi.findShuffledPosition(currentTrackIndex, newSeed, queueLength);
-      console.log(`[PlayerContext] Current track moved from index ${currentTrackIndex} to ${newPosition}`);
+      // When toggling shuffle ON, the original position becomes the anchor
+      // When toggling shuffle OFF, anchor doesn't matter (seed=1 means sequential)
+      const newAnchor = newSeed !== 1 ? originalPosition : 0;
+      
+      // Find where the original position ends up in the new order
+      const newPosition = await queueApi.findShuffledPosition(originalPosition, newSeed, queueLength, newAnchor);
+      console.log(`[PlayerContext] Track will be at position ${newPosition} in new order, anchor: ${newAnchor}, seed: ${newSeed}`);
       
       // Update state
       setShuffleSeed(newSeed);
       setIsShuffled(newSeed !== 1);
+      setShuffleAnchor(newAnchor); // Store the anchor position
       setCurrentTrackIndex(newPosition);
       
       // Update the database with the new position
@@ -167,7 +184,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to toggle shuffle:', error);
     }
-  }, [currentQueueId, isShuffled, currentTrackIndex]);
+  }, [currentQueueId, isShuffled, currentTrackIndex, currentTrack]);
 
   // Load active queue's current track on startup
   useEffect(() => {
@@ -192,8 +209,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           console.log(`[PlayerContext] Active queue current index: ${currentIndex}`);
           setCurrentTrackIndex(currentIndex);
           
+          // For startup, assume anchor is at position 0 (or could be stored separately in DB)
+          const anchor = 0;
+          setShuffleAnchor(anchor);
+          
           // Get the track at that position (respecting shuffle state)
-          const track = await queueApi.getQueueTrackAtShuffledPosition(activeQueue.id, currentIndex, seed);
+          const track = await queueApi.getQueueTrackAtShuffledPosition(activeQueue.id, currentIndex, seed, anchor);
           
           if (track) {
             console.log(`[PlayerContext] Loaded track metadata: ${track.title}`);

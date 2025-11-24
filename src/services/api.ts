@@ -203,8 +203,8 @@ export const queueApi = {
     return await invoke("get_queue_track_at_position", { queueId, position });
   },
 
-  getQueueTrackAtShuffledPosition: async (queueId: number, shuffledPosition: number, shuffleSeed: number): Promise<Track | null> => {
-    return await invoke("get_queue_track_at_shuffled_position", { queueId, shuffledPosition, shuffleSeed });
+  getQueueTrackAtShuffledPosition: async (queueId: number, shuffledPosition: number, shuffleSeed: number, anchorPosition: number): Promise<Track | null> => {
+    return await invoke("get_queue_track_at_shuffled_position", { queueId, shuffledPosition, shuffleSeed, anchorPosition });
   },
 
   getQueueLength: async (queueId: number): Promise<number> => {
@@ -215,8 +215,8 @@ export const queueApi = {
     return await invoke("toggle_queue_shuffle", { queueId });
   },
 
-  findShuffledPosition: async (originalIndex: number, seed: number, queueLength: number): Promise<number> => {
-    return await invoke("find_shuffled_position", { originalIndex, seed, queueLength });
+  findShuffledPosition: async (originalIndex: number, seed: number, queueLength: number, anchorPosition: number): Promise<number> => {
+    return await invoke("find_shuffled_position", { originalIndex, seed, queueLength, anchorPosition });
   },
 };
 
