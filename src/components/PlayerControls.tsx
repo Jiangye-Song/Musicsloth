@@ -5,7 +5,6 @@ import {
   Slider,
   Typography,
   useMediaQuery,
-  useTheme,
 } from "@mui/material";
 import {
   PlayArrow,
@@ -17,8 +16,10 @@ import {
   Repeat,
   Shuffle,
   VolumeUp,
-  Menu,
   MusicNote,
+  QueueMusic,
+  Person,
+  Album
 } from "@mui/icons-material";
 import { playerApi, PlayerState } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
@@ -38,6 +39,7 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
   });
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
+  const [volume, setVolume] = useState(100);
 
   useEffect(() => {
     // Update player state periodically (faster for smoother seekbar)
@@ -76,6 +78,16 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
     setIsSeeking(true);
   };
 
+  const handleVolumeChange = async (_: Event, value: number | number[]) => {
+    const newVolume = value as number;
+    setVolume(newVolume);
+    try {
+      await playerApi.setVolume(newVolume / 100);
+    } catch (error) {
+      console.error("Failed to set volume:", error);
+    }
+  };
+
   const handleRewind = async () => {
     try {
       const newPosition = Math.max(0, playerState.position_ms - 5000); // 5 seconds back
@@ -104,51 +116,87 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
 
   const currentPosition = isSeeking ? seekPosition : playerState.position_ms;
   const duration = playerState.duration_ms || 0;
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const isMobile = useMediaQuery('(max-width:660px)');
 
   return (
     <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isMobile ? 0 : 2, height: "80px" }}>
-        {/* Album Art - Full height, no padding/margin */}
+      {/* Album Art - Full height, no padding/margin */}
+      <Box
+        onClick={onExpandClick}
+        sx={{
+          width: "80px",
+          bgcolor: "background.default",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          flexShrink: 0,
+          cursor: onExpandClick ? "pointer" : "default",
+        }}
+      >
+        {albumArt ? (
+          <img src={albumArt} alt="Album" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <MusicNote sx={{ fontSize: 32, opacity: 0.3 }} />
+        )}
+      </Box>
+
+      {/* Track Info - Hidden on mobile */}
+      {!isMobile && (
         <Box
           onClick={onExpandClick}
           sx={{
-            width: "80px",
-            bgcolor: "background.default",
+            flex: "0 0 calc(20%)",
+            maxWidth: "160px",
+            minWidth: "80px",
             display: "flex",
-            alignItems: "center",
+            flexDirection: "column",
             justifyContent: "center",
-            overflow: "hidden",
-            flexShrink: 0,
             cursor: onExpandClick ? "pointer" : "default",
+            transition: "background-color 0.2s",
+            "&:hover": onExpandClick ? {
+              bgcolor: "action.hover",
+            } : {},
+            px: 2,
+            py: 1,
           }}
         >
-          {albumArt ? (
-            <img src={albumArt} alt="Album" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <MusicNote sx={{ fontSize: 32, opacity: 0.3 }} />
-          )}
-        </Box>
-
-        {/* Track Info - Hidden on mobile */}
-        {!isMobile && (
-          <Box
-            onClick={onExpandClick}
-            sx={{
-              flex: "0 0 calc(20% - 80px)",
-              minWidth: 0,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              cursor: onExpandClick ? "pointer" : "default",
-              transition: "background-color 0.2s",
-              "&:hover": onExpandClick ? {
-                bgcolor: "action.hover",
-              } : {},
-              px: 2,
-              py: 1,
-            }}
+          <Typography
+            variant="body2"
+            fontWeight="bold"
+            noWrap
+            sx={{ color: "text.primary" }}
           >
+            {currentTrack ? currentTrack.title : "Track title"}
+          </Typography>
+          <Typography
+            variant="caption"
+            noWrap
+            sx={{ color: "text.primary", display: "flex", alignItems: "center" }}
+          >
+            <Person sx={{fontSize: 12, mr: "3px"}}/>
+            {currentTrack
+              ? `${currentTrack.artist || "Unknown Artist"}`
+              : "Track artist"}
+          </Typography>
+          <Typography
+            variant="caption"
+            noWrap
+            sx={{ color: "text.primary", display: "flex", alignItems: "center" }}
+          >
+            <Album sx={{fontSize: 12, mr: "3px"}}/>
+            {currentTrack
+              ? `${currentTrack.album ? `${currentTrack.album}` : "Unknown Album"}`
+              : "Track album"}
+          </Typography>
+        </Box>
+      )}
+
+      {/* Center: Playback Controls with Seekbar */}
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.5, mx: 0 }}>
+        {/* Control Buttons */}
+        <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: isMobile ? "space-between" : "center", mx: "16px" }}>
+          {isMobile && (<div>
             <Typography
               variant="body2"
               fontWeight="bold"
@@ -157,71 +205,96 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
             >
               {currentTrack ? currentTrack.title : "Track title"}
             </Typography>
-            <Typography
-              variant="caption"
-              noWrap
-              sx={{ color: "text.secondary" }}
+          </div>)}
+
+          <div>
+            <IconButton
+              onClick={playPrevious}
+              disabled={!playerState.current_file && !currentTrack}
+              size="small"
+              title="Previous Track"
+              sx={{ color: "text.primary" }}
             >
-              {currentTrack
-                ? `${currentTrack.artist || "Unknown Artist"}${currentTrack.album ? ` • ${currentTrack.album}` : ""}`
-                : "Track artist"}
-            </Typography>
-          </Box>
-        )}
+              <SkipPrevious />
+            </IconButton>
+            {!isMobile && (
+              <IconButton
+                onClick={handleRewind}
+                disabled={!playerState.current_file}
+                size="small"
+                title="Rewind 5s"
+                sx={{ color: "text.primary" }}
+              >
+                <FastRewind />
+              </IconButton>
+            )}
+            <IconButton
+              onClick={handlePlayPause}
+              disabled={!playerState.current_file && !currentTrack}
+              size="medium"
+              title={playerState.is_playing ? "Pause" : "Play"}
+              sx={{ color: "primary.main", "&:hover": { bgcolor: "action.hover" } }}
+            >
+              {playerState.is_playing ? <Pause /> : <PlayArrow />}
+            </IconButton>
+            {!isMobile && (
+              <IconButton
+                onClick={handleFastForward}
+                disabled={!playerState.current_file}
+                size="small"
+                title="Fast Forward 15s"
+                sx={{ color: "text.primary" }}
+              >
+                <FastForward />
+              </IconButton>
+            )}
+            <IconButton
+              onClick={playNext}
+              disabled={!playerState.current_file && !currentTrack}
+              size="small"
+              title="Next Track"
+              sx={{ color: "text.primary" }}
+            >
+              <SkipNext />
+            </IconButton>
+            {isMobile && (<IconButton
+              onClick={() => {/* TODO: implement menu */ }}
+              size="small"
+              title="Menu"
+              sx={{ color: "text.primary" }}
+            >
+              <QueueMusic />
+            </IconButton>)}
+          </div>
+          {!isMobile && (
+            <div>
 
-      {/* Center: Playback Controls with Seekbar */}
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.5, mx: 2 }}>
-        {/* Control Buttons */}
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center", justifyContent: "center" }}>
-          <IconButton
-            onClick={playPrevious}
-            disabled={!playerState.current_file && !currentTrack}
-            size="small"
-            title="Previous Track"
-            sx={{ color: "text.primary" }}
-          >
-            <SkipPrevious />
-          </IconButton>
-
-          <IconButton
-            onClick={handleRewind}
-            disabled={!playerState.current_file}
-            size="small"
-            title="Rewind 5s"
-            sx={{ color: "text.secondary" }}
-          >
-            <FastRewind />
-          </IconButton>
-
-          <IconButton
-            onClick={handlePlayPause}
-            disabled={!playerState.current_file && !currentTrack}
-            size="medium"
-            title={playerState.is_playing ? "Pause" : "Play"}
-            sx={{ color: "primary.main", "&:hover": { bgcolor: "action.hover" } }}
-          >
-            {playerState.is_playing ? <Pause /> : <PlayArrow />}
-          </IconButton>
-
-          <IconButton
-            onClick={handleFastForward}
-            disabled={!playerState.current_file}
-            size="small"
-            title="Fast Forward 15s"
-            sx={{ color: "text.secondary" }}
-          >
-            <FastForward />
-          </IconButton>
-
-          <IconButton
-            onClick={playNext}
-            disabled={!playerState.current_file && !currentTrack}
-            size="small"
-            title="Next Track"
-            sx={{ color: "text.primary" }}
-          >
-            <SkipNext />
-          </IconButton>
+              <IconButton
+                onClick={() => {/* TODO: implement repeat */ }}
+                size="small"
+                title="Repeat"
+                sx={{ color: "text.primary" }}
+              >
+                <Repeat />
+              </IconButton>
+              <IconButton
+                onClick={() => {/* TODO: implement shuffle */ }}
+                size="small"
+                title="Shuffle"
+                sx={{ color: "text.primary" }}
+              >
+                <Shuffle />
+              </IconButton>
+              <IconButton
+                onClick={() => {/* TODO: implement menu */ }}
+                size="small"
+                title="Menu"
+                sx={{ color: "text.primary" }}
+              >
+                <QueueMusic />
+              </IconButton>
+            </div>
+          )}
         </Box>
 
         {/* Seekbar */}
@@ -257,41 +330,17 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
       {/* Right Side Controls */}
       {!isMobile && (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-          <IconButton
-            onClick={() => {/* TODO: implement repeat */}}
-            size="small"
-            title="Repeat"
-            sx={{ color: "text.secondary" }}
-          >
-            <Repeat />
-          </IconButton>
-
-          <IconButton
-            onClick={() => {/* TODO: implement shuffle */}}
-            size="small"
-            title="Shuffle"
-            sx={{ color: "text.secondary" }}
-          >
-            <Shuffle />
-          </IconButton>
-
-          <IconButton
-            onClick={() => {/* TODO: implement menu */}}
-            size="small"
-            title="Menu"
-            sx={{ color: "text.secondary" }}
-          >
-            <Menu />
-          </IconButton>
-
-          <IconButton
-            onClick={() => {/* TODO: implement volume control */}}
-            size="small"
-            title="Volume"
-            sx={{ color: "text.secondary" }}
-          >
-            <VolumeUp />
-          </IconButton>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 100 }}>
+            <VolumeUp fontSize="small" sx={{ color: "text.secondary" }} />
+            <Slider
+              min={0}
+              max={100}
+              value={volume}
+              onChange={handleVolumeChange}
+              size="small"
+              sx={{ flex: 1 }}
+            />
+          </Box>
         </Box>
       )}
     </Box>
