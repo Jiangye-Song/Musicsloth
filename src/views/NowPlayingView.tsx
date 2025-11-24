@@ -144,14 +144,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowP
   };
 
   const renderAlbumArt = () => {
-    const size = isShortHeight ? 150 : (isNarrow ? 250 : 300);
-    const maxSize = isShortHeight ? 150 : (isNarrow ? 300 : 300);
+    const size = isNarrow ? 250 : 200;
+    const maxSize = isShortHeight ? 200 : (isNarrow ? 300 : 300);
     
     return (
       <Box
         sx={{
           width: isNarrow ? "100%" : size,
-          height: size,
           maxWidth: isNarrow ? maxSize : size,
           margin: isNarrow ? "0 auto" : 0,
           bgcolor: "background.default",
@@ -405,8 +404,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowP
         <Box sx={{ display: "flex", flexDirection: "column", flex: 1, p: 3, overflow: "hidden" }}>
           <Box sx={{ display: "flex", flex: 1, gap: 4, mb: 3, minHeight: 0 }}>
             {/* Left: Album Art & Track Info */}
-            <Box sx={{ flex: isShortHeight ? "0 0 150px" : "0 0 300px", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <Box sx={{ flexShrink: 0 }}>
+            <Box sx={{ flex: isShortHeight ? "0 0 150px" : "0 0 300px", display: "flex", flexDirection: "column", overflow: "hidden", justifyContent: "center" }}>
+              <Box sx={{ flexShrink: 0, pl: "12%"}}>
                 {renderAlbumArt()}
                 {renderTrackInfo()}
               </Box>
