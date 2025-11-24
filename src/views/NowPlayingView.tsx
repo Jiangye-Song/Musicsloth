@@ -30,9 +30,10 @@ import { usePlayer } from "../contexts/PlayerContext";
 interface NowPlayingViewProps {
   isNarrow: boolean;
   onClose: () => void;
+  onQueueClick?: () => void;
 }
 
-export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProps) {
+export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowPlayingViewProps) {
   const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -275,7 +276,7 @@ export default function NowPlayingView({ isNarrow, onClose }: NowPlayingViewProp
             sx={{ flex: 1 }}
           />
         </Box>
-        <IconButton size="small" sx={{ color: "text.secondary" }}>
+        <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }}>
           <QueueMusic />
         </IconButton>
       </Box>

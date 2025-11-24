@@ -26,9 +26,10 @@ import { usePlayer } from "../contexts/PlayerContext";
 
 interface PlayerControlsProps {
   onExpandClick?: () => void;
+  onQueueClick?: () => void;
 }
 
-export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
+export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerControlsProps) {
   const { currentTrack, albumArt, playNext, playPrevious } = usePlayer();
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
@@ -258,9 +259,9 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
               <SkipNext />
             </IconButton>
             {isMobile && (<IconButton
-              onClick={() => {/* TODO: implement menu */ }}
+              onClick={onQueueClick}
               size="small"
-              title="Menu"
+              title="Queue"
               sx={{ color: "text.primary" }}
             >
               <QueueMusic />
@@ -286,9 +287,9 @@ export default function PlayerControls({ onExpandClick }: PlayerControlsProps) {
                 <Shuffle />
               </IconButton>
               <IconButton
-                onClick={() => {/* TODO: implement menu */ }}
+                onClick={onQueueClick}
                 size="small"
-                title="Menu"
+                title="Queue"
                 sx={{ color: "text.primary" }}
               >
                 <QueueMusic />

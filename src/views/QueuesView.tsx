@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList, { VirtualTrackListRef } from "../components/VirtualTrackList";
 import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress, useMediaQuery, Select, MenuItem, FormControl } from "@mui/material";
@@ -11,7 +11,11 @@ interface QueuesViewProps {
   searchQuery?: string;
 }
 
-export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
+export interface QueuesViewRef {
+  scrollToActiveTrack: () => void;
+}
+
+const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "" }, ref) => {
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -20,6 +24,25 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const trackListRef = useRef<VirtualTrackListRef>(null);
   const isMobile = useMediaQuery('(max-width:660px)');
+
+  // Expose scrollToActiveTrack to parent via ref
+  useImperativeHandle(ref, () => ({
+    scrollToActiveTrack: async () => {
+      // Find and select active queue first
+      const activeQueue = queues.find(q => q.is_active);
+      if (activeQueue) {
+        // If not already selected, select it and load tracks
+        if (selectedQueue?.id !== activeQueue.id) {
+          setSelectedQueue(activeQueue);
+          await loadQueueTracks(activeQueue.id);
+        }
+        // Wait a bit for the tracks to render, then scroll
+        setTimeout(() => {
+          trackListRef.current?.scrollToActiveTrack();
+        }, 150);
+      }
+    }
+  }));
 
   useEffect(() => {
     loadQueues();
@@ -344,14 +367,10 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
               <Box sx={{ display: "flex", gap: 1.5 }}>
                 <IconButton
                   onClick={() => trackListRef.current?.scrollToActiveTrack()}
+                  disabled={queueTracks.length === 0}
                   sx={{
-                    bgcolor: "action.hover",
-                    color: "text.primary",
                     width: 48,
                     height: 48,
-                    "&:hover": {
-                      bgcolor: "action.selected",
-                    },
                   }}
                   title="Locate active track"
                 >
@@ -359,14 +378,12 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
                 </IconButton>
                 <IconButton
                   onClick={handlePlayQueue}
+                  disabled={queueTracks.length === 0}
+                  title={selectedQueue.is_active && isPlaying? "Pause":selectedQueue.is_active?"Play":"Play this queue"}
                   sx={{
-                    bgcolor: "primary.main",
-                    color: "white",
+                    color: "primary.main",
                     width: 48,
                     height: 48,
-                    "&:hover": {
-                      bgcolor: "primary.light",
-                    },
                   }}
                 >
                   {selectedQueue.is_active && isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
@@ -406,4 +423,6 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
       </div>
     </div>
   );
-}
+});
+
+export default QueuesView;

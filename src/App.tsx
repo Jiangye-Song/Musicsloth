@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Box,
   Drawer,
@@ -29,7 +29,7 @@ import PlayerControls from "./components/PlayerControls";
 import SearchBar from "./components/SearchBar";
 import NowPlayingView from "./views/NowPlayingView";
 import LibraryView from "./views/LibraryView";
-import QueuesView from "./views/QueuesView";
+import QueuesView, { QueuesViewRef } from "./views/QueuesView";
 import PlaylistsView from "./views/PlaylistsView";
 import ArtistsView from "./views/ArtistsView";
 import AlbumsView from "./views/AlbumsView";
@@ -58,6 +58,7 @@ function App() {
   const [showNowPlaying, setShowNowPlaying] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const queuesViewRef = useRef<QueuesViewRef>(null);
 
   const handleFileSelect = async () => {
     const filePath = prompt("Enter the full path to an audio file:");
@@ -75,7 +76,7 @@ function App() {
       case "library":
         return <LibraryView searchQuery={globalSearchQuery} />;
       case "queues":
-        return <QueuesView searchQuery={globalSearchQuery} />;
+        return <QueuesView ref={queuesViewRef} searchQuery={globalSearchQuery} />;
       case "playlists":
         return <PlaylistsView searchQuery={globalSearchQuery} />;
       case "artists":
@@ -230,7 +231,13 @@ function App() {
           bgcolor: "background.paper",
         }}
       >
-        <PlayerControls onExpandClick={() => setShowNowPlaying(true)} />
+        <PlayerControls 
+          onExpandClick={() => setShowNowPlaying(true)}
+          onQueueClick={() => {
+            setActiveTab("queues");
+            setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
+          }}
+        />
       </Paper>
 
       {/* Now Playing Dialog */}
@@ -240,7 +247,15 @@ function App() {
         onClose={() => setShowNowPlaying(false)}
         TransitionComponent={Transition}
       >
-        <NowPlayingView isNarrow={isMobile} onClose={() => setShowNowPlaying(false)} />
+        <NowPlayingView 
+          isNarrow={isMobile} 
+          onClose={() => setShowNowPlaying(false)}
+          onQueueClick={() => {
+            setShowNowPlaying(false);
+            setActiveTab("queues");
+            setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
+          }}
+        />
       </Dialog>
     </Box>
     </PlayerProvider>
