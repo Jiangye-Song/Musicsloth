@@ -187,7 +187,7 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
       {/* Queue List Sidebar */}
       <div
         style={{
-          width: "300px",
+          width: "33%",
           borderRight: "1px solid #333",
           overflowY: "auto",
         }}
