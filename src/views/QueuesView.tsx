@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList, { VirtualTrackListRef } from "../components/VirtualTrackList";
-import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress } from "@mui/material";
+import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress, useMediaQuery, Select, MenuItem, FormControl } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
@@ -19,6 +19,7 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const trackListRef = useRef<VirtualTrackListRef>(null);
+  const isMobile = useMediaQuery('(max-width:660px)');
 
   useEffect(() => {
     loadQueues();
@@ -183,81 +184,154 @@ export default function QueuesView({ searchQuery = "" }: QueuesViewProps) {
   };
 
   return (
-    <div style={{ display: "flex", height: "100%" }}>
-      {/* Queue List Sidebar */}
-      <div
-        style={{
-          width: "33%",
-          borderRight: "1px solid #333",
-          overflowY: "auto",
-        }}
-      >
-        {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "15px 20px",
-          backgroundColor: "#1a1a1a",
-          borderBottom: "1px solid #333",
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
-      </div>
-        
-        {queues.length === 0 ? (
-          <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
-            No queues yet.
-            <br />
-            Click any track to create a queue.
-          </Box>
-        ) : filteredQueues.length === 0 ? (
-          <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
-            No queues found matching "{searchQuery}"
-          </Box>
-        ) : (
-          <List disablePadding>
-            {filteredQueues.map((queue) => (
-              <ListItem
-                key={queue.id}
-                disablePadding
-                sx={{ mb: 1 }}
-                secondaryAction={
-                  <IconButton
-                    edge="end"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteQueue(queue.id);
-                    }}
-                    sx={{ color: "text.secondary" }}
-                  >
-                    <CloseIcon />
-                  </IconButton>
-                }
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100%" }}>
+      {/* Queue List Sidebar / Dropdown */}
+      {isMobile ? (
+        // Mobile: Dropdown selector
+        <Box sx={{ p: 2, borderBottom: "1px solid #333" }}>
+          {queues.length === 0 ? (
+            <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center" }}>
+              No queues yet. Click any track to create a queue.
+            </Box>
+          ) : filteredQueues.length === 0 ? (
+            <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center" }}>
+              No queues found matching "{searchQuery}"
+            </Box>
+          ) : (
+            <FormControl fullWidth>
+              <Select
+                value={selectedQueue?.id || ""}
+                onChange={(e) => {
+                  const queue = queues.find(q => q.id === e.target.value);
+                  if (queue) handleSelectQueue(queue);
+                }}
+                displayEmpty
+                sx={{
+                  bgcolor: "background.paper",
+                  "& .MuiSelect-select": {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }
+                }}
               >
-                <ListItemButton
-                  onClick={() => handleSelectQueue(queue)}
-                  selected={selectedQueue?.id === queue.id}
-                  sx={{
-                    borderRadius: "6px",
-                    "&.Mui-selected": {
-                      bgcolor: "action.selected",
-                    },
-                  }}
-                >
-                  <ListItemText
-                    primary={queue.is_active ? `▶ ${queue.name}` : queue.name}
-                    primaryTypographyProps={{ 
-                      fontWeight: queue.is_active ? 700 : 500,
-                      color: queue.is_active ? "primary.main" : "text.primary"
+                {!selectedQueue && (
+                  <MenuItem value="" disabled>
+                    Select a queue
+                  </MenuItem>
+                )}
+                {filteredQueues.map((queue) => (
+                  <MenuItem 
+                    key={queue.id} 
+                    value={queue.id}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                     }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </div>
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}>
+                      <Typography
+                        sx={{
+                          fontWeight: queue.is_active ? 700 : 500,
+                          color: queue.is_active ? "primary.main" : "text.primary",
+                        }}
+                      >
+                        {queue.is_active ? `▶ ${queue.name}` : queue.name}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteQueue(queue.id);
+                      }}
+                      sx={{ color: "text.secondary" }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+        </Box>
+      ) : (
+        // Desktop: Sidebar
+        <div
+          style={{
+            width: "33%",
+            borderRight: "1px solid #333",
+            overflowY: "auto",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "15px 20px",
+              backgroundColor: "#1a1a1a",
+              borderBottom: "1px solid #333",
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
+          </div>
+          
+          {queues.length === 0 ? (
+            <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
+              No queues yet.
+              <br />
+              Click any track to create a queue.
+            </Box>
+          ) : filteredQueues.length === 0 ? (
+            <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
+              No queues found matching "{searchQuery}"
+            </Box>
+          ) : (
+            <List disablePadding>
+              {filteredQueues.map((queue) => (
+                <ListItem
+                  key={queue.id}
+                  disablePadding
+                  sx={{ mb: 1 }}
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteQueue(queue.id);
+                      }}
+                      sx={{ color: "text.secondary" }}
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  }
+                >
+                  <ListItemButton
+                    onClick={() => handleSelectQueue(queue)}
+                    selected={selectedQueue?.id === queue.id}
+                    sx={{
+                      borderRadius: "6px",
+                      "&.Mui-selected": {
+                        bgcolor: "action.selected",
+                      },
+                    }}
+                  >
+                    <ListItemText
+                      primary={queue.is_active ? `▶ ${queue.name}` : queue.name}
+                      primaryTypographyProps={{ 
+                        fontWeight: queue.is_active ? 700 : 500,
+                        color: queue.is_active ? "primary.main" : "text.primary"
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </div>
+      )}
 
       {/* Queue Tracks */}
       <div style={{ flex: 1, padding: "20px", display: "flex", flexDirection: "column" }}>
