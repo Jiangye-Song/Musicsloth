@@ -199,14 +199,14 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
   const renderTrackInfo = () => (
     currentTrack ? (
-      <Box sx={{ textAlign: isNarrow ? "center" : "left", mt: 2 }}>
+      <Box sx={{ textAlign: isNarrow ? "center" : "left", mt: 2, display: "flex", flexDirection: "column", alignItems: isNarrow ? "center" : "flex-start" }}>
         <Typography variant="h5" fontWeight="bold" gutterBottom>
           {currentTrack.title}
         </Typography>
         <Box sx={{ my: "6px" }}>
-          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+          <Box sx={{ display: "inline-flex", alignItems: "flex-start", gap: 0.5 }}>
             <Person sx={{ fontSize: 18, mr: "3px", flexShrink: 0, color: "text.primary", mt: "2px" }} />
-            <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+            <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0.5 }}>
               {splitMultiValue(currentTrack.artist).length > 0 ? (
                 splitMultiValue(currentTrack.artist).map((artist, index, arr) => (
                   <Typography
@@ -230,7 +230,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
             </Box>
           </Box>
         </Box>
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+        <Box sx={{ display: "inline-flex", alignItems: "flex-start", gap: 0.5 }}>
           <Album sx={{ fontSize: 18, mr: "3px", flexShrink: 0, color: "text.primary", mt: "2px" }} />
           <Typography
             variant="body2"
@@ -238,8 +238,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
             onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
             sx={{
               cursor: currentTrack.album && onNavigateToAlbum ? "pointer" : "default",
-              "&:hover": currentTrack.album && onNavigateToAlbum ? { textDecoration: "underline" } : {},
-              flex: 1
+              "&:hover": currentTrack.album && onNavigateToAlbum ? { textDecoration: "underline" } : {}
             }}
           >
             {currentTrack.album || "Unknown Album"}
