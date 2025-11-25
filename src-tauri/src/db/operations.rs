@@ -189,7 +189,7 @@ impl DbOperations {
             "SELECT id, file_path, title, artist, album, album_artist, year,
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
-                    play_count, last_played, date_added, date_modified
+                    play_count, last_played, date_added, date_modified, file_hash
              FROM tracks
              ORDER BY date_added DESC"
         )?;
@@ -215,6 +215,7 @@ impl DbOperations {
                 last_played: row.get(16)?,
                 date_added: row.get(17)?,
                 date_modified: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -234,7 +235,7 @@ impl DbOperations {
             "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist, t.year,
                     t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
-                    t.play_count, t.last_played, t.date_added, t.date_modified
+                    t.play_count, t.last_played, t.date_added, t.date_modified, t.file_hash
              FROM tracks t
              INNER JOIN track_artists ta ON ta.track_id = t.id
              WHERE ta.artist_id = ?1
@@ -262,6 +263,7 @@ impl DbOperations {
                 last_played: row.get(16)?,
                 date_added: row.get(17)?,
                 date_modified: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -281,7 +283,7 @@ impl DbOperations {
             "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist, t.year,
                     t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
-                    t.play_count, t.last_played, t.date_added, t.date_modified
+                    t.play_count, t.last_played, t.date_added, t.date_modified, t.file_hash
              FROM tracks t
              INNER JOIN track_genres tg ON tg.track_id = t.id
              WHERE tg.genre_id = ?1
@@ -309,6 +311,7 @@ impl DbOperations {
                 last_played: row.get(16)?,
                 date_added: row.get(17)?,
                 date_modified: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -328,7 +331,7 @@ impl DbOperations {
             "SELECT id, file_path, title, artist, album, album_artist, year,
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
-                    play_count, last_played, date_added, date_modified
+                    play_count, last_played, date_added, date_modified, file_hash
              FROM tracks
              WHERE album = ?1
              ORDER BY disc_number, track_number"
@@ -355,6 +358,7 @@ impl DbOperations {
                 last_played: row.get(16)?,
                 date_added: row.get(17)?,
                 date_modified: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -374,7 +378,7 @@ impl DbOperations {
             "SELECT id, file_path, title, artist, album, album_artist, year,
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
-                    play_count, last_played, date_added, date_modified
+                    play_count, last_played, date_added, date_modified, file_hash
              FROM tracks
              WHERE file_path = ?1"
         )?;
@@ -402,6 +406,7 @@ impl DbOperations {
                 last_played: row.get(16)?,
                 date_added: row.get(17)?,
                 date_modified: row.get(18)?,
+                file_hash: row.get(19)?,
             }))
         } else {
             Ok(None)
@@ -686,6 +691,7 @@ impl DbOperations {
                 last_played: None,
                 date_added: 0,
                 date_modified: 0,
+                file_hash: None,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -887,6 +893,7 @@ impl DbOperations {
                 last_played: None,
                 date_added: 0,
                 date_modified: 0,
+                file_hash: None,
             })
         }).optional()?;
         
@@ -990,6 +997,7 @@ impl DbOperations {
                 last_played: None,
                 date_added: 0,
                 date_modified: 0,
+                file_hash: None,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1032,6 +1040,7 @@ impl DbOperations {
                 last_played: None,
                 date_added: 0,
                 date_modified: 0,
+                file_hash: None,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1074,6 +1083,7 @@ impl DbOperations {
                 last_played: None,
                 date_added: 0,
                 date_modified: 0,
+                file_hash: None,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1222,5 +1232,199 @@ impl DbOperations {
         
         // Shouldn't reach here, but return original index as fallback
         Ok(original_index)
+    }
+
+    // ===== Scan Path Management =====
+    
+    /// Add a scan path to the database
+    pub fn add_scan_path(
+        db: &DatabaseConnection,
+        path: &str,
+    ) -> Result<i64, anyhow::Error> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_secs() as i64;
+        
+        conn.execute(
+            "INSERT INTO scan_paths (path, date_added) VALUES (?1, ?2)",
+            params![path, now],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+    
+    /// Get all scan paths
+    pub fn get_all_scan_paths(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<crate::db::models::ScanPath>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, path, date_added FROM scan_paths ORDER BY path"
+        )?;
+        
+        let paths = stmt.query_map([], |row| {
+            Ok(crate::db::models::ScanPath {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                date_added: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(paths)
+    }
+    
+    /// Remove a scan path from the database
+    pub fn remove_scan_path(
+        db: &DatabaseConnection,
+        path_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute("DELETE FROM scan_paths WHERE id = ?1", params![path_id])?;
+        Ok(())
+    }
+    
+    /// Check if a path is a subdirectory of any existing scan path
+    pub fn is_subdirectory_of_existing_path(
+        db: &DatabaseConnection,
+        new_path: &str,
+    ) -> Result<bool, anyhow::Error> {
+        use std::path::Path;
+        
+        let existing_paths = Self::get_all_scan_paths(db)?;
+        let new_path_buf = Path::new(new_path).canonicalize()
+            .unwrap_or_else(|_| Path::new(new_path).to_path_buf());
+        
+        for existing in existing_paths {
+            let existing_path_buf = Path::new(&existing.path).canonicalize()
+                .unwrap_or_else(|_| Path::new(&existing.path).to_path_buf());
+            
+            // Check if new_path starts with existing_path
+            if new_path_buf.starts_with(&existing_path_buf) && new_path_buf != existing_path_buf {
+                return Ok(true);
+            }
+        }
+        
+        Ok(false)
+    }
+    
+    /// Remove tracks that are not within any scan path
+    pub fn remove_tracks_outside_scan_paths<F>(
+        db: &DatabaseConnection,
+        mut progress_callback: F,
+    ) -> Result<usize, anyhow::Error>
+    where
+        F: FnMut(usize, usize),
+    {
+        use std::path::Path;
+        
+        let scan_paths = Self::get_all_scan_paths(db)?;
+        if scan_paths.is_empty() {
+            return Ok(0);
+        }
+        
+        // Canonicalize all scan paths
+        let canonical_scan_paths: Vec<_> = scan_paths
+            .iter()
+            .filter_map(|sp| Path::new(&sp.path).canonicalize().ok())
+            .collect();
+        
+        let all_tracks = Self::get_all_tracks(db)?;
+        let total = all_tracks.len();
+        let mut removed_count = 0;
+        
+        for (index, track) in all_tracks.iter().enumerate() {
+            // Report progress
+            progress_callback(index + 1, total);
+            
+            let track_path = Path::new(&track.file_path);
+            let track_canonical = track_path.canonicalize()
+                .unwrap_or_else(|_| track_path.to_path_buf());
+            
+            // Check if track is within any scan path
+            let is_within_scan_path = canonical_scan_paths.iter().any(|scan_path| {
+                track_canonical.starts_with(scan_path)
+            });
+            
+            if !is_within_scan_path {
+                // Remove track
+                let conn = db.get_connection();
+                let conn = conn.lock().unwrap();
+                conn.execute("DELETE FROM tracks WHERE id = ?1", params![track.id])?;
+                removed_count += 1;
+            }
+        }
+        
+        Ok(removed_count)
+    }
+    
+    /// Update or insert track with hash comparison
+    pub fn upsert_track_with_hash(
+        db: &DatabaseConnection,
+        track: &crate::db::models::Track,
+        file_hash: &str,
+    ) -> Result<(i64, bool), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Check if track exists
+        let existing: Option<(i64, Option<String>)> = conn.query_row(
+            "SELECT id, file_hash FROM tracks WHERE file_path = ?1",
+            params![&track.file_path],
+            |row| Ok((row.get(0)?, row.get(1)?))
+        ).optional()?;
+        
+        if let Some((track_id, existing_hash)) = existing {
+            // Track exists - check if hash changed
+            if Some(file_hash.to_string()) == existing_hash {
+                // No changes, skip update
+                return Ok((track_id, false));
+            }
+            
+            // Hash changed, update track
+            conn.execute(
+                "UPDATE tracks SET 
+                    title = ?1, artist = ?2, album = ?3, album_artist = ?4,
+                    year = ?5, track_number = ?6, disc_number = ?7, duration_ms = ?8,
+                    genre = ?9, file_size = ?10, file_format = ?11, bitrate = ?12,
+                    sample_rate = ?13, date_modified = ?14, file_hash = ?15
+                WHERE id = ?16",
+                params![
+                    track.title, track.artist, track.album, track.album_artist,
+                    track.year, track.track_number, track.disc_number, track.duration_ms,
+                    track.genre, track.file_size, track.file_format, track.bitrate,
+                    track.sample_rate, track.date_modified, file_hash, track_id
+                ],
+            )?;
+            
+            Ok((track_id, true))
+        } else {
+            // New track, insert
+            conn.execute(
+                "INSERT INTO tracks (
+                    file_path, title, artist, album, album_artist,
+                    year, track_number, disc_number, duration_ms,
+                    genre, file_size, file_format, bitrate, sample_rate,
+                    date_added, date_modified, play_count, file_hash
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+                params![
+                    track.file_path, track.title, track.artist, track.album, track.album_artist,
+                    track.year, track.track_number, track.disc_number, track.duration_ms,
+                    track.genre, track.file_size, track.file_format, track.bitrate, track.sample_rate,
+                    track.date_added, track.date_modified, track.play_count, file_hash
+                ],
+            )?;
+            
+            Ok((conn.last_insert_rowid(), true))
+        }
     }
 }

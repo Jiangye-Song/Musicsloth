@@ -175,17 +175,6 @@ function App() {
             },
           }}
         >
-          <Box sx={{ p: 2 }}>
-            <Button
-              variant="contained"
-              color="success"
-              fullWidth
-              startIcon={<FolderOpen />}
-              onClick={handleFileSelect}
-            >
-              Open File
-            </Button>
-          </Box>
           <List>
             {tabs.map((tab) => (
               <ListItem key={tab.key} disablePadding>

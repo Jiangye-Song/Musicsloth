@@ -189,6 +189,29 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    // Create scan_paths table for managing library directories
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS scan_paths (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT UNIQUE NOT NULL,
+            date_added INTEGER NOT NULL
+        )",
+        [],
+    )?;
+
+    // Migration: Add file_hash column to tracks table for change detection
+    let file_hash_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('tracks') WHERE name='file_hash'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = file_hash_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE tracks ADD COLUMN file_hash TEXT", [])?;
+        }
+    }
+
     // Create indexes for better query performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist)",
@@ -200,6 +223,10 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_file_hash ON tracks(file_hash)",
         [],
     )?;
     conn.execute(

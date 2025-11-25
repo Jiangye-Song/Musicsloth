@@ -105,12 +105,37 @@ export interface IndexingResult {
   total_files: number;
   successful: number;
   failed: number;
+  skipped: number;
+  updated: number;
+  removed: number;
   errors: string[];
 }
 
+export interface ScanPath {
+  id: number;
+  path: string;
+  date_added: number;
+}
+
 export const libraryApi = {
-  scanLibrary: async (directory: string): Promise<IndexingResult> => {
-    return await invoke("scan_library", { directory });
+  scanLibrary: async (): Promise<IndexingResult> => {
+    return await invoke("scan_library");
+  },
+
+  addScanPath: async (path: string): Promise<number> => {
+    return await invoke("add_scan_path", { path });
+  },
+
+  getAllScanPaths: async (): Promise<ScanPath[]> => {
+    return await invoke("get_all_scan_paths");
+  },
+
+  removeScanPath: async (pathId: number): Promise<void> => {
+    return await invoke("remove_scan_path", { pathId });
+  },
+
+  pickFolder: async (): Promise<string | null> => {
+    return await invoke("pick_folder");
   },
 
   getAllTracks: async (): Promise<Track[]> => {

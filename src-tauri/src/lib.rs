@@ -43,6 +43,7 @@ pub fn run() {
     
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Get app data directory
             let app_dir = app.path().app_data_dir()
@@ -67,6 +68,10 @@ pub fn run() {
             commands::set_current_track,
             commands::clear_current_track,
             commands::scan_library,
+            commands::add_scan_path,
+            commands::get_all_scan_paths,
+            commands::remove_scan_path,
+            commands::pick_folder,
             commands::get_all_tracks,
             commands::get_all_albums,
             commands::get_all_artists,

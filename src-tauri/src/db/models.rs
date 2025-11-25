@@ -22,6 +22,14 @@ pub struct Track {
     pub date_modified: i64,
     pub play_count: i32,
     pub last_played: Option<i64>,
+    pub file_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanPath {
+    pub id: i64,
+    pub path: String,
+    pub date_added: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -6,7 +6,7 @@ use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
 use crate::library::indexer::{LibraryIndexer, IndexingResult};
 use crate::db::operations::DbOperations;
-use crate::db::models::{Track, Album, Artist, Genre, Queue};
+use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath};
 use lofty::file::TaggedFileExt;
 
 // Backend now only tracks current file - playback is in frontend
@@ -32,7 +32,6 @@ pub fn clear_current_track(state: State<'_, AppState>) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn scan_library(
-    directory: String,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<IndexingResult, String> {
@@ -41,9 +40,18 @@ pub async fn scan_library(
     
     // Spawn blocking task to avoid blocking the event loop
     let result = tokio::task::spawn_blocking(move || {
-        // Scan directory for audio files
-        let audio_files = DirectoryScanner::scan(&directory)
-            .map_err(|e| format!("Failed to scan directory: {}", e))?;
+        // Get all configured scan paths
+        let scan_paths = DbOperations::get_all_scan_paths(&db)
+            .map_err(|e| format!("Failed to get scan paths: {}", e))?;
+        
+        if scan_paths.is_empty() {
+            return Err("No scan paths configured. Please add at least one directory to scan.".to_string());
+        }
+        
+        // Scan all configured directories for audio files
+        let paths: Vec<&str> = scan_paths.iter().map(|sp| sp.path.as_str()).collect();
+        let audio_files = DirectoryScanner::scan_multiple(&paths)
+            .map_err(|e| format!("Failed to scan directories: {}", e))?;
         
         // Index files into database with progress updates
         let result = LibraryIndexer::index_files_with_progress(&audio_files, &db, |progress| {
@@ -58,6 +66,50 @@ pub async fn scan_library(
     .map_err(|e| format!("Task join error: {}", e))??;
     
     Ok(result)
+}
+
+#[tauri::command]
+pub fn add_scan_path(path: String, state: State<'_, AppState>) -> Result<i64, String> {
+    // Check if path is a subdirectory of existing paths
+    if DbOperations::is_subdirectory_of_existing_path(&state.db, &path)
+        .map_err(|e| format!("Failed to check subdirectory: {}", e))? 
+    {
+        return Err("This directory is already covered by an existing scan path.".to_string());
+    }
+    
+    DbOperations::add_scan_path(&state.db, &path)
+        .map_err(|e| format!("Failed to add scan path: {}", e))
+}
+
+#[tauri::command]
+pub fn get_all_scan_paths(state: State<'_, AppState>) -> Result<Vec<ScanPath>, String> {
+    DbOperations::get_all_scan_paths(&state.db)
+        .map_err(|e| format!("Failed to get scan paths: {}", e))
+}
+
+#[tauri::command]
+pub fn remove_scan_path(path_id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    DbOperations::remove_scan_path(&state.db, path_id)
+        .map_err(|e| format!("Failed to remove scan path: {}", e))
+}
+
+#[tauri::command]
+pub async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    
+    let folder = app.dialog()
+        .file()
+        .blocking_pick_folder();
+    
+    match folder {
+        Some(file_path) => {
+            match file_path.into_path() {
+                Ok(path) => Ok(Some(path.to_string_lossy().to_string())),
+                Err(e) => Err(format!("Failed to get path: {}", e)),
+            }
+        }
+        None => Ok(None),
+    }
 }
 
 #[tauri::command]

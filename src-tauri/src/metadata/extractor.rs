@@ -106,6 +106,7 @@ impl MetadataExtractor {
             date_modified: now,
             play_count: 0,
             last_played: None,
+            file_hash: None,
         })
     }
     
@@ -148,6 +149,7 @@ impl MetadataExtractor {
             date_modified: now,
             play_count: 0,
             last_played: None,
+            file_hash: None,
         })
     }
 }
