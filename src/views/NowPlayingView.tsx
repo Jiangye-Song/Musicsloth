@@ -528,8 +528,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <Box sx={{ display: "flex", flexDirection: "column", flex: 1, p: 3, overflow: "hidden" }}>
           <Box sx={{ display: "flex", flex: 1, gap: 4, mb: 3, minHeight: 0 }}>
             {/* Left: Album Art & Track Info */}
-            <Box sx={{ flex: isShortHeight ? "0 0 150px" : "0 0 300px", display: "flex", flexDirection: "column", overflow: "hidden", justifyContent: "center" }}>
-              <Box sx={{ flexShrink: 0, pl: "12%" }}>
+            <Box sx={{ flex: "0 0 33%", display: "flex", flexDirection: "column", overflow: "hidden", justifyContent: "center" }}>
+              <Box sx={{ flexShrink: 0, pl: "12%"}}>
                 {renderAlbumArt()}
                 {renderTrackInfo()}
               </Box>
