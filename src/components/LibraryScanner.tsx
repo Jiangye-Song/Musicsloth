@@ -38,7 +38,10 @@ interface LibraryScannerProps {
 }
 
 export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryScannerProps) {
-  const [scanning, setScanning] = useState(false);
+  const [scanning, setScanning] = useState(() => {
+    // Check if a scan is in progress when component mounts
+    return sessionStorage.getItem('isScanning') === 'true';
+  });
   const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<IndexingResult | null>(null);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
@@ -55,8 +58,15 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
     // Load initial scan paths
     loadScanPaths();
 
+    // Poll sessionStorage to keep scanning state in sync
+    const interval = setInterval(() => {
+      const scanningInStorage = sessionStorage.getItem('isScanning') === 'true';
+      setScanning(scanningInStorage);
+    }, 500);
+
     return () => {
       unlisten.then((fn) => fn());
+      clearInterval(interval);
     };
   }, []);
 
