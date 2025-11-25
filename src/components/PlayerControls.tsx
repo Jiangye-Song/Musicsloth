@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   IconButton,
@@ -41,6 +41,12 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
   const [volume, setVolume] = useState(100);
+  const [titleOverflows, setTitleOverflows] = useState(false);
+  const [artistOverflows, setArtistOverflows] = useState(false);
+  const [albumOverflows, setAlbumOverflows] = useState(false);
+  const titleRef = useRef<HTMLDivElement>(null);
+  const artistRef = useRef<HTMLDivElement>(null);
+  const albumRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Update player state periodically (faster for smoother seekbar)
@@ -57,6 +63,38 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
 
     return () => clearInterval(interval);
   }, [isSeeking]);
+
+  // Check if text overflows and needs scrolling
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (titleRef.current) {
+        const container = titleRef.current;
+        const textElement = container.querySelector('span');
+        if (textElement) {
+          setTitleOverflows(textElement.scrollWidth > container.clientWidth);
+        }
+      }
+      if (artistRef.current) {
+        const container = artistRef.current;
+        const textElement = container.querySelector('span');
+        if (textElement) {
+          setArtistOverflows(textElement.scrollWidth > container.clientWidth);
+        }
+      }
+      if (albumRef.current) {
+        const container = albumRef.current;
+        const textElement = container.querySelector('span');
+        if (textElement) {
+          setAlbumOverflows(textElement.scrollWidth > container.clientWidth);
+        }
+      }
+    };
+
+    checkOverflow();
+    // Recheck on window resize
+    window.addEventListener('resize', checkOverflow);
+    return () => window.removeEventListener('resize', checkOverflow);
+  }, [currentTrack]);
 
   const handlePlayPause = async () => {
     try {
@@ -160,36 +198,176 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             } : {},
             px: 2,
             py: 1,
+            overflow: "hidden",
           }}
         >
-          <Typography
-            variant="body2"
-            fontWeight="bold"
-            noWrap
-            sx={{ color: "text.primary" }}
+          <Box
+            ref={titleRef}
+            sx={{
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              position: "relative",
+              maskImage: titleOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+              WebkitMaskImage: titleOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+            }}
           >
-            {currentTrack ? currentTrack.title : "Track title"}
-          </Typography>
-          <Typography
-            variant="caption"
-            noWrap
-            sx={{ color: "text.primary", display: "flex", alignItems: "center" }}
+            <Typography
+              variant="body2"
+              fontWeight="bold"
+              component="span"
+              sx={{
+                color: "text.primary",
+                display: "inline-block",
+                paddingRight: titleOverflows ? "40px" : "0",
+                animation: titleOverflows ? "scroll-text 10s linear infinite" : "none",
+                "@keyframes scroll-text": {
+                  "0%": { transform: "translateX(0%)" },
+                  "100%": { transform: "translateX(-100%)" },
+                },
+              }}
+            >
+              {currentTrack ? currentTrack.title : "Track title"}
+            </Typography>
+            {titleOverflows && (
+              <Typography
+                variant="body2"
+                fontWeight="bold"
+                component="span"
+                sx={{
+                  color: "text.primary",
+                  display: "inline-block",
+                  paddingRight: "40px",
+                  animation: "scroll-text 10s linear infinite",
+                  "@keyframes scroll-text": {
+                    "0%": { transform: "translateX(0%)" },
+                    "100%": { transform: "translateX(-100%)" },
+                  },
+                }}
+              >
+                {currentTrack ? currentTrack.title : "Track title"}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              overflow: "hidden",
+              position: "relative",
+            }}
           >
-            <Person sx={{fontSize: 12, mr: "3px"}}/>
-            {currentTrack
-              ? `${currentTrack.artist || "Unknown Artist"}`
-              : "Track artist"}
-          </Typography>
-          <Typography
-            variant="caption"
-            noWrap
-            sx={{ color: "text.primary", display: "flex", alignItems: "center" }}
+            <Person sx={{ fontSize: 12, mr: "3px", flexShrink: 0, color: "text.primary" }} />
+            <Box
+              ref={artistRef}
+              sx={{
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                flex: 1,
+                position: "relative",
+                maskImage: artistOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+                WebkitMaskImage: artistOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+              }}
+            >
+              <Typography
+                variant="caption"
+                component="span"
+                sx={{
+                  color: "text.primary",
+                  display: "inline-block",
+                  paddingRight: artistOverflows ? "40px" : "0",
+                  animation: artistOverflows ? "scroll-text 10s linear infinite" : "none",
+                  "@keyframes scroll-text": {
+                    "0%": { transform: "translateX(0%)" },
+                    "100%": { transform: "translateX(-100%)" },
+                  },
+                }}
+              >
+                {currentTrack
+                  ? (currentTrack.artist || "Unknown Artist")
+                  : "Track artist"}
+              </Typography>
+              {artistOverflows && (
+                <Typography
+                  variant="caption"
+                  component="span"
+                  sx={{
+                    color: "text.primary",
+                    display: "inline-block",
+                    paddingRight: "40px",
+                    animation: "scroll-text 10s linear infinite",
+                    "@keyframes scroll-text": {
+                      "0%": { transform: "translateX(0%)" },
+                      "100%": { transform: "translateX(-100%)" },
+                    },
+                  }}
+                >
+                  {currentTrack
+                    ? (currentTrack.artist || "Unknown Artist")
+                    : "Track artist"}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              overflow: "hidden",
+              position: "relative",
+            }}
           >
-            <Album sx={{fontSize: 12, mr: "3px"}}/>
-            {currentTrack
-              ? `${currentTrack.album ? `${currentTrack.album}` : "Unknown Album"}`
-              : "Track album"}
-          </Typography>
+            <Album sx={{ fontSize: 12, mr: "3px", flexShrink: 0, color: "text.primary" }} />
+            <Box
+              ref={albumRef}
+              sx={{
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                flex: 1,
+                position: "relative",
+                maskImage: albumOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+                WebkitMaskImage: albumOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+              }}
+            >
+              <Typography
+                variant="caption"
+                component="span"
+                sx={{
+                  color: "text.primary",
+                  display: "inline-block",
+                  paddingRight: albumOverflows ? "40px" : "0",
+                  animation: albumOverflows ? "scroll-text 10s linear infinite" : "none",
+                  "@keyframes scroll-text": {
+                    "0%": { transform: "translateX(0%)" },
+                    "100%": { transform: "translateX(-100%)" },
+                  },
+                }}
+              >
+                {currentTrack
+                  ? (currentTrack.album || "Unknown Album")
+                  : "Track album"}
+              </Typography>
+              {albumOverflows && (
+                <Typography
+                  variant="caption"
+                  component="span"
+                  sx={{
+                    color: "text.primary",
+                    display: "inline-block",
+                    paddingRight: "40px",
+                    animation: "scroll-text 10s linear infinite",
+                    "@keyframes scroll-text": {
+                      "0%": { transform: "translateX(0%)" },
+                      "100%": { transform: "translateX(-100%)" },
+                    },
+                  }}
+                >
+                  {currentTrack
+                    ? (currentTrack.album || "Unknown Album")
+                    : "Track album"}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Box>
       )}
 

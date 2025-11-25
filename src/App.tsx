@@ -10,7 +10,6 @@ import {
   Paper,
   useMediaQuery,
   useTheme,
-  Button,
   Dialog,
   Slide,
 } from "@mui/material";
@@ -21,7 +20,6 @@ import {
   Person,
   Album,
   MusicNote,
-  FolderOpen,
 } from "@mui/icons-material";
 import { TransitionProps } from "@mui/material/transitions";
 import "./App.css";
@@ -34,7 +32,7 @@ import PlaylistsView from "./views/PlaylistsView";
 import ArtistsView from "./views/ArtistsView";
 import AlbumsView from "./views/AlbumsView";
 import GenresView from "./views/GenresView";
-import { playerApi } from "./services/api";
+// import { playerApi } from "./services/api";
 import { PlayerProvider } from "./contexts/PlayerContext";
 import React from "react";
 
@@ -64,16 +62,16 @@ function App() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const queuesViewRef = useRef<QueuesViewRef>(null);
 
-  const handleFileSelect = async () => {
-    const filePath = prompt("Enter the full path to an audio file:");
-    if (filePath) {
-      try {
-        await playerApi.playFile(filePath);
-      } catch (error) {
-        alert(`Failed to play file: ${error}`);
-      }
-    }
-  };
+  // const handleFileSelect = async () => {
+  //   const filePath = prompt("Enter the full path to an audio file:");
+  //   if (filePath) {
+  //     try {
+  //       await playerApi.playFile(filePath);
+  //     } catch (error) {
+  //       alert(`Failed to play file: ${error}`);
+  //     }
+  //   }
+  // };
 
   const renderTabContent = () => {
     switch (activeTab) {

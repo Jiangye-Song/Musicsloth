@@ -22,6 +22,8 @@ import {
   Repeat,
   VolumeUp,
   QueueMusic,
+  Person,
+  Album
 } from "@mui/icons-material";
 import { playerApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
@@ -37,7 +39,7 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
-  const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
+  const isShortHeight = useMediaQuery('(max-height:600px)'); const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -61,10 +63,10 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     const interval = setInterval(async () => {
       try {
         const state = await playerApi.getState();
-        
+
         setIsPlaying(state.is_playing);
         setVolume(Math.round(state.position_ms > 0 ? (audioPlayer.getState().volume * 100) : 100));
-        
+
         if (!isSeeking) {
           setCurrentPosition(state.position_ms);
           setDuration(state.duration_ms || 0);
@@ -164,16 +166,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   };
 
   const renderAlbumArt = () => {
-    const size = isNarrow ? 250 : 200;
-    const maxSize = isShortHeight ? 200 : (isNarrow ? 300 : 300);
-    
+    // const size = isNarrow ? 200 : 200;
+    // const maxSize = isShortHeight ? 200 : (isNarrow ? 200 : 300);
+
     return (
       <Box
         sx={{
-          width: isNarrow ? "100%" : size,
-          maxWidth: isNarrow ? maxSize : size,
-          minWidth: isNarrow ? maxSize : size,
-          minHeight: isNarrow ? maxSize : size,
+          width: 200,
           margin: isNarrow ? "0 auto" : 0,
           bgcolor: "background.default",
           borderRadius: 2,
@@ -186,9 +185,9 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         }}
       >
         {albumArt ? (
-          <img 
-            src={albumArt} 
-            alt="Album Art" 
+          <img
+            src={albumArt}
+            alt="Album Art"
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
@@ -204,39 +203,48 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <Typography variant="h5" fontWeight="bold" gutterBottom>
           {currentTrack.title}
         </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
-          {splitMultiValue(currentTrack.artist).length > 0 ? (
-            splitMultiValue(currentTrack.artist).map((artist, index, arr) => (
-              <Typography
-                key={index}
-                variant="body1"
-                color="text.secondary"
-                onClick={() => onNavigateToArtist?.(artist, currentTrack.id)}
-                sx={{
-                  cursor: onNavigateToArtist ? "pointer" : "default",
-                  "&:hover": onNavigateToArtist ? { textDecoration: "underline" } : {}
-                }}
-              >
-                {artist}{index < arr.length - 1 ? ", " : ""}
-              </Typography>
-            ))
-          ) : (
-            <Typography variant="body1" color="text.secondary">
-              Unknown Artist
-            </Typography>
-          )}
+        <Box sx={{ my: "6px" }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+            <Person sx={{ fontSize: 18, mr: "3px", flexShrink: 0, color: "text.primary", mt: "2px" }} />
+            <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+              {splitMultiValue(currentTrack.artist).length > 0 ? (
+                splitMultiValue(currentTrack.artist).map((artist, index, arr) => (
+                  <Typography
+                    key={index}
+                    variant="body1"
+                    color="text.secondary"
+                    onClick={() => onNavigateToArtist?.(artist, currentTrack.id)}
+                    sx={{
+                      cursor: onNavigateToArtist ? "pointer" : "default",
+                      "&:hover": onNavigateToArtist ? { textDecoration: "underline" } : {}
+                    }}
+                  >
+                    {artist}{index < arr.length - 1 ? ", " : ""}
+                  </Typography>
+                ))
+              ) : (
+                <Typography variant="body1" color="text.secondary">
+                  Unknown Artist
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Box>
-        <Typography 
-          variant="body2" 
-          color="text.secondary"
-          onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
-          sx={{ 
-            cursor: currentTrack.album && onNavigateToAlbum ? "pointer" : "default",
-            "&:hover": currentTrack.album && onNavigateToAlbum ? { textDecoration: "underline" } : {}
-          }}
-        >
-          {currentTrack.album || "Unknown Album"}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+          <Album sx={{ fontSize: 18, mr: "3px", flexShrink: 0, color: "text.primary", mt: "2px" }} />
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
+            sx={{
+              cursor: currentTrack.album && onNavigateToAlbum ? "pointer" : "default",
+              "&:hover": currentTrack.album && onNavigateToAlbum ? { textDecoration: "underline" } : {},
+              flex: 1
+            }}
+          >
+            {currentTrack.album || "Unknown Album"}
+          </Typography>
+        </Box>
       </Box>
     ) : (
       <Box sx={{ textAlign: "center", mt: 2 }}>
@@ -279,10 +287,10 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
       {/* Playback Controls */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-        <IconButton 
+        <IconButton
           onClick={toggleShuffle}
-          size="small" 
-          disabled={!currentTrack} 
+          size="small"
+          disabled={!currentTrack}
           title={isShuffled ? "Shuffle On" : "Shuffle Off"}
           sx={{ color: isShuffled ? "primary.main" : "text.secondary" }}
         >
@@ -312,9 +320,9 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <IconButton onClick={handleNext} disabled={!currentTrack} sx={{ color: "text.primary" }} title="Next Track">
           <SkipNext fontSize="large" />
         </IconButton>
-        <IconButton 
+        <IconButton
           onClick={toggleRepeat}
-          size="small" 
+          size="small"
           disabled={!currentTrack}
           title={isRepeating ? "Repeat Track" : "Repeat Queue"}
           sx={{ color: isRepeating ? "primary.main" : "text.secondary" }}
@@ -374,13 +382,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           }}
         >
           <Typography color="text.secondary">Title:</Typography>
-          <Typography 
+          <Typography
             onContextMenu={(e) => copyToClipboard(currentTrack.title, e)}
             sx={{ userSelect: "text" }}
           >
             {currentTrack.title}
           </Typography>
-          
+
           <Typography color="text.secondary">Artist:</Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => copyToClipboard(currentTrack.artist, e)}>
             {splitMultiValue(currentTrack.artist).length > 0 ? (
@@ -401,20 +409,20 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
               <Typography sx={{ userSelect: "text" }}>—</Typography>
             )}
           </Box>
-          
+
           <Typography color="text.secondary">Album Artist:</Typography>
-          <Typography 
+          <Typography
             onContextMenu={(e) => copyToClipboard(currentTrack.album_artist, e)}
             sx={{ userSelect: "text" }}
           >
             {currentTrack.album_artist || "—"}
           </Typography>
-          
+
           <Typography color="text.secondary">Album:</Typography>
-          <Typography 
+          <Typography
             onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
             onContextMenu={(e) => copyToClipboard(currentTrack.album, e)}
-            sx={{ 
+            sx={{
               cursor: currentTrack.album && currentTrack.album !== "—" && onNavigateToAlbum ? "pointer" : "default",
               "&:hover": currentTrack.album && currentTrack.album !== "—" && onNavigateToAlbum ? { textDecoration: "underline" } : {},
               userSelect: "text"
@@ -422,15 +430,15 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           >
             {currentTrack.album || "—"}
           </Typography>
-          
+
           <Typography color="text.secondary">Year:</Typography>
-          <Typography 
+          <Typography
             onContextMenu={(e) => copyToClipboard(currentTrack.year?.toString(), e)}
             sx={{ userSelect: "text" }}
           >
             {currentTrack.year || "—"}
           </Typography>
-          
+
           <Typography color="text.secondary">Genre:</Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => copyToClipboard(currentTrack.genre, e)}>
             {splitMultiValue(currentTrack.genre).length > 0 ? (
@@ -451,19 +459,19 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
               <Typography sx={{ userSelect: "text" }}>—</Typography>
             )}
           </Box>
-          
+
           <Typography color="text.secondary">Track:</Typography>
           <Typography>{currentTrack.track_number ? `${currentTrack.track_number}${currentTrack.disc_number ? ` (Disc ${currentTrack.disc_number})` : ""}` : "—"}</Typography>
-          
+
           <Typography color="text.secondary">Duration:</Typography>
           <Typography>{formatDuration(currentTrack.duration_ms)}</Typography>
-          
+
           <Typography color="text.secondary">Format:</Typography>
           <Typography>{currentTrack.file_format?.toUpperCase() || "—"}</Typography>
-          
+
           <Typography color="text.secondary">Bitrate:</Typography>
           <Typography>{currentTrack.bitrate ? `${Math.round(currentTrack.bitrate / 1000)} kbps` : "—"}</Typography>
-          
+
           <Typography color="text.secondary">Sample Rate:</Typography>
           <Typography>{currentTrack.sample_rate ? `${currentTrack.sample_rate} Hz` : "—"}</Typography>
         </Box>
@@ -508,7 +516,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
               {activeTab === "lyrics" && renderLyrics()}
               {activeTab === "details" && renderDetails()}
             </Box>
-            
+
             {/* Controls always at bottom */}
             <Box sx={{ pt: 3, flexShrink: 0 }}>
               {renderControls()}
@@ -521,7 +529,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           <Box sx={{ display: "flex", flex: 1, gap: 4, mb: 3, minHeight: 0 }}>
             {/* Left: Album Art & Track Info */}
             <Box sx={{ flex: isShortHeight ? "0 0 150px" : "0 0 300px", display: "flex", flexDirection: "column", overflow: "hidden", justifyContent: "center" }}>
-              <Box sx={{ flexShrink: 0, pl: "12%"}}>
+              <Box sx={{ flexShrink: 0, pl: "12%" }}>
                 {renderAlbumArt()}
                 {renderTrackInfo()}
               </Box>
