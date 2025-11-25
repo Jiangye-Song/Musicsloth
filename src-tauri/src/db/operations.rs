@@ -427,7 +427,7 @@ impl DbOperations {
                     COUNT(DISTINCT t.id) as song_count
              FROM tracks t
              WHERE t.album IS NOT NULL
-             GROUP BY t.album, COALESCE(t.album_artist, t.artist)
+             GROUP BY t.album
              ORDER BY t.album"
         )?;
         
