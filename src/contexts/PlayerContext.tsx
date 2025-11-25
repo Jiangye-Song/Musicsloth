@@ -99,11 +99,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     try {
       // Simply move to previous track in the (potentially shuffled) queue
-      const prevIndex = currentTrackIndex - 1;
+      let prevIndex = currentTrackIndex - 1;
       
+      // If at start of queue, loop to end
       if (prevIndex < 0) {
-        console.log('[PlayerContext] playPrevious - at start of queue');
-        return;
+        const queueLength = await queueApi.getQueueLength(currentQueueId);
+        prevIndex = queueLength - 1;
+        console.log('[PlayerContext] playPrevious - at start of queue, looping to end');
       }
 
       // Use shuffled position function to respect shuffle state
