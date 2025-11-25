@@ -227,27 +227,22 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
               <ListItem
                 key={scanPath.id}
                 secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label="delete"
-                    onClick={() => handleRemovePath(scanPath.id)}
-                    disabled={loading || scanning}
-                    color="error"
-                  >
-                    <Delete />
-                  </IconButton>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <IconButton
+                      edge="end"
+                      aria-label="delete"
+                      onClick={() => handleRemovePath(scanPath.id)}
+                      disabled={loading || scanning}
+                      color="error"
+                    >
+                      <Delete />
+                    </IconButton>
+                  </Stack>
                 }
               >
                 <ListItemText
                   primary={scanPath.path}
-                  secondary={
-                    <>
-                      Added: {new Date(scanPath.date_added * 1000).toLocaleDateString()}
-                      {scanPath.last_scanned && (
-                        <> • Last scanned: {new Date(scanPath.last_scanned * 1000).toLocaleString()}</>
-                      )}
-                    </>
-                  }
+                  secondary={`Added: ${new Date(scanPath.date_added * 1000).toLocaleDateString()}` + `\t·\tScanned: ${scanPath.last_scanned ? new Date(scanPath.last_scanned * 1000).toLocaleDateString():"Never"}`}
                 />
               </ListItem>
             ))}
