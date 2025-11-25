@@ -596,13 +596,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <Box sx={{ display: "flex", flexDirection: "column", flex: 1, p: 3, overflow: "hidden" }}>
           <Box sx={{ display: "flex", flex: 1, gap: 4, mb: 3, minHeight: 0 }}>
             {/* Left: Album Art & Track Info */}
-            <Box sx={{ flex: "0 0 33%", display: "flex", flexDirection: "column", overflow: "hidden", justifyContent: "center" }}>
+            <Box sx={{ flex: "0 0 33%", maxWidth: "350px", display: "flex", flexDirection: "column", overflow: "hidden", justifyContent: "center" }}>
               <Box sx={{ flexShrink: 0, pl: "12%"}}>
                 {renderAlbumArt()}
                 {renderTrackInfo()}
               </Box>
             </Box>
-
+            <hr style={{borderColor: "#2f2f2f"}}/>
             {/* Right: Tabs */}
             <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
               <Tabs
@@ -614,8 +614,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
                 <Tab label="Details" value="details" />
               </Tabs>
 
-              <Paper
-                elevation={2}
+              <Box
                 sx={{
                   flex: 1,
                   overflowY: "auto",
@@ -624,7 +623,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
               >
                 {activeTab === "lyrics" && renderLyrics()}
                 {activeTab === "details" && renderDetails()}
-              </Paper>
+              </Box>
             </Box>
           </Box>
 
