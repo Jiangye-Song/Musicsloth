@@ -37,7 +37,7 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
-  const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle } = usePlayer();
+  const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -290,7 +290,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <IconButton onClick={handleNext} disabled={!currentTrack} sx={{ color: "text.primary" }} title="Next Track">
           <SkipNext fontSize="large" />
         </IconButton>
-        <IconButton size="small" disabled={!currentTrack} sx={{ color: "text.secondary" }}>
+        <IconButton 
+          onClick={toggleRepeat}
+          size="small" 
+          disabled={!currentTrack}
+          title={isRepeating ? "Repeat Track" : "Repeat Queue"}
+          sx={{ color: isRepeating ? "primary.main" : "text.secondary" }}
+        >
           <Repeat />
         </IconButton>
       </Box>

@@ -30,7 +30,7 @@ interface PlayerControlsProps {
 }
 
 export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerControlsProps) {
-  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle } = usePlayer();
+  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,
@@ -271,10 +271,10 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             <div>
 
               <IconButton
-                onClick={() => {/* TODO: implement repeat */ }}
+                onClick={toggleRepeat}
                 size="small"
-                title="Repeat"
-                sx={{ color: "text.primary" }}
+                title={isRepeating ? "Repeat Track" : "Repeat Queue"}
+                sx={{ color: isRepeating ? "primary.main" : "text.primary" }}
               >
                 <Repeat />
               </IconButton>

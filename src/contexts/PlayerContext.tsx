@@ -9,12 +9,14 @@ interface PlayerContextType {
   currentTrackIndex: number | null;
   isShuffled: boolean;
   shuffleSeed: number;
+  isRepeating: boolean;
   setCurrentTrack: (track: Track | null) => void;
   setAlbumArt: (art: string | null) => void;
   updateQueuePosition: (queueId: number, trackIndex: number) => Promise<void>;
   playNext: () => Promise<void>;
   playPrevious: () => Promise<void>;
   toggleShuffle: () => Promise<void>;
+  toggleRepeat: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -28,6 +30,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [shuffleSeed, setShuffleSeed] = useState<number>(1);
   const [isShuffled, setIsShuffled] = useState<boolean>(false);
   const [shuffleAnchor, setShuffleAnchor] = useState<number>(0); // The position where shuffle was activated
+  const [isRepeating, setIsRepeating] = useState<boolean>(false); // true = repeat track, false = repeat queue
 
   const updateQueuePosition = async (queueId: number, trackIndex: number) => {
     console.log(`[PlayerContext] updateQueuePosition - queueId: ${queueId}, trackIndex: ${trackIndex}`);
@@ -44,12 +47,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
     try {
       // Simply move to next track in the (potentially shuffled) queue
-      const nextIndex = currentTrackIndex + 1;
+      let nextIndex = currentTrackIndex + 1;
       const queueLength = await queueApi.getQueueLength(currentQueueId);
       
+      // If reached end of queue, loop back to start (queue loop)
       if (nextIndex >= queueLength) {
-        console.log('[PlayerContext] playNext - reached end of queue');
-        return;
+        console.log('[PlayerContext] playNext - reached end of queue, looping to start');
+        nextIndex = 0;
       }
 
       // Use shuffled position function to respect shuffle state
@@ -186,6 +190,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [currentQueueId, isShuffled, currentTrackIndex, currentTrack]);
 
+  const toggleRepeat = useCallback(() => {
+    setIsRepeating(prev => {
+      const newState = !prev;
+      console.log(`[PlayerContext] Repeat toggled: ${newState ? 'Track Loop' : 'Queue Loop'}`);
+      return newState;
+    });
+  }, []);
+
   // Load active queue's current track on startup
   useEffect(() => {
     const loadActiveQueueTrack = async () => {
@@ -255,17 +267,30 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     loadActiveQueueTrack();
   }, []); // Run only once on mount
 
-  // Set up track ended listener to auto-play next track
+  // Set up track ended listener to auto-play next track or repeat
   useEffect(() => {
-    const unsubscribe = audioPlayer.onTrackEnded(() => {
-      console.log('[PlayerContext] Track ended, playing next track');
-      playNext();
+    const unsubscribe = audioPlayer.onTrackEnded(async () => {
+      if (isRepeating) {
+        // Track loop: replay the same track
+        console.log('[PlayerContext] Track ended, repeating current track');
+        if (currentTrack) {
+          try {
+            await playerApi.playFile(currentTrack.file_path);
+          } catch (error) {
+            console.error('Failed to repeat track:', error);
+          }
+        }
+      } else {
+        // Queue loop: play next track (will loop to start when reaching end)
+        console.log('[PlayerContext] Track ended, playing next track');
+        playNext();
+      }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [playNext]);
+  }, [playNext, isRepeating, currentTrack]);
 
   useEffect(() => {
     console.log('[PlayerContext] Setting up polling interval');
@@ -401,12 +426,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrackIndex,
       isShuffled,
       shuffleSeed,
+      isRepeating,
       setCurrentTrack, 
       setAlbumArt,
       updateQueuePosition,
       playNext,
       playPrevious,
-      toggleShuffle
+      toggleShuffle,
+      toggleRepeat
     }}>
       {children}
     </PlayerContext.Provider>
