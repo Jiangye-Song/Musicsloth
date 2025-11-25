@@ -32,7 +32,12 @@ interface ScanProgress {
   current_file: string;
 }
 
-export default function LibraryScanner() {
+interface LibraryScannerProps {
+  onScanStart?: () => void;
+  onScanComplete?: () => void;
+}
+
+export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryScannerProps) {
   const [scanning, setScanning] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<IndexingResult | null>(null);
@@ -118,13 +123,21 @@ export default function LibraryScanner() {
     setScanning(true);
     setResult(null);
     setProgress(null);
+    
+    // Store scanning state in sessionStorage so it persists across tab switches
+    sessionStorage.setItem('isScanning', 'true');
+    onScanStart?.();
 
     try {
       const scanResult = await libraryApi.scanLibrary();
       setResult(scanResult);
       setProgress(null);
+      sessionStorage.removeItem('isScanning');
+      onScanComplete?.();
     } catch (error) {
       alert(`Failed to scan library: ${error}`);
+      sessionStorage.removeItem('isScanning');
+      onScanComplete?.();
     } finally {
       setScanning(false);
     }

@@ -12,6 +12,10 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isScanning, setIsScanning] = useState(() => {
+        // Check if a scan is in progress when component mounts
+        return sessionStorage.getItem('isScanning') === 'true';
+    });
 
     const loadTracks = async () => {
         try {
@@ -24,9 +28,23 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
         }
     };
 
+    const handleScanComplete = () => {
+        console.log('[LibraryView] Scan complete, reloading tracks');
+        setLoading(true);
+        loadTracks();
+    };
+
     useEffect(() => {
         console.log('[LibraryView] Loading tracks useEffect');
         loadTracks();
+        
+        // Poll sessionStorage to detect scan state changes from other components
+        const interval = setInterval(() => {
+            const scanningInStorage = sessionStorage.getItem('isScanning') === 'true';
+            setIsScanning(scanningInStorage);
+        }, 500);
+        
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
@@ -60,17 +78,24 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
                 <h2 style={{ margin: 0, fontSize: "18px" }}>Library</h2>
             </div>
             <div style={{ padding: "20px" }}>
-                <LibraryScanner />
+                <LibraryScanner 
+                    onScanStart={() => setIsScanning(true)}
+                    onScanComplete={() => {
+                        setIsScanning(false);
+                        handleScanComplete();
+                    }}
+                />
 
-                <div style={{ marginTop: "30px" }}>
-                    <h2 style={{ marginBottom: "15px" }}>
-                        All Tracks ({tracks.length})
-                        {searchQuery && ` - Showing ${filteredTracks.length} results`}
-                    </h2>
+                {!isScanning && (
+                    <div style={{ marginTop: "30px" }}>
+                        <h2 style={{ marginBottom: "15px" }}>
+                            All Tracks ({tracks.length})
+                            {searchQuery && ` - Showing ${filteredTracks.length} results`}
+                        </h2>
 
-                    {loading ? (
-                        <p style={{ color: "#888" }}>Loading tracks...</p>
-                    ) : tracks.length === 0 ? (
+                        {loading ? (
+                            <p style={{ color: "#888" }}>Loading tracks...</p>
+                        ) : tracks.length === 0 ? (
                         <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
                             <p style={{ color: "#888", margin: 0 }}>
                                 No tracks in library. Use the scanner above to add music files.
@@ -85,7 +110,8 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
                     ) : (
                         <VirtualTrackList tracks={filteredTracks} contextType="library" showSearch={false} />
                     )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );
