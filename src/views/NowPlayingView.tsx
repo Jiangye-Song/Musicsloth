@@ -162,6 +162,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         sx={{
           width: isNarrow ? "100%" : size,
           maxWidth: isNarrow ? maxSize : size,
+          minWidth: isNarrow ? maxSize : size,
+          minHeight: isNarrow ? maxSize : size,
           margin: isNarrow ? "0 auto" : 0,
           bgcolor: "background.default",
           borderRadius: 2,

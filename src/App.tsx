@@ -112,6 +112,15 @@ function App() {
     { key: "genres", label: "Genres", icon: <MusicNote /> },
   ];
 
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    // Clear navigation selections when manually switching tabs
+    setSelectedArtistName(undefined);
+    setSelectedAlbumName(undefined);
+    setSelectedGenreName(undefined);
+    setSelectedTrackId(undefined);
+  };
+
   return (
     <PlayerProvider>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
@@ -129,7 +138,7 @@ function App() {
               <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
                 <ListItemButton
                   selected={activeTab === tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => handleTabChange(tab.key)}
                   sx={{
                     flexDirection: "column",
                     py: 1,
@@ -180,7 +189,7 @@ function App() {
               <ListItem key={tab.key} disablePadding>
                 <ListItemButton
                   selected={activeTab === tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => handleTabChange(tab.key)}
                   sx={{
                     borderLeft: activeTab === tab.key ? 3 : 0,
                     borderColor: "success.main",

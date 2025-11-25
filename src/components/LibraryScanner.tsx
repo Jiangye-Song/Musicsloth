@@ -12,16 +12,12 @@ import {
   ListItem,
   ListItemText,
   IconButton,
-  TextField,
-  InputAdornment,
 } from "@mui/material";
 import { 
-  FolderOpen, 
   DeleteForever, 
   Sync, 
   Add, 
-  Delete, 
-  Search 
+  Delete,
 } from "@mui/icons-material";
 import { listen } from "@tauri-apps/api/event";
 import { libraryApi, IndexingResult, ScanPath } from "../services/api";
@@ -46,7 +42,6 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
   const [result, setResult] = useState<IndexingResult | null>(null);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [scanPaths, setScanPaths] = useState<ScanPath[]>([]);
-  const [newPath, setNewPath] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -79,24 +74,6 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
     }
   };
 
-  const handleAddPath = async () => {
-    if (!newPath.trim()) {
-      alert("Please enter a directory path");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await libraryApi.addScanPath(newPath.trim());
-      setNewPath("");
-      await loadScanPaths();
-    } catch (error) {
-      alert(`Failed to add scan path: ${error}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRemovePath = async (pathId: number) => {
     if (!confirm("Remove this directory from the library? Tracks from this directory will be removed during the next scan.")) {
       return;
@@ -113,14 +90,18 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
     }
   };
 
-  const handleBrowseFolder = async () => {
+  const handleAddDirectory = async () => {
+    setLoading(true);
     try {
       const directory = await libraryApi.pickFolder();
       if (directory) {
-        setNewPath(directory);
+        await libraryApi.addScanPath(directory);
+        await loadScanPaths();
       }
     } catch (error) {
-      console.error("Failed to pick folder:", error);
+      alert(`Failed to add scan path: ${error}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -181,44 +162,16 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
         </Typography>
         
         {/* Add New Path Section */}
-        <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Enter directory path to scan (e.g., C:\Music)"
-            value={newPath}
-            onChange={(e) => setNewPath(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === "Enter") {
-                handleAddPath();
-              }
-            }}
-            disabled={loading || scanning}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<FolderOpen />}
-            onClick={handleBrowseFolder}
-            disabled={loading || scanning}
-          >
-            Browse
-          </Button>
+        <Box sx={{ mb: 3 }}>
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={handleAddPath}
-            disabled={loading || scanning || !newPath.trim()}
+            onClick={handleAddDirectory}
+            disabled={loading || scanning}
           >
-            Add
+            Add Directory
           </Button>
-        </Stack>
+        </Box>
 
         {/* List of Scan Paths */}
         {scanPaths.length > 0 ? (
