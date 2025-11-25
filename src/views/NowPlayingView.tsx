@@ -25,7 +25,7 @@ import {
   Person,
   Album
 } from "@mui/icons-material";
-import { playerApi } from "../services/api";
+import { playerApi, libraryApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import { usePlayer } from "../contexts/PlayerContext";
 
@@ -40,13 +40,15 @@ interface NowPlayingViewProps {
 
 export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
   const isShortHeight = useMediaQuery('(max-height:600px)'); const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
-  const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
+  const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "lyrics");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(100);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
+  const [lyrics, setLyrics] = useState<string | null>(null);
+  const [loadingLyrics, setLoadingLyrics] = useState(false);
 
   // Helper function to split multi-value fields (artists, genres)
   const splitMultiValue = (value: string | null): string[] => {
@@ -81,7 +83,34 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     };
   }, [isSeeking]);
 
+  // Load lyrics when track changes or when switching to lyrics tab
+  useEffect(() => {
+    const loadLyrics = async () => {
+      if (!currentTrack) {
+        setLyrics(null);
+        return;
+      }
 
+      // Only load if we're on the lyrics tab (or it's selected in landscape) and lyrics aren't already loaded/loading
+      const showingLyrics = activeTab === "lyrics" || (!isNarrow && activeTab === "albumart");
+      if (!showingLyrics || loadingLyrics) {
+        return;
+      }
+
+      setLoadingLyrics(true);
+      try {
+        const lyricsData = await libraryApi.getLyrics(currentTrack.file_path);
+        setLyrics(lyricsData);
+      } catch (error) {
+        console.error("Failed to load lyrics:", error);
+        setLyrics(null);
+      } finally {
+        setLoadingLyrics(false);
+      }
+    };
+
+    loadLyrics();
+  }, [currentTrack?.file_path, activeTab, isNarrow]);
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return "—";
@@ -350,19 +379,59 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     </Box>
   );
 
-  const renderLyrics = () => (
-    <Box
-      sx={{
-        p: 3,
-        textAlign: "center",
-        color: "text.secondary",
-      }}
-    >
-      <Typography variant="body2">
-        Lyrics will appear here when available
-      </Typography>
-    </Box>
-  );
+  const renderLyrics = () => {
+    if (loadingLyrics) {
+      return (
+        <Box
+          sx={{
+            p: 3,
+            textAlign: "center",
+            color: "text.secondary",
+          }}
+        >
+          <Typography variant="body2">Loading lyrics...</Typography>
+        </Box>
+      );
+    }
+
+    if (!lyrics) {
+      return (
+        <Box
+          sx={{
+            p: 3,
+            textAlign: "center",
+            color: "text.secondary",
+          }}
+        >
+          <Typography variant="body2">No lyrics available</Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Box
+        sx={{
+          p: 3,
+          overflowY: "auto",
+          height: "100%",
+        }}
+      >
+        <Typography
+          variant="body2"
+          component="pre"
+          sx={{
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            fontFamily: "inherit",
+            color: "text.primary",
+            lineHeight: 1.8,
+          }}
+        >
+          {lyrics}
+        </Typography>
+      </Box>
+    );
+  };
 
   const renderDetails = () => (
     currentTrack && (

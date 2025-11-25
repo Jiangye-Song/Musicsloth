@@ -82,6 +82,7 @@ pub fn run() {
             commands::get_tracks_by_album,
             commands::get_current_track,
             commands::get_album_art,
+            commands::get_lyrics,
             commands::create_queue_from_tracks,
             commands::get_all_queues,
             commands::get_queue_tracks,

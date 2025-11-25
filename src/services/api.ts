@@ -178,6 +178,10 @@ export const libraryApi = {
   getAlbumArt: async (filePath: string): Promise<number[] | null> => {
     return await invoke("get_album_art", { filePath });
   },
+
+  getLyrics: async (filePath: string): Promise<string | null> => {
+    return await invoke("get_lyrics", { filePath });
+  },
 };
 
 export const queueApi = {

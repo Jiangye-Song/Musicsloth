@@ -292,6 +292,90 @@ pub async fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String>
     .map_err(|e| format!("Task join error: {}", e))?
 }
 
+#[tauri::command]
+pub async fn get_lyrics(file_path: String) -> Result<Option<String>, String> {
+    use lofty::probe::Probe;
+    use lofty::tag::ItemKey;
+    use std::path::Path;
+    use std::fs;
+    
+    // Run file I/O in a blocking task to avoid blocking the async runtime
+    tokio::task::spawn_blocking(move || {
+        let path = Path::new(&file_path);
+        
+        // First, try to read .lrc file with the same name
+        if let Some(parent) = path.parent() {
+            if let Some(stem) = path.file_stem() {
+                let lrc_path = parent.join(format!("{}.lrc", stem.to_string_lossy()));
+                if lrc_path.exists() {
+                    match fs::read_to_string(&lrc_path) {
+                        Ok(content) => {
+                            if !content.trim().is_empty() {
+                                return Ok(Some(content));
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to read .lrc file: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If no .lrc file, try to read lyrics from audio file tags
+        let tagged_file = Probe::open(&file_path)
+            .map_err(|e| format!("Failed to open file: {}", e))?
+            .read()
+            .map_err(|e| format!("Failed to read file: {}", e))?;
+        
+        // Try to get lyrics from primary tag first
+        if let Some(tag) = tagged_file.primary_tag() {
+            // Try the Lyrics ItemKey
+            if let Some(lyrics) = tag.get_string(&ItemKey::Lyrics) {
+                if !lyrics.trim().is_empty() {
+                    return Ok(Some(lyrics.to_string()));
+                }
+            }
+            
+            // Iterate through all items to find lyrics-related fields
+            for item in tag.items() {
+                let key_str = format!("{:?}", item.key());
+                if key_str.to_lowercase().contains("lyric") {
+                    if let Some(text) = item.value().text() {
+                        if !text.trim().is_empty() {
+                            return Ok(Some(text.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Try all tags if primary tag didn't have lyrics
+        for tag in tagged_file.tags() {
+            if let Some(lyrics) = tag.get_string(&ItemKey::Lyrics) {
+                if !lyrics.trim().is_empty() {
+                    return Ok(Some(lyrics.to_string()));
+                }
+            }
+            
+            for item in tag.items() {
+                let key_str = format!("{:?}", item.key());
+                if key_str.to_lowercase().contains("lyric") {
+                    if let Some(text) = item.value().text() {
+                        if !text.trim().is_empty() {
+                            return Ok(Some(text.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(None)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
 // ===== Queue Management Commands =====
 
 #[tauri::command]
