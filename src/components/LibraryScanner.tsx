@@ -240,7 +240,14 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
               >
                 <ListItemText
                   primary={scanPath.path}
-                  secondary={`Added: ${new Date(scanPath.date_added * 1000).toLocaleDateString()}`}
+                  secondary={
+                    <>
+                      Added: {new Date(scanPath.date_added * 1000).toLocaleDateString()}
+                      {scanPath.last_scanned && (
+                        <> • Last scanned: {new Date(scanPath.last_scanned * 1000).toLocaleString()}</>
+                      )}
+                    </>
+                  }
                 />
               </ListItem>
             ))}

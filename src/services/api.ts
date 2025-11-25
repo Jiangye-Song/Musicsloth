@@ -115,6 +115,7 @@ export interface ScanPath {
   id: number;
   path: string;
   date_added: number;
+  last_scanned: number | null;
 }
 
 export const libraryApi = {

@@ -212,6 +212,19 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    // Migration: Add last_scanned column to scan_paths table
+    let last_scanned_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('scan_paths') WHERE name='last_scanned'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = last_scanned_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE scan_paths ADD COLUMN last_scanned INTEGER", [])?;
+        }
+    }
+
     // Create indexes for better query performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist)",

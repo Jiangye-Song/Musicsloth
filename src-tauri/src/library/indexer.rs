@@ -35,6 +35,7 @@ impl LibraryIndexer {
     pub fn index_files_with_progress<P: AsRef<Path>, F>(
         paths: &[P],
         db: &DatabaseConnection,
+        last_scanned: Option<i64>,
         mut progress_callback: F,
     ) -> Result<IndexingResult, anyhow::Error>
     where
@@ -60,7 +61,7 @@ impl LibraryIndexer {
                     .to_string(),
             });
             
-            match Self::index_single_file(path_ref, db) {
+            match Self::index_single_file(path_ref, db, last_scanned) {
                 Ok(was_updated) => {
                     if was_updated {
                         updated += 1;
@@ -77,23 +78,13 @@ impl LibraryIndexer {
             }
         }
         
-        // Remove tracks outside scan paths with progress
-        let removed = DbOperations::remove_tracks_outside_scan_paths(db, |current, total| {
-            progress_callback(IndexingProgress {
-                current: total_files + current,
-                total: total_files + total,
-                current_file: format!("Cleaning up: {} / {} tracks checked", current, total),
-            });
-        })
-        .unwrap_or(0);
-        
         Ok(IndexingResult {
             total_files,
             successful,
             failed,
             skipped,
             updated,
-            removed,
+            removed: 0, // Removal is now handled separately in the command
             errors,
         })
     }
@@ -102,8 +93,9 @@ impl LibraryIndexer {
     pub fn index_files<P: AsRef<Path>>(
         paths: &[P],
         db: &DatabaseConnection,
+        last_scanned: Option<i64>,
     ) -> Result<IndexingResult, anyhow::Error> {
-        Self::index_files_with_progress(paths, db, |_| {})
+        Self::index_files_with_progress(paths, db, last_scanned, |_| {})
     }
     
     /// Calculate file hash using BLAKE3 (fast and secure)
@@ -127,7 +119,23 @@ impl LibraryIndexer {
     fn index_single_file(
         path: &Path,
         db: &DatabaseConnection,
+        last_scanned: Option<i64>,
     ) -> Result<bool, anyhow::Error> {
+        // If last_scanned is provided, check file modification time
+        if let Some(last_scan_time) = last_scanned {
+            if let Ok(metadata) = std::fs::metadata(path) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(modified_duration) = modified.duration_since(std::time::UNIX_EPOCH) {
+                        let modified_timestamp = modified_duration.as_secs() as i64;
+                        // Skip if file wasn't modified since last scan
+                        if modified_timestamp < last_scan_time {
+                            return Ok(false);
+                        }
+                    }
+                }
+            }
+        }
+        
         // Calculate file hash first
         let file_hash = Self::calculate_file_hash(path)?;
         

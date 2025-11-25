@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
-use crate::library::indexer::{LibraryIndexer, IndexingResult};
+use crate::library::indexer::{LibraryIndexer, IndexingResult, IndexingProgress};
 use crate::db::operations::DbOperations;
 use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath};
 use lofty::file::TaggedFileExt;
@@ -48,19 +48,73 @@ pub async fn scan_library(
             return Err("No scan paths configured. Please add at least one directory to scan.".to_string());
         }
         
-        // Scan all configured directories for audio files
-        let paths: Vec<&str> = scan_paths.iter().map(|sp| sp.path.as_str()).collect();
-        let audio_files = DirectoryScanner::scan_multiple(&paths)
-            .map_err(|e| format!("Failed to scan directories: {}", e))?;
+        // Accumulate results from all scan paths
+        let mut total_files = 0;
+        let mut successful = 0;
+        let mut failed = 0;
+        let mut skipped = 0;
+        let mut updated = 0;
+        let mut all_errors = Vec::new();
         
-        // Index files into database with progress updates
-        let result = LibraryIndexer::index_files_with_progress(&audio_files, &db, |progress| {
-            // Emit progress event to frontend
-            let _ = app.emit("scan-progress", progress);
+        // Scan each path individually with its last_scanned timestamp
+        for scan_path in &scan_paths {
+            // Scan this directory for audio files
+            let audio_files = DirectoryScanner::scan(&scan_path.path)
+                .map_err(|e| format!("Failed to scan directory {}: {}", scan_path.path, e))?;
+            
+            // Index files with last_scanned check
+            let result = LibraryIndexer::index_files_with_progress(
+                &audio_files, 
+                &db, 
+                scan_path.last_scanned,
+                |progress| {
+                    // Emit progress event to frontend
+                    let _ = app.emit("scan-progress", progress);
+                }
+            )
+            .map_err(|e| format!("Failed to index files from {}: {}", scan_path.path, e))?;
+            
+            // Accumulate results
+            total_files += result.total_files;
+            successful += result.successful;
+            failed += result.failed;
+            skipped += result.skipped;
+            updated += result.updated;
+            all_errors.extend(result.errors);
+            
+            // Update last_scanned timestamp for this path
+            DbOperations::update_scan_path_last_scanned(&db, scan_path.id)
+                .map_err(|e| format!("Failed to update last_scanned for {}: {}", scan_path.path, e))?;
+        }
+        
+        // Final cleanup: remove tracks outside all scan paths and missing files
+        let removed = DbOperations::remove_tracks_outside_scan_paths(&db, |current, total| {
+            let _ = app.emit("scan-progress", IndexingProgress {
+                current: total_files + current,
+                total: total_files + total,
+                current_file: format!("Removing orphaned tracks: {} / {}", current, total),
+            });
         })
-        .map_err(|e| format!("Failed to index files: {}", e))?;
+        .unwrap_or(0);
         
-        Ok::<IndexingResult, String>(result)
+        let removed_missing = DbOperations::remove_missing_files(&db, |current, total| {
+            let _ = app.emit("scan-progress", IndexingProgress {
+                current: total_files + current,
+                total: total_files + total,
+                current_file: format!("Checking file existence: {} / {}", current, total),
+            });
+        })
+        .unwrap_or(0);
+        
+        Ok::<IndexingResult, String>(IndexingResult {
+            total_files,
+            successful,
+            failed,
+            skipped,
+            updated,
+            removed: removed + removed_missing,
+            errors: all_errors,
+        })
     })
     .await
     .map_err(|e| format!("Task join error: {}", e))??;

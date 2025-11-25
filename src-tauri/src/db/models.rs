@@ -30,6 +30,7 @@ pub struct ScanPath {
     pub id: i64,
     pub path: String,
     pub date_added: i64,
+    pub last_scanned: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

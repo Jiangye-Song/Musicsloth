@@ -1266,7 +1266,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, path, date_added FROM scan_paths ORDER BY path"
+            "SELECT id, path, date_added, last_scanned FROM scan_paths ORDER BY path"
         )?;
         
         let paths = stmt.query_map([], |row| {
@@ -1274,6 +1274,7 @@ impl DbOperations {
                 id: row.get(0)?,
                 path: row.get(1)?,
                 date_added: row.get(2)?,
+                last_scanned: row.get(3)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1317,6 +1318,60 @@ impl DbOperations {
         Ok(false)
     }
     
+    /// Update the last_scanned timestamp for a scan path
+    pub fn update_scan_path_last_scanned(
+        db: &DatabaseConnection,
+        path_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_secs() as i64;
+        
+        conn.execute(
+            "UPDATE scan_paths SET last_scanned = ?1 WHERE id = ?2",
+            params![now, path_id],
+        )?;
+        
+        Ok(())
+    }
+
+    /// Remove tracks whose files no longer exist on disk
+    pub fn remove_missing_files<F>(
+        db: &DatabaseConnection,
+        mut progress_callback: F,
+    ) -> Result<usize, anyhow::Error>
+    where
+        F: FnMut(usize, usize),
+    {
+        use std::path::Path;
+        
+        let all_tracks = Self::get_all_tracks(db)?;
+        let total = all_tracks.len();
+        let mut removed_count = 0;
+        
+        for (index, track) in all_tracks.iter().enumerate() {
+            progress_callback(index + 1, total);
+            
+            let track_path = Path::new(&track.file_path);
+            
+            // Check if file exists
+            if !track_path.exists() {
+                // Remove track
+                let conn = db.get_connection();
+                let conn = conn.lock().unwrap();
+                conn.execute("DELETE FROM tracks WHERE id = ?1", params![track.id])?;
+                removed_count += 1;
+            }
+        }
+        
+        Ok(removed_count)
+    }
+
     /// Remove tracks that are not within any scan path
     pub fn remove_tracks_outside_scan_paths<F>(
         db: &DatabaseConnection,
