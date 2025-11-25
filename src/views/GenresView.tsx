@@ -6,14 +6,17 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 interface GenresViewProps {
   searchQuery?: string;
+  initialGenreName?: string;
+  initialTrackId?: number;
 }
 
-export default function GenresView({ searchQuery = "" }: GenresViewProps) {
+export default function GenresView({ searchQuery = "", initialGenreName, initialTrackId }: GenresViewProps) {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [filteredGenres, setFilteredGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
+  const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
 
   useEffect(() => {
     const loadGenres = async () => {
@@ -21,6 +24,14 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
         const allGenres = await libraryApi.getAllGenres();
         setGenres(allGenres);
         setFilteredGenres(allGenres);
+        
+        // Auto-select genre if initialGenreName is provided
+        if (initialGenreName) {
+          const genre = allGenres.find(g => g.name === initialGenreName);
+          if (genre) {
+            handleGenreClick(genre);
+          }
+        }
       } catch (error) {
         console.error("Failed to load genres:", error);
       } finally {
@@ -29,7 +40,7 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
     };
 
     loadGenres();
-  }, []);
+  }, [initialGenreName]);
 
   const handleGenreClick = async (genre: Genre) => {
     setSelectedGenre(genre);
@@ -78,7 +89,7 @@ export default function GenresView({ searchQuery = "" }: GenresViewProps) {
           </h2>
         </div>
         <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-          <VirtualTrackList tracks={genreTracks} contextType="genre" contextName={selectedGenre?.name} showSearch={true} />
+          <VirtualTrackList tracks={genreTracks} contextType="genre" contextName={selectedGenre?.name} showSearch={true} initialTrackId={trackIdToFlash} />
         </div>
       </div>
     );

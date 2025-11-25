@@ -6,14 +6,17 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 interface ArtistsViewProps {
     searchQuery?: string;
+    initialArtistName?: string;
+    initialTrackId?: number;
 }
 
-export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
+export default function ArtistsView({ searchQuery = "", initialArtistName, initialTrackId }: ArtistsViewProps) {
     const [artists, setArtists] = useState<Artist[]>([]);
     const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
     const [artistTracks, setArtistTracks] = useState<Track[]>([]);
+    const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
 
     useEffect(() => {
         const loadArtists = async () => {
@@ -21,6 +24,14 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
                 const allArtists = await libraryApi.getAllArtists();
                 setArtists(allArtists);
                 setFilteredArtists(allArtists);
+                
+                // Auto-select artist if initialArtistName is provided
+                if (initialArtistName) {
+                    const artist = allArtists.find(a => a.name === initialArtistName);
+                    if (artist) {
+                        handleArtistClick(artist);
+                    }
+                }
             } catch (error) {
                 console.error("Failed to load artists:", error);
             } finally {
@@ -29,7 +40,7 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
         };
 
         loadArtists();
-    }, []);
+    }, [initialArtistName]);
 
     const handleArtistClick = async (artist: Artist) => {
         setSelectedArtist(artist);
@@ -78,7 +89,7 @@ export default function ArtistsView({ searchQuery = "" }: ArtistsViewProps) {
                     </h2>
                 </div>
                 <div style={{ flex: 1, overflow: "hidden", height: "80%" }}>
-                    <VirtualTrackList tracks={artistTracks} contextType="artist" contextName={selectedArtist?.name} showSearch={true} />
+                    <VirtualTrackList tracks={artistTracks} contextType="artist" contextName={selectedArtist?.name} showSearch={true} initialTrackId={trackIdToFlash} />
                 </div>
             </div>
         );

@@ -196,14 +196,17 @@ function AlbumItem({ album, onClick }: AlbumItemProps) {
 
 interface AlbumsViewProps {
     searchQuery?: string;
+    initialAlbumName?: string;
+    initialTrackId?: number;
 }
 
-export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
+export default function AlbumsView({ searchQuery = "", initialAlbumName, initialTrackId }: AlbumsViewProps) {
     const [albums, setAlbums] = useState<Album[]>([]);
     const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
     const [albumTracks, setAlbumTracks] = useState<Track[]>([]);
+    const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
 
     useEffect(() => {
         const loadAlbums = async () => {
@@ -211,6 +214,14 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
                 const allAlbums = await libraryApi.getAllAlbums();
                 setAlbums(allAlbums);
                 setFilteredAlbums(allAlbums);
+                
+                // Auto-select album if initialAlbumName is provided
+                if (initialAlbumName) {
+                    const album = allAlbums.find(a => a.name === initialAlbumName);
+                    if (album) {
+                        handleAlbumClick(album);
+                    }
+                }
             } catch (error) {
                 console.error("Failed to load albums:", error);
             } finally {
@@ -219,7 +230,7 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
         };
 
         loadAlbums();
-    }, []);
+    }, [initialAlbumName]);
 
     const handleAlbumClick = async (album: Album) => {
         setSelectedAlbum(album);
@@ -272,7 +283,7 @@ export default function AlbumsView({ searchQuery = "" }: AlbumsViewProps) {
                     </h2>
                 </div>
                 <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-                    <VirtualTrackList tracks={albumTracks} contextType="album" contextName={selectedAlbum?.name} showSearch={true} />
+                    <VirtualTrackList tracks={albumTracks} contextType="album" contextName={selectedAlbum?.name} showSearch={true} initialTrackId={trackIdToFlash} />
                 </div>
             </div>
         );

@@ -23,9 +23,10 @@ interface VirtualTrackListProps {
   onQueueActivated?: () => void; // Callback when queue is activated
   showSearch?: boolean; // Whether to show the search bar
   activeTrackFilePath?: string | null; // File path of the currently active track in the queue
+  initialTrackId?: number; // Track ID to scroll to and flash on mount
 }
 
-const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false, activeTrackFilePath }, ref) => {
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false, activeTrackFilePath, initialTrackId }, ref) => {
 // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
@@ -428,6 +429,17 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
     setShowDropdown(false);
     setSearchQuery("");
   };
+
+  // Scroll to initial track if provided
+  useEffect(() => {
+    if (initialTrackId && tracks.length > 0) {
+      const index = tracks.findIndex(t => t.id === initialTrackId);
+      if (index >= 0) {
+        // Delay to ensure DOM is ready
+        setTimeout(() => scrollToTrack(index), 100);
+      }
+    }
+  }, [initialTrackId, tracks]);
 
   // Expose scrollToActiveTrack to parent via ref
   useImperativeHandle(ref, () => ({

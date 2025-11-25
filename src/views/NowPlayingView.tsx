@@ -31,9 +31,12 @@ interface NowPlayingViewProps {
   isNarrow: boolean;
   onClose: () => void;
   onQueueClick?: () => void;
+  onNavigateToArtist?: (artistName: string, trackId: number) => void;
+  onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+  onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
-export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowPlayingViewProps) {
+export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
   const isShortHeight = useMediaQuery('(max-height:600px)');  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle } = usePlayer();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">("albumart");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -143,6 +146,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowP
     }
   };
 
+  const copyToClipboard = (text: string | null | undefined, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (text && text !== "—") {
+      navigator.clipboard.writeText(text);
+    }
+  };
+
   const renderAlbumArt = () => {
     const size = isNarrow ? 250 : 200;
     const maxSize = isShortHeight ? 200 : (isNarrow ? 300 : 300);
@@ -182,10 +192,27 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowP
         <Typography variant="h5" fontWeight="bold" gutterBottom>
           {currentTrack.title}
         </Typography>
-        <Typography variant="body1" color="text.secondary" gutterBottom>
+        <Typography 
+          variant="body1" 
+          color="text.secondary" 
+          gutterBottom
+          onClick={() => currentTrack.artist && onNavigateToArtist?.(currentTrack.artist, currentTrack.id)}
+          sx={{ 
+            cursor: currentTrack.artist && onNavigateToArtist ? "pointer" : "default",
+            "&:hover": currentTrack.artist && onNavigateToArtist ? { textDecoration: "underline" } : {}
+          }}
+        >
           {currentTrack.artist || "Unknown Artist"}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography 
+          variant="body2" 
+          color="text.secondary"
+          onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
+          sx={{ 
+            cursor: currentTrack.album && onNavigateToAlbum ? "pointer" : "default",
+            "&:hover": currentTrack.album && onNavigateToAlbum ? { textDecoration: "underline" } : {}
+          }}
+        >
           {currentTrack.album || "Unknown Album"}
         </Typography>
       </Box>
@@ -319,22 +346,67 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick }: NowP
           }}
         >
           <Typography color="text.secondary">Title:</Typography>
-          <Typography>{currentTrack.title}</Typography>
+          <Typography 
+            onContextMenu={(e) => copyToClipboard(currentTrack.title, e)}
+            sx={{ userSelect: "text" }}
+          >
+            {currentTrack.title}
+          </Typography>
           
           <Typography color="text.secondary">Artist:</Typography>
-          <Typography>{currentTrack.artist || "—"}</Typography>
+          <Typography 
+            onClick={() => currentTrack.artist && onNavigateToArtist?.(currentTrack.artist, currentTrack.id)}
+            onContextMenu={(e) => copyToClipboard(currentTrack.artist, e)}
+            sx={{ 
+              cursor: currentTrack.artist && currentTrack.artist !== "—" && onNavigateToArtist ? "pointer" : "default",
+              "&:hover": currentTrack.artist && currentTrack.artist !== "—" && onNavigateToArtist ? { textDecoration: "underline" } : {},
+              userSelect: "text"
+            }}
+          >
+            {currentTrack.artist || "—"}
+          </Typography>
           
           <Typography color="text.secondary">Album Artist:</Typography>
-          <Typography>{currentTrack.album_artist || "—"}</Typography>
+          <Typography 
+            onContextMenu={(e) => copyToClipboard(currentTrack.album_artist, e)}
+            sx={{ userSelect: "text" }}
+          >
+            {currentTrack.album_artist || "—"}
+          </Typography>
           
           <Typography color="text.secondary">Album:</Typography>
-          <Typography>{currentTrack.album || "—"}</Typography>
+          <Typography 
+            onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
+            onContextMenu={(e) => copyToClipboard(currentTrack.album, e)}
+            sx={{ 
+              cursor: currentTrack.album && currentTrack.album !== "—" && onNavigateToAlbum ? "pointer" : "default",
+              "&:hover": currentTrack.album && currentTrack.album !== "—" && onNavigateToAlbum ? { textDecoration: "underline" } : {},
+              userSelect: "text"
+            }}
+          >
+            {currentTrack.album || "—"}
+          </Typography>
           
           <Typography color="text.secondary">Year:</Typography>
-          <Typography>{currentTrack.year || "—"}</Typography>
+          <Typography 
+            onContextMenu={(e) => copyToClipboard(currentTrack.year?.toString(), e)}
+            sx={{ userSelect: "text" }}
+          >
+            {currentTrack.year || "—"}
+          </Typography>
           
           <Typography color="text.secondary">Genre:</Typography>
-          <Typography>{currentTrack.genre || "—"}</Typography>
+          <Typography 
+            onClick={() => currentTrack.genre && onNavigateToGenre?.(currentTrack.genre, currentTrack.id)}
+            onContextMenu={(e) => copyToClipboard(currentTrack.genre, e)}
+            sx={{ 
+              cursor: currentTrack.genre && currentTrack.genre !== "—" && onNavigateToGenre ? "pointer" : "default",
+              "&:hover": currentTrack.genre && currentTrack.genre !== "—" && onNavigateToGenre ? { textDecoration: "underline" } : {},
+              userSelect: "text"
+            }}
+          >
+            {currentTrack.genre || "—"}
+          </Typography>
           
           <Typography color="text.secondary">Track:</Typography>
           <Typography>{currentTrack.track_number ? `${currentTrack.track_number}${currentTrack.disc_number ? ` (Disc ${currentTrack.disc_number})` : ""}` : "—"}</Typography>

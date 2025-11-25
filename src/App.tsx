@@ -56,6 +56,10 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>("library");
   const [globalSearchQuery, setGlobalSearchQuery] = useState("");
   const [showNowPlaying, setShowNowPlaying] = useState(false);
+  const [selectedArtistName, setSelectedArtistName] = useState<string | undefined>(undefined);
+  const [selectedAlbumName, setSelectedAlbumName] = useState<string | undefined>(undefined);
+  const [selectedGenreName, setSelectedGenreName] = useState<string | undefined>(undefined);
+  const [selectedTrackId, setSelectedTrackId] = useState<number | undefined>(undefined);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const queuesViewRef = useRef<QueuesViewRef>(null);
@@ -80,11 +84,11 @@ function App() {
       case "playlists":
         return <PlaylistsView searchQuery={globalSearchQuery} />;
       case "artists":
-        return <ArtistsView searchQuery={globalSearchQuery} />;
+        return <ArtistsView searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} />;
       case "albums":
-        return <AlbumsView searchQuery={globalSearchQuery} />;
+        return <AlbumsView searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} />;
       case "genres":
-        return <GenresView searchQuery={globalSearchQuery} />;
+        return <GenresView searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} />;
       default:
         return <LibraryView searchQuery={globalSearchQuery} />;
     }
@@ -254,6 +258,33 @@ function App() {
             setShowNowPlaying(false);
             setActiveTab("queues");
             setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
+          }}
+          onNavigateToArtist={(artistName, trackId) => {
+            setShowNowPlaying(false);
+            setSelectedArtistName(artistName);
+            setSelectedAlbumName(undefined);
+            setSelectedGenreName(undefined);
+            setSelectedTrackId(trackId);
+            setGlobalSearchQuery("");
+            setActiveTab("artists");
+          }}
+          onNavigateToAlbum={(albumName, trackId) => {
+            setShowNowPlaying(false);
+            setSelectedAlbumName(albumName);
+            setSelectedArtistName(undefined);
+            setSelectedGenreName(undefined);
+            setSelectedTrackId(trackId);
+            setGlobalSearchQuery("");
+            setActiveTab("albums");
+          }}
+          onNavigateToGenre={(genreName, trackId) => {
+            setShowNowPlaying(false);
+            setSelectedGenreName(genreName);
+            setSelectedArtistName(undefined);
+            setSelectedAlbumName(undefined);
+            setSelectedTrackId(trackId);
+            setGlobalSearchQuery("");
+            setActiveTab("genres");
           }}
         />
       </Dialog>
