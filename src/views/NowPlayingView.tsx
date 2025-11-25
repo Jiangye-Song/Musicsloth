@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   IconButton,
@@ -29,6 +29,11 @@ import { playerApi, libraryApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import { usePlayer } from "../contexts/PlayerContext";
 
+interface LyricLine {
+  time: number; // milliseconds
+  text: string;
+}
+
 interface NowPlayingViewProps {
   isNarrow: boolean;
   onClose: () => void;
@@ -49,6 +54,31 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   const [seekPosition, setSeekPosition] = useState(0);
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [loadingLyrics, setLoadingLyrics] = useState(false);
+  const [parsedLyrics, setParsedLyrics] = useState<LyricLine[]>([]);
+  const [currentLyricIndex, setCurrentLyricIndex] = useState(-1);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Parse LRC format lyrics
+  const parseLrcLyrics = (lrcText: string): LyricLine[] => {
+    const lines: LyricLine[] = [];
+    const lrcRegex = /\[(\d{1,2}):(\d{2})(?:\.(\d{2,3}))?\](.*)/g;
+    
+    let match;
+    while ((match = lrcRegex.exec(lrcText)) !== null) {
+      const minutes = parseInt(match[1], 10);
+      const seconds = parseInt(match[2], 10);
+      const milliseconds = match[3] ? parseInt(match[3].padEnd(3, '0'), 10) : 0;
+      const text = match[4].trim();
+      
+      const time = (minutes * 60 + seconds) * 1000 + milliseconds;
+      lines.push({ time, text });
+    }
+    
+    // Sort by time in case lyrics are not ordered
+    lines.sort((a, b) => a.time - b.time);
+    
+    return lines;
+  };
 
   // Helper function to split multi-value fields (artists, genres)
   const splitMultiValue = (value: string | null): string[] => {
@@ -88,6 +118,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     const loadLyrics = async () => {
       if (!currentTrack) {
         setLyrics(null);
+        setParsedLyrics([]);
         return;
       }
 
@@ -101,9 +132,18 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
       try {
         const lyricsData = await libraryApi.getLyrics(currentTrack.file_path);
         setLyrics(lyricsData);
+        
+        // Parse LRC format if available
+        if (lyricsData) {
+          const parsed = parseLrcLyrics(lyricsData);
+          setParsedLyrics(parsed);
+        } else {
+          setParsedLyrics([]);
+        }
       } catch (error) {
         console.error("Failed to load lyrics:", error);
         setLyrics(null);
+        setParsedLyrics([]);
       } finally {
         setLoadingLyrics(false);
       }
@@ -111,6 +151,38 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
     loadLyrics();
   }, [currentTrack?.file_path, activeTab, isNarrow]);
+
+  // Update current lyric line based on playback position
+  useEffect(() => {
+    if (parsedLyrics.length === 0) {
+      setCurrentLyricIndex(-1);
+      return;
+    }
+
+    // Find the current lyric line
+    let index = -1;
+    for (let i = parsedLyrics.length - 1; i >= 0; i--) {
+      if (currentPosition >= parsedLyrics[i].time) {
+        index = i;
+        break;
+      }
+    }
+
+    if (index !== currentLyricIndex) {
+      setCurrentLyricIndex(index);
+      
+      // Auto-scroll to current lyric line
+      if (index >= 0 && lyricsContainerRef.current) {
+        const currentElement = lyricsContainerRef.current.querySelector(`[data-lyric-index="${index}"]`);
+        if (currentElement) {
+          currentElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+          });
+        }
+      }
+    }
+  }, [currentPosition, parsedLyrics, currentLyricIndex]);
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return "—";
@@ -408,6 +480,85 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
       );
     }
 
+    // If we have parsed LRC lyrics, render them with sync
+    if (parsedLyrics.length > 0) {
+      // Group consecutive lines with the same timestamp
+      const groupedLyrics: { time: number; lines: string[]; index: number }[] = [];
+      parsedLyrics.forEach((line, index) => {
+        const lastGroup = groupedLyrics[groupedLyrics.length - 1];
+        if (lastGroup && lastGroup.time === line.time) {
+          lastGroup.lines.push(line.text);
+        } else {
+          groupedLyrics.push({ time: line.time, lines: [line.text], index });
+        }
+      });
+
+      // Find current group index
+      let currentGroupIndex = -1;
+      for (let i = groupedLyrics.length - 1; i >= 0; i--) {
+        if (currentPosition >= groupedLyrics[i].time) {
+          currentGroupIndex = i;
+          break;
+        }
+      }
+
+      return (
+        <Box
+          ref={lyricsContainerRef}
+          sx={{
+            p: 3,
+            overflowY: "auto",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          {groupedLyrics.map((group, groupIndex) => {
+            const isActive = groupIndex === currentGroupIndex;
+            const isPast = groupIndex < currentGroupIndex;
+            
+            return (
+              <Box
+                key={groupIndex}
+                data-lyric-index={group.index}
+                sx={{
+                  py: 1.5,
+                  px: 2,
+                  my: 0.5,
+                  transition: "all 0.3s ease",
+                  transform: isActive ? "scale(1.05)" : "scale(1)",
+                  opacity: isPast ? 0.4 : isActive ? 1 : 0.6,
+                  textAlign: "center",
+                  width: "100%",
+                  maxWidth: "800px",
+                }}
+              >
+                {group.lines.map((text, lineIndex) => (
+                  <Typography
+                    key={lineIndex}
+                    variant="body1"
+                    sx={{
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: isActive ? "1.2rem" : "1rem",
+                      color: isActive ? "primary.main" : "text.primary",
+                      lineHeight: 1.8,
+                      transition: "all 0.3s ease",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {text || " "}
+                  </Typography>
+                ))}
+              </Box>
+            );
+          })}
+        </Box>
+      );
+    }
+
+    // Fallback to plain text display if no LRC format detected
     return (
       <Box
         sx={{
