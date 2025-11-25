@@ -659,10 +659,11 @@ impl DbOperations {
         let conn = db.get_connection();
         let conn = conn.lock().unwrap();
         
-        // Only select columns needed for display: id, file_path, title, artist, album, duration_ms
-        // This dramatically reduces data transfer for large queues
         let mut stmt = conn.prepare(
-            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.duration_ms
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist,
+                    t.year, t.track_number, t.disc_number, t.duration_ms, t.genre,
+                    t.file_size, t.file_format, t.bitrate, t.sample_rate,
+                    t.date_added, t.date_modified, t.play_count, t.last_played, t.file_hash
              FROM tracks t
              INNER JOIN queue_tracks qt ON qt.track_id = t.id
              WHERE qt.queue_id = ?1
@@ -676,22 +677,21 @@ impl DbOperations {
                 title: row.get(2)?,
                 artist: row.get(3)?,
                 album: row.get(4)?,
-                duration_ms: row.get(5)?,
-                // Set unused fields to defaults to satisfy the model
-                album_artist: None,
-                year: None,
-                track_number: None,
-                disc_number: None,
-                genre: None,
-                file_size: None,
-                file_format: None,
-                bitrate: None,
-                sample_rate: None,
-                play_count: 0,
-                last_played: None,
-                date_added: 0,
-                date_modified: 0,
-                file_hash: None,
+                album_artist: row.get(5)?,
+                year: row.get(6)?,
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                date_added: row.get(15)?,
+                date_modified: row.get(16)?,
+                play_count: row.get(17)?,
+                last_played: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -866,7 +866,10 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.duration_ms
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist,
+                    t.year, t.track_number, t.disc_number, t.duration_ms, t.genre,
+                    t.file_size, t.file_format, t.bitrate, t.sample_rate,
+                    t.date_added, t.date_modified, t.play_count, t.last_played, t.file_hash
              FROM tracks t
              INNER JOIN queue_tracks qt ON qt.track_id = t.id
              WHERE qt.queue_id = ?1 AND qt.position = ?2"
@@ -879,21 +882,21 @@ impl DbOperations {
                 title: row.get(2)?,
                 artist: row.get(3)?,
                 album: row.get(4)?,
-                duration_ms: row.get(5)?,
-                album_artist: None,
-                year: None,
-                track_number: None,
-                disc_number: None,
-                genre: None,
-                file_size: None,
-                file_format: None,
-                bitrate: None,
-                sample_rate: None,
-                play_count: 0,
-                last_played: None,
-                date_added: 0,
-                date_modified: 0,
-                file_hash: None,
+                album_artist: row.get(5)?,
+                year: row.get(6)?,
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                date_added: row.get(15)?,
+                date_modified: row.get(16)?,
+                play_count: row.get(17)?,
+                last_played: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         }).optional()?;
         
@@ -971,7 +974,10 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, file_path, title, artist, album, duration_ms
+            "SELECT id, file_path, title, artist, album, album_artist,
+                    year, track_number, disc_number, duration_ms, genre,
+                    file_size, file_format, bitrate, sample_rate,
+                    date_added, date_modified, play_count, last_played, file_hash
              FROM tracks
              ORDER BY date_added DESC"
         )?;
@@ -983,21 +989,21 @@ impl DbOperations {
                 title: row.get(2)?,
                 artist: row.get(3)?,
                 album: row.get(4)?,
-                duration_ms: row.get(5)?,
-                album_artist: None,
-                year: None,
-                track_number: None,
-                disc_number: None,
-                genre: None,
-                file_size: None,
-                file_format: None,
-                bitrate: None,
-                sample_rate: None,
-                play_count: 0,
-                last_played: None,
-                date_added: 0,
-                date_modified: 0,
-                file_hash: None,
+                album_artist: row.get(5)?,
+                year: row.get(6)?,
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                date_added: row.get(15)?,
+                date_modified: row.get(16)?,
+                play_count: row.get(17)?,
+                last_played: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1013,7 +1019,10 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, file_path, title, artist, album, duration_ms
+            "SELECT id, file_path, title, artist, album, album_artist,
+                    year, track_number, disc_number, duration_ms, genre,
+                    file_size, file_format, bitrate, sample_rate,
+                    date_added, date_modified, play_count, last_played, file_hash
              FROM tracks
              WHERE play_count > 0
              ORDER BY play_count DESC, last_played DESC"
@@ -1026,21 +1035,21 @@ impl DbOperations {
                 title: row.get(2)?,
                 artist: row.get(3)?,
                 album: row.get(4)?,
-                duration_ms: row.get(5)?,
-                album_artist: None,
-                year: None,
-                track_number: None,
-                disc_number: None,
-                genre: None,
-                file_size: None,
-                file_format: None,
-                bitrate: None,
-                sample_rate: None,
-                play_count: 0,
-                last_played: None,
-                date_added: 0,
-                date_modified: 0,
-                file_hash: None,
+                album_artist: row.get(5)?,
+                year: row.get(6)?,
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                date_added: row.get(15)?,
+                date_modified: row.get(16)?,
+                play_count: row.get(17)?,
+                last_played: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1056,7 +1065,10 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, file_path, title, artist, album, duration_ms
+            "SELECT id, file_path, title, artist, album, album_artist,
+                    year, track_number, disc_number, duration_ms, genre,
+                    file_size, file_format, bitrate, sample_rate,
+                    date_added, date_modified, play_count, last_played, file_hash
              FROM tracks
              WHERE play_count = 0
              ORDER BY date_added DESC"
@@ -1069,21 +1081,21 @@ impl DbOperations {
                 title: row.get(2)?,
                 artist: row.get(3)?,
                 album: row.get(4)?,
-                duration_ms: row.get(5)?,
-                album_artist: None,
-                year: None,
-                track_number: None,
-                disc_number: None,
-                genre: None,
-                file_size: None,
-                file_format: None,
-                bitrate: None,
-                sample_rate: None,
-                play_count: 0,
-                last_played: None,
-                date_added: 0,
-                date_modified: 0,
-                file_hash: None,
+                album_artist: row.get(5)?,
+                year: row.get(6)?,
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                date_added: row.get(15)?,
+                date_modified: row.get(16)?,
+                play_count: row.get(17)?,
+                last_played: row.get(18)?,
+                file_hash: row.get(19)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

@@ -46,6 +46,16 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
 
+  // Helper function to split multi-value fields (artists, genres)
+  const splitMultiValue = (value: string | null): string[] => {
+    if (!value) return [];
+    // Split on: comma, semicolon, slash, pipe, ideographic comma, ampersand, ft./feat./featuring
+    return value
+      .split(/[,;/|、&]|\s+(?:ft\.?|feat\.?|featuring)\s+/i)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+  };
+
   useEffect(() => {
     // Update player state periodically
     const interval = setInterval(async () => {
@@ -194,18 +204,28 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <Typography variant="h5" fontWeight="bold" gutterBottom>
           {currentTrack.title}
         </Typography>
-        <Typography 
-          variant="body1" 
-          color="text.secondary" 
-          gutterBottom
-          onClick={() => currentTrack.artist && onNavigateToArtist?.(currentTrack.artist, currentTrack.id)}
-          sx={{ 
-            cursor: currentTrack.artist && onNavigateToArtist ? "pointer" : "default",
-            "&:hover": currentTrack.artist && onNavigateToArtist ? { textDecoration: "underline" } : {}
-          }}
-        >
-          {currentTrack.artist || "Unknown Artist"}
-        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, justifyContent: isNarrow ? "center" : "flex-start" }}>
+          {splitMultiValue(currentTrack.artist).length > 0 ? (
+            splitMultiValue(currentTrack.artist).map((artist, index, arr) => (
+              <Typography
+                key={index}
+                variant="body1"
+                color="text.secondary"
+                onClick={() => onNavigateToArtist?.(artist, currentTrack.id)}
+                sx={{
+                  cursor: onNavigateToArtist ? "pointer" : "default",
+                  "&:hover": onNavigateToArtist ? { textDecoration: "underline" } : {}
+                }}
+              >
+                {artist}{index < arr.length - 1 ? ", " : ""}
+              </Typography>
+            ))
+          ) : (
+            <Typography variant="body1" color="text.secondary">
+              Unknown Artist
+            </Typography>
+          )}
+        </Box>
         <Typography 
           variant="body2" 
           color="text.secondary"
@@ -362,17 +382,25 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           </Typography>
           
           <Typography color="text.secondary">Artist:</Typography>
-          <Typography 
-            onClick={() => currentTrack.artist && onNavigateToArtist?.(currentTrack.artist, currentTrack.id)}
-            onContextMenu={(e) => copyToClipboard(currentTrack.artist, e)}
-            sx={{ 
-              cursor: currentTrack.artist && currentTrack.artist !== "—" && onNavigateToArtist ? "pointer" : "default",
-              "&:hover": currentTrack.artist && currentTrack.artist !== "—" && onNavigateToArtist ? { textDecoration: "underline" } : {},
-              userSelect: "text"
-            }}
-          >
-            {currentTrack.artist || "—"}
-          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => copyToClipboard(currentTrack.artist, e)}>
+            {splitMultiValue(currentTrack.artist).length > 0 ? (
+              splitMultiValue(currentTrack.artist).map((artist, index, arr) => (
+                <Typography
+                  key={index}
+                  onClick={() => onNavigateToArtist?.(artist, currentTrack.id)}
+                  sx={{
+                    cursor: onNavigateToArtist ? "pointer" : "default",
+                    "&:hover": onNavigateToArtist ? { textDecoration: "underline" } : {},
+                    userSelect: "text"
+                  }}
+                >
+                  {artist}{index < arr.length - 1 ? ", " : ""}
+                </Typography>
+              ))
+            ) : (
+              <Typography sx={{ userSelect: "text" }}>—</Typography>
+            )}
+          </Box>
           
           <Typography color="text.secondary">Album Artist:</Typography>
           <Typography 
@@ -404,17 +432,25 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           </Typography>
           
           <Typography color="text.secondary">Genre:</Typography>
-          <Typography 
-            onClick={() => currentTrack.genre && onNavigateToGenre?.(currentTrack.genre, currentTrack.id)}
-            onContextMenu={(e) => copyToClipboard(currentTrack.genre, e)}
-            sx={{ 
-              cursor: currentTrack.genre && currentTrack.genre !== "—" && onNavigateToGenre ? "pointer" : "default",
-              "&:hover": currentTrack.genre && currentTrack.genre !== "—" && onNavigateToGenre ? { textDecoration: "underline" } : {},
-              userSelect: "text"
-            }}
-          >
-            {currentTrack.genre || "—"}
-          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => copyToClipboard(currentTrack.genre, e)}>
+            {splitMultiValue(currentTrack.genre).length > 0 ? (
+              splitMultiValue(currentTrack.genre).map((genre, index, arr) => (
+                <Typography
+                  key={index}
+                  onClick={() => onNavigateToGenre?.(genre, currentTrack.id)}
+                  sx={{
+                    cursor: onNavigateToGenre ? "pointer" : "default",
+                    "&:hover": onNavigateToGenre ? { textDecoration: "underline" } : {},
+                    userSelect: "text"
+                  }}
+                >
+                  {genre}{index < arr.length - 1 ? ", " : ""}
+                </Typography>
+              ))
+            ) : (
+              <Typography sx={{ userSelect: "text" }}>—</Typography>
+            )}
+          </Box>
           
           <Typography color="text.secondary">Track:</Typography>
           <Typography>{currentTrack.track_number ? `${currentTrack.track_number}${currentTrack.disc_number ? ` (Disc ${currentTrack.disc_number})` : ""}` : "—"}</Typography>

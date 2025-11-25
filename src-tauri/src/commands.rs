@@ -228,14 +228,16 @@ pub fn get_current_track(state: State<'_, AppState>) -> Result<Option<Track>, St
 }
 
 #[tauri::command]
-pub fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
+pub async fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
     use lofty::probe::Probe;
     use lofty::picture::PictureType;
     
-    let tagged_file = Probe::open(&file_path)
-        .map_err(|e| format!("Failed to open file: {}", e))?
-        .read()
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    // Run file I/O in a blocking task to avoid blocking the async runtime
+    tokio::task::spawn_blocking(move || {
+        let tagged_file = Probe::open(&file_path)
+            .map_err(|e| format!("Failed to open file: {}", e))?
+            .read()
+            .map_err(|e| format!("Failed to read file: {}", e))?;
     
     // Priority order for picture types (matching foobar2000 behavior)
     let picture_priority = [
@@ -260,31 +262,34 @@ pub fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
         PictureType::PublisherLogo,    // Publisher/Studio Logotype
     ];
     
-    // Try to get the primary tag first
-    if let Some(tag) = tagged_file.primary_tag() {
-        // Try each picture type in priority order
-        for pic_type in &picture_priority {
-            for picture in tag.pictures() {
-                if picture.pic_type() == *pic_type {
-                    return Ok(Some(picture.data().to_vec()));
+        // Try to get the primary tag first
+        if let Some(tag) = tagged_file.primary_tag() {
+            // Try each picture type in priority order
+            for pic_type in &picture_priority {
+                for picture in tag.pictures() {
+                    if picture.pic_type() == *pic_type {
+                        return Ok(Some(picture.data().to_vec()));
+                    }
                 }
             }
         }
-    }
-    
-    // Try all tags if primary tag didn't have cover art
-    for tag in tagged_file.tags() {
-        // Try each picture type in priority order
-        for pic_type in &picture_priority {
-            for picture in tag.pictures() {
-                if picture.pic_type() == *pic_type {
-                    return Ok(Some(picture.data().to_vec()));
+        
+        // Try all tags if primary tag didn't have cover art
+        for tag in tagged_file.tags() {
+            // Try each picture type in priority order
+            for pic_type in &picture_priority {
+                for picture in tag.pictures() {
+                    if picture.pic_type() == *pic_type {
+                        return Ok(Some(picture.data().to_vec()));
+                    }
                 }
             }
         }
-    }
-    
-    Ok(None)
+        
+        Ok(None)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
 }
 
 // ===== Queue Management Commands =====
