@@ -57,6 +57,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   const [parsedLyrics, setParsedLyrics] = useState<LyricLine[]>([]);
   const [currentLyricIndex, setCurrentLyricIndex] = useState(-1);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const lastUserScrollTimeRef = useRef<number>(0);
+  const isAutoScrollingRef = useRef(false);
 
   // Parse LRC format lyrics
   const parseLrcLyrics = (lrcText: string): LyricLine[] => {
@@ -152,6 +154,24 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     loadLyrics();
   }, [currentTrack?.file_path, activeTab, isNarrow]);
 
+  // Track user scroll events
+  useEffect(() => {
+    const container = lyricsContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      // Only track if this is a user-initiated scroll (not auto-scroll)
+      if (!isAutoScrollingRef.current) {
+        lastUserScrollTimeRef.current = Date.now();
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [parsedLyrics]); // Re-attach when lyrics change
+
   // Update current lyric line based on playback position
   useEffect(() => {
     if (parsedLyrics.length === 0) {
@@ -168,21 +188,52 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
       }
     }
 
-    if (index !== currentLyricIndex) {
-      setCurrentLyricIndex(index);
+    setCurrentLyricIndex(index);
+  }, [currentPosition, parsedLyrics]);
+
+  // Auto-scroll effect - separate from index update for better control
+  useEffect(() => {
+    if (currentLyricIndex < 0 || !lyricsContainerRef.current || parsedLyrics.length === 0) {
+      return;
+    }
+
+    // Find which group contains this lyric index
+    const allElements = lyricsContainerRef.current.querySelectorAll('[data-lyric-index]');
+    let targetElement: Element | null = null;
+    
+    for (const element of allElements) {
+      const firstIndex = parseInt(element.getAttribute('data-lyric-index') || '-1', 10);
+      const nextElement = element.nextElementSibling;
+      const nextIndex = nextElement ? parseInt(nextElement.getAttribute('data-lyric-index') || '-1', 10) : parsedLyrics.length;
       
-      // Auto-scroll to current lyric line
-      if (index >= 0 && lyricsContainerRef.current) {
-        const currentElement = lyricsContainerRef.current.querySelector(`[data-lyric-index="${index}"]`);
-        if (currentElement) {
-          currentElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-          });
-        }
+      if (currentLyricIndex >= firstIndex && currentLyricIndex < nextIndex) {
+        targetElement = element;
+        break;
       }
     }
-  }, [currentPosition, parsedLyrics, currentLyricIndex]);
+    
+    // Fallback: if not found, try direct match or last element
+    if (!targetElement) {
+      targetElement = lyricsContainerRef.current.querySelector(`[data-lyric-index="${currentLyricIndex}"]`);
+      if (!targetElement && allElements.length > 0) {
+        targetElement = allElements[allElements.length - 1];
+      }
+    }
+    
+    console.log('Scrolling to index:', currentLyricIndex, 'Element:', targetElement);
+    
+    if (targetElement) {
+      isAutoScrollingRef.current = true;
+      targetElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+      // Reset auto-scroll flag after animation completes
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 500);
+    }
+  }, [currentLyricIndex, parsedLyrics.length]);
 
   const formatDuration = (ms: number | null) => {
     if (!ms) return "—";
@@ -231,6 +282,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     try {
       const newPosition = Math.max(0, currentPosition - 5000); // 5 seconds back
       await playerApi.seekTo(newPosition);
+      // Reset user scroll timer to enable auto-scroll after seeking
+      lastUserScrollTimeRef.current = 0;
     } catch (error) {
       console.error("Failed to rewind:", error);
     }
@@ -240,6 +293,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     try {
       const newPosition = Math.min(duration, currentPosition + 15000); // 15 seconds forward
       await playerApi.seekTo(newPosition);
+      // Reset user scroll timer to enable auto-scroll after seeking
+      lastUserScrollTimeRef.current = 0;
     } catch (error) {
       console.error("Failed to fast forward:", error);
     }
@@ -371,6 +426,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           onChangeCommitted={async (_, value) => {
             try {
               await playerApi.seekTo(value as number);
+              // Reset user scroll timer to enable auto-scroll after seeking
+              lastUserScrollTimeRef.current = 0;
             } catch (error) {
               console.error("Failed to seek:", error);
             } finally {
@@ -483,22 +540,28 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     // If we have parsed LRC lyrics, render them with sync
     if (parsedLyrics.length > 0) {
       // Group consecutive lines with the same timestamp
-      const groupedLyrics: { time: number; lines: string[]; index: number }[] = [];
+      const groupedLyrics: { time: number; lines: string[]; firstIndex: number }[] = [];
       parsedLyrics.forEach((line, index) => {
         const lastGroup = groupedLyrics[groupedLyrics.length - 1];
         if (lastGroup && lastGroup.time === line.time) {
           lastGroup.lines.push(line.text);
         } else {
-          groupedLyrics.push({ time: line.time, lines: [line.text], index });
+          groupedLyrics.push({ time: line.time, lines: [line.text], firstIndex: index });
         }
       });
 
-      // Find current group index
+      // Find which group contains the current lyric index
       let currentGroupIndex = -1;
-      for (let i = groupedLyrics.length - 1; i >= 0; i--) {
-        if (currentPosition >= groupedLyrics[i].time) {
-          currentGroupIndex = i;
-          break;
+      if (currentLyricIndex >= 0) {
+        for (let i = 0; i < groupedLyrics.length; i++) {
+          const group = groupedLyrics[i];
+          const nextGroup = groupedLyrics[i + 1];
+          const groupEndIndex = nextGroup ? nextGroup.firstIndex - 1 : parsedLyrics.length - 1;
+          
+          if (currentLyricIndex >= group.firstIndex && currentLyricIndex <= groupEndIndex) {
+            currentGroupIndex = i;
+            break;
+          }
         }
       }
 
@@ -521,7 +584,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
             return (
               <Box
                 key={groupIndex}
-                data-lyric-index={group.index}
+                data-lyric-group={groupIndex}
+                data-lyric-index={group.firstIndex}
                 sx={{
                   py: 1.5,
                   px: 2,
