@@ -8,9 +8,10 @@ interface GenresViewProps {
   searchQuery?: string;
   initialGenreName?: string;
   initialTrackId?: number;
+  onClearSearch?: () => void;
 }
 
-export default function GenresView({ searchQuery = "", initialGenreName, initialTrackId }: GenresViewProps) {
+export default function GenresView({ searchQuery = "", initialGenreName, initialTrackId, onClearSearch }: GenresViewProps) {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [filteredGenres, setFilteredGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
         const allGenres = await libraryApi.getAllGenres();
         setGenres(allGenres);
         setFilteredGenres(allGenres);
-        
+
         // Auto-select genre if initialGenreName is provided
         if (initialGenreName) {
           const genre = allGenres.find(g => g.name === initialGenreName);
@@ -189,6 +190,16 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
           </div>
         )}
       </div>
+      {searchQuery && onClearSearch && (
+        <div className="search-tip">
+          <span>Searching "{searchQuery}", </span>
+          <button
+            onClick={onClearSearch}
+          >
+            show all items
+          </button>
+        </div>
+      )}
     </div>
   );
 }

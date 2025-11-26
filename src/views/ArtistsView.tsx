@@ -8,9 +8,10 @@ interface ArtistsViewProps {
     searchQuery?: string;
     initialArtistName?: string;
     initialTrackId?: number;
+    onClearSearch?: () => void;
 }
 
-export default function ArtistsView({ searchQuery = "", initialArtistName, initialTrackId }: ArtistsViewProps) {
+export default function ArtistsView({ searchQuery = "", initialArtistName, initialTrackId, onClearSearch }: ArtistsViewProps) {
     const [artists, setArtists] = useState<Artist[]>([]);
     const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
     const [loading, setLoading] = useState(true);
@@ -24,7 +25,7 @@ export default function ArtistsView({ searchQuery = "", initialArtistName, initi
                 const allArtists = await libraryApi.getAllArtists();
                 setArtists(allArtists);
                 setFilteredArtists(allArtists);
-                
+
                 // Auto-select artist if initialArtistName is provided
                 if (initialArtistName) {
                     const artist = allArtists.find(a => a.name === initialArtistName);
@@ -190,6 +191,16 @@ export default function ArtistsView({ searchQuery = "", initialArtistName, initi
                     </div>
                 )}
             </div>
+            {searchQuery && onClearSearch && (
+                <div className="search-tip">
+                    <span>Searching "{searchQuery}", </span>
+                    <button
+                        onClick={onClearSearch}
+                    >
+                        show all items
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

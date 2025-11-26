@@ -21,6 +21,7 @@ interface PlaylistItemProps {
 
 interface PlaylistsViewProps {
   searchQuery?: string;
+  onClearSearch?: () => void;
 }
 
 function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
@@ -78,7 +79,7 @@ function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
   );
 }
 
-export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) {
+export default function PlaylistsView({ searchQuery = "", onClearSearch }: PlaylistsViewProps) {
   const [systemPlaylists] = useState<SystemPlaylist[]>([
     {
       id: "all-songs",
@@ -251,6 +252,16 @@ export default function PlaylistsView({ searchQuery = "" }: PlaylistsViewProps) 
             </p>
           </div>
         </div>
+        {searchQuery && onClearSearch && (
+          <div className="search-tip">
+            <span>Searching "{searchQuery}", </span>
+            <button
+              onClick={onClearSearch}
+            >
+              show all items
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

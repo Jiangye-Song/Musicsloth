@@ -11,13 +11,14 @@ import { usePlayer } from "../contexts/PlayerContext";
 
 interface QueuesViewProps {
   searchQuery?: string;
+  onClearSearch?: () => void;
 }
 
 export interface QueuesViewRef {
   scrollToActiveTrack: () => void;
 }
 
-const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "" }, ref) => {
+const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
   const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
@@ -92,18 +93,18 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
   const loadQueues = async (forceReloadTracks = false) => {
     try {
       const allQueues = await queueApi.getAllQueues();
-      
+
       // Check if queues actually changed (compare active status)
-      const queuesChanged = queues.length !== allQueues.length || 
+      const queuesChanged = queues.length !== allQueues.length ||
         queues.some((q, i) => q.is_active !== allQueues[i]?.is_active || q.id !== allQueues[i]?.id);
-      
+
       if (!queuesChanged && !forceReloadTracks) {
         // No changes, skip update to avoid re-renders
         return;
       }
-      
+
       setQueues(allQueues);
-      
+
       // Update selectedQueue if it's in the list (to refresh active status)
       if (selectedQueue) {
         const updatedSelectedQueue = allQueues.find(q => q.id === selectedQueue.id);
@@ -111,7 +112,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
           setSelectedQueue(updatedSelectedQueue);
         }
       }
-      
+
       // Auto-select active queue on first load
       const activeQueue = allQueues.find(q => q.is_active);
       if (activeQueue && !selectedQueue) {
@@ -129,34 +130,34 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       // Refresh queue data to get latest shuffle_seed
       const allQueues = await queueApi.getAllQueues();
       const queue = allQueues.find(q => q.id === queueId);
-      
+
       // Update selectedQueue if it's the one being loaded
       if (selectedQueue?.id === queueId && queue) {
         setSelectedQueue(queue);
       }
-      
+
       const tracks = await queueApi.getQueueTracks(queueId);
-      
+
       // Apply shuffle if the queue has a shuffle seed that's not 1
       if (queue && queue.shuffle_seed !== null && queue.shuffle_seed !== 1) {
         // Get current index to use as anchor
-        const currentIndex = queue.is_active && currentQueueId === queueId && currentTrackIndex !== null 
-          ? currentTrackIndex 
+        const currentIndex = queue.is_active && currentQueueId === queueId && currentTrackIndex !== null
+          ? currentTrackIndex
           : await queueApi.getQueueCurrentIndex(queueId);
-        
+
         // Create shuffled order based on seed, anchored at current track
         const shuffled = [...tracks];
         const seed = queue.shuffle_seed;
         const step = Math.abs(seed) % tracks.length || 1;
         const anchor = currentIndex;
-        
+
         const newOrder: typeof tracks = [];
         const used = new Set<number>();
         let currentPos = anchor;
-        
+
         // First, place the anchor track at its position
         used.add(anchor);
-        
+
         // Generate shuffled order by following the step pattern from anchor
         for (let i = 0; i < tracks.length; i++) {
           if (i === anchor) {
@@ -164,17 +165,17 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
             newOrder.push(shuffled[anchor]);
             continue;
           }
-          
+
           // Find next unused position using step pattern
           currentPos = (currentPos + step) % tracks.length;
           while (used.has(currentPos)) {
             currentPos = (currentPos + 1) % tracks.length;
           }
-          
+
           newOrder.push(shuffled[currentPos]);
           used.add(currentPos);
         }
-        
+
         setQueueTracks(newOrder);
       } else {
         setQueueTracks(tracks);
@@ -193,32 +194,32 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
 
   const handlePlayQueue = async () => {
     if (!selectedQueue) return;
-    
+
     try {
       // If this queue is active and playing, just pause
       if (selectedQueue.is_active && isPlaying) {
         await playerApi.pause();
         return;
       }
-      
+
       // If this queue is active but paused, resume
       if (selectedQueue.is_active && !isPlaying) {
         await playerApi.resume();
         return;
       }
-      
+
       // If this queue is not active, switch to it
       await queueApi.setActiveQueue(selectedQueue.id);
-      
+
       // Get the saved position in this queue
       const currentIndex = await queueApi.getQueueCurrentIndex(selectedQueue.id);
-      
+
       // Play from that position (or first track if index is 0)
       if (queueTracks.length > 0) {
         const trackIndex = Math.max(0, Math.min(currentIndex, queueTracks.length - 1));
         await playerApi.playFile(queueTracks[trackIndex].file_path);
       }
-      
+
       // Refresh queue list to update active status
       await loadQueues(true);
     } catch (error) {
@@ -228,38 +229,38 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
 
   const handleDeleteQueue = async (queueId: number) => {
     // if (!confirm("Are you sure you want to delete this queue?")) return;
-    
+
     try {
       // Check if this is the active queue
       const deletingActiveQueue = queues.find(q => q.id === queueId)?.is_active;
-      
+
       if (deletingActiveQueue) {
         // Stop playback
         await playerApi.stop();
-        
+
         // Find next queue to switch to
         const nextQueue = await queueApi.getNextQueue(queueId);
-        
+
         if (nextQueue) {
           // Get the current track index from the next queue
           const currentIndex = await queueApi.getQueueCurrentIndex(nextQueue.id);
-          
+
           // Get the track at that position
           const trackToPlay = await queueApi.getQueueTrackAtPosition(nextQueue.id, currentIndex);
-          
+
           // Set the next queue as active
           await queueApi.setActiveQueue(nextQueue.id);
-          
+
           // Resume playback from that track
           if (trackToPlay) {
             await playerApi.playFile(trackToPlay.file_path);
           }
         }
       }
-      
+
       // Delete the queue
       await queueApi.deleteQueue(queueId);
-      
+
       if (selectedQueue?.id === queueId) {
         setSelectedQueue(null);
         setQueueTracks([]);
@@ -308,8 +309,8 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   </MenuItem>
                 )}
                 {filteredQueues.map((queue) => (
-                  <MenuItem 
-                    key={queue.id} 
+                  <MenuItem
+                    key={queue.id}
                     value={queue.id}
                     sx={{
                       display: "flex",
@@ -342,6 +343,16 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
               </Select>
             </FormControl>
           )}
+          {searchQuery && onClearSearch && (
+            <div className="search-tip">
+              <span>Searching "{searchQuery}", </span>
+              <button
+                onClick={onClearSearch}
+              >
+                show all items
+              </button>
+            </div>
+          )}
         </Box>
       ) : (
         // Desktop: Sidebar
@@ -364,7 +375,16 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
           >
             <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
           </div>
-          
+{searchQuery && onClearSearch && (
+            <div className="search-tip">
+              <span>Searching "{searchQuery}", </span>
+              <button
+                onClick={onClearSearch}
+              >
+                show all items
+              </button>
+            </div>
+          )}
           {queues.length === 0 ? (
             <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center", padding: "20px" }}>
               No queues yet.
@@ -407,7 +427,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   >
                     <ListItemText
                       primary={queue.is_active ? `▶ ${queue.name}` : queue.name}
-                      primaryTypographyProps={{ 
+                      primaryTypographyProps={{
                         fontWeight: queue.is_active ? 700 : 500,
                         color: queue.is_active ? "primary.main" : "text.primary"
                       }}
@@ -448,7 +468,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                 <IconButton
                   onClick={handlePlayQueue}
                   disabled={queueTracks.length === 0}
-                  title={selectedQueue.is_active && isPlaying? "Pause":selectedQueue.is_active?"Play":"Play this queue"}
+                  title={selectedQueue.is_active && isPlaying ? "Pause" : selectedQueue.is_active ? "Play" : "Play this queue"}
                   sx={{
                     color: "primary.main",
                     width: 48,

@@ -78,17 +78,17 @@ function App() {
       case "library":
         return <LibraryView searchQuery={globalSearchQuery} />;
       case "queues":
-        return <QueuesView ref={queuesViewRef} searchQuery={globalSearchQuery} />;
+        return <QueuesView ref={queuesViewRef} searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "playlists":
-        return <PlaylistsView searchQuery={globalSearchQuery} />;
+        return <PlaylistsView searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "artists":
-        return <ArtistsView searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} />;
+        return <ArtistsView searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "albums":
-        return <AlbumsView searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} />;
+        return <AlbumsView searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "genres":
-        return <GenresView searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} />;
+        return <GenresView searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       default:
-        return <LibraryView searchQuery={globalSearchQuery} />;
+        return <LibraryView searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
     }
   };
 

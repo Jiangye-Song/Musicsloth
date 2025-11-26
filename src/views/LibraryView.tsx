@@ -37,13 +37,13 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
     useEffect(() => {
         console.log('[LibraryView] Loading tracks useEffect');
         loadTracks();
-        
+
         // Poll sessionStorage to detect scan state changes from other components
         const interval = setInterval(() => {
             const scanningInStorage = sessionStorage.getItem('isScanning') === 'true';
             setIsScanning(scanningInStorage);
         }, 500);
-        
+
         return () => clearInterval(interval);
     }, []);
 
@@ -78,7 +78,7 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
                 <h2 style={{ margin: 0, fontSize: "18px" }}>Library</h2>
             </div>
             <div style={{ padding: "20px" }}>
-                <LibraryScanner 
+                <LibraryScanner
                     onScanStart={() => setIsScanning(true)}
                     onScanComplete={() => {
                         setIsScanning(false);
@@ -96,20 +96,20 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
                         {loading ? (
                             <p style={{ color: "#888" }}>Loading tracks...</p>
                         ) : tracks.length === 0 ? (
-                        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
-                            <p style={{ color: "#888", margin: 0 }}>
-                                No tracks in library. Use the scanner above to add music files.
-                            </p>
-                        </div>
-                    ) : filteredTracks.length === 0 ? (
-                        <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
-                            <p style={{ color: "#888", margin: 0 }}>
-                                No tracks found matching "{searchQuery}"
-                            </p>
-                        </div>
-                    ) : (
-                        <VirtualTrackList tracks={filteredTracks} contextType="library" showSearch={false} />
-                    )}
+                            <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
+                                <p style={{ color: "#888", margin: 0 }}>
+                                    No tracks in library. Use the scanner above to add music files.
+                                </p>
+                            </div>
+                        ) : filteredTracks.length === 0 ? (
+                            <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
+                                <p style={{ color: "#888", margin: 0 }}>
+                                    No tracks found matching "{searchQuery}"
+                                </p>
+                            </div>
+                        ) : (
+                            <VirtualTrackList tracks={filteredTracks} contextType="library" showSearch={false} />
+                        )}
                     </div>
                 )}
             </div>

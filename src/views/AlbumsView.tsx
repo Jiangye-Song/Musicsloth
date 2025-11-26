@@ -198,9 +198,10 @@ interface AlbumsViewProps {
     searchQuery?: string;
     initialAlbumName?: string;
     initialTrackId?: number;
+    onClearSearch?: () => void;
 }
 
-export default function AlbumsView({ searchQuery = "", initialAlbumName, initialTrackId }: AlbumsViewProps) {
+export default function AlbumsView({ searchQuery = "", initialAlbumName, initialTrackId, onClearSearch }: AlbumsViewProps) {
     const [albums, setAlbums] = useState<Album[]>([]);
     const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
     const [loading, setLoading] = useState(true);
@@ -214,7 +215,7 @@ export default function AlbumsView({ searchQuery = "", initialAlbumName, initial
                 const allAlbums = await libraryApi.getAllAlbums();
                 setAlbums(allAlbums);
                 setFilteredAlbums(allAlbums);
-                
+
                 // Auto-select album if initialAlbumName is provided
                 if (initialAlbumName) {
                     const album = allAlbums.find(a => a.name === initialAlbumName);
@@ -347,7 +348,18 @@ export default function AlbumsView({ searchQuery = "", initialAlbumName, initial
                         ))}
                     </div>
                 )}
+
             </div>
+            {searchQuery && onClearSearch && (
+                <div className="search-tip">
+                    <span>Searching "{searchQuery}", </span>
+                    <button
+                        onClick={onClearSearch}
+                    >
+                        show all items
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

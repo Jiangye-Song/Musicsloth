@@ -5,7 +5,9 @@
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafb);
 }
-html, body {
+
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -91,6 +93,7 @@ button {
 button:hover {
   border-color: #396cd8;
 }
+
 button:active {
   border-color: #396cd8;
   background-color: #e8e8e8;
@@ -120,7 +123,33 @@ button {
     color: #ffffff;
     background-color: #0f0f0f98;
   }
+
   button:active {
     background-color: #0f0f0f69;
   }
+}
+
+.search-tip {
+  margin-top: 5px;
+  margin-bottom: 5px;
+  text-align: center;
+  padding: 5px;
+  border: solid;
+  border-width: 1px;
+  border-radius: 3px;
+  border-color: #888888;
+}
+
+.search-tip span {
+  color: #888;
+}
+
+.search-tip button {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 0;
 }
