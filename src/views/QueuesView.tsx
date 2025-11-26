@@ -272,11 +272,11 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "100%", overflow: "hidden" }}>
       {/* Queue List Sidebar / Dropdown */}
       {isMobile ? (
         // Mobile: Dropdown selector
-        <Box sx={{ px: 2 }}>
+        <Box sx={{ px: 2, flexShrink: 0 }}>
           <div
             style={{
               display: "flex",
@@ -317,6 +317,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
             width: "33%",
             borderRight: "1px solid #333",
             overflowY: "auto",
+            flexShrink: 0,
           }}
         >
           {/* Header */}
@@ -397,10 +398,10 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       )}
 
       {/* Queue Tracks */}
-      <div style={{ flex: 1, padding: "20px", display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, padding: "20px", display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
         {selectedQueue ? (
           <>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5, flexShrink: 0 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
 
                 {isMobile ? (<FormControl size="small">
@@ -497,7 +498,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
               </Box>
             ) : queueTracks.length > 0 ? (
               <>
-                <div style={{ flex: 1, overflow: "hidden" }}>
+                <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
                   <VirtualTrackList
                     ref={trackListRef}
                     tracks={queueTracks}
