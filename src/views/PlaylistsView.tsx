@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { libraryApi, playlistApi, Track } from "../services/api";
+import { libraryApi, playlistApi, Track, Playlist } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 
 import { IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import PlaylistPlayIcon from "@mui/icons-material/PlaylistPlay";
 import { ReactNode } from "react";
 import { LibraryMusic, Input as InputIcon, Replay as ReplayIcon, PlayDisabled } from "@mui/icons-material";
 
@@ -31,11 +32,11 @@ function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
       style={{
         display: "flex",
         alignItems: "center",
-        padding: "15px 20px",
-        borderBottom: "1px solid #2a2a2a",
+        gap: "12px",
+        padding: "10px 20px",
         cursor: "pointer",
-        transition: "background-color 0.2s",
-        gap: "15px",
+        backgroundColor: "transparent",
+        transition: "background-color 0.15s",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = "#2a2a2a";
@@ -44,37 +45,8 @@ function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
         e.currentTarget.style.backgroundColor = "transparent";
       }}
     >
-      {/* Playlist Icon */}
-      <div
-        style={{
-          width: "60px",
-          height: "60px",
-          backgroundColor: "#1a1a1a",
-          borderRadius: "6px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "32px",
-          flexShrink: 0,
-        }}
-      >
-        {playlist.icon}
-      </div>
-
-      {/* Playlist Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <h3
-          style={{
-            margin: 0,
-            fontSize: "16px",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {playlist.name}
-        </h3>
-      </div>
+      <span style={{ color: "#888" }}>{playlist.icon}</span>
+      <span style={{ color: "#fff", fontSize: "14px" }}>{playlist.name}</span>
     </div>
   );
 }
@@ -84,36 +56,55 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
     {
       id: "all-songs",
       name: "All Songs",
-      icon: <LibraryMusic sx={{ fontSize: 32 }} />,
+      icon: <LibraryMusic sx={{ fontSize: 24 }} />,
       loadTracks: () => libraryApi.getAllTracks(),
     },
     {
       id: "recent-added",
       name: "Recently Added",
-      icon: <InputIcon sx={{ fontSize: 32 }} />,
+      icon: <InputIcon sx={{ fontSize: 24 }} />,
       loadTracks: () => playlistApi.getRecentTracks(),
     },
     {
       id: "most-played",
       name: "Most Played",
-      icon: <ReplayIcon sx={{ fontSize: 32 }} />,
+      icon: <ReplayIcon sx={{ fontSize: 24 }} />,
       loadTracks: () => playlistApi.getMostPlayedTracks(),
     },
     {
       id: "not-played",
       name: "Never Played",
-      icon: <PlayDisabled sx={{ fontSize: 32 }} />,
+      icon: <PlayDisabled sx={{ fontSize: 24 }} />,
       loadTracks: () => playlistApi.getUnplayedTracks(),
     },
   ]);
   const [filteredPlaylists, setFilteredPlaylists] = useState<SystemPlaylist[]>(systemPlaylists);
+  const [userPlaylists, setUserPlaylists] = useState<Playlist[]>([]);
+  const [filteredUserPlaylists, setFilteredUserPlaylists] = useState<Playlist[]>([]);
 
   const [selectedPlaylist, setSelectedPlaylist] = useState<SystemPlaylist | null>(null);
+  const [selectedUserPlaylist, setSelectedUserPlaylist] = useState<Playlist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Load user playlists on mount
+  useEffect(() => {
+    loadUserPlaylists();
+  }, []);
+
+  const loadUserPlaylists = async () => {
+    try {
+      const playlists = await playlistApi.getAllPlaylists();
+      setUserPlaylists(playlists);
+      setFilteredUserPlaylists(playlists);
+    } catch (error) {
+      console.error("Failed to load user playlists:", error);
+    }
+  };
+
   const handlePlaylistClick = async (playlist: SystemPlaylist) => {
     setSelectedPlaylist(playlist);
+    setSelectedUserPlaylist(null);
     setLoading(true);
     try {
       const loadedTracks = await playlist.loadTracks();
@@ -125,15 +116,33 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
     }
   };
 
+  const handleUserPlaylistClick = async (playlist: Playlist) => {
+    setSelectedUserPlaylist(playlist);
+    setSelectedPlaylist(null);
+    setLoading(true);
+    try {
+      const loadedTracks = await playlistApi.getPlaylistTracks(playlist.id);
+      setTracks(loadedTracks);
+    } catch (error) {
+      console.error("Failed to load playlist tracks:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBack = () => {
     setSelectedPlaylist(null);
+    setSelectedUserPlaylist(null);
     setTracks([]);
+    // Refresh user playlists in case new ones were added
+    loadUserPlaylists();
   };
 
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setFilteredPlaylists(systemPlaylists);
+      setFilteredUserPlaylists(userPlaylists);
     } else {
       const query = searchQuery.toLowerCase();
       setFilteredPlaylists(
@@ -141,10 +150,16 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           playlist.name.toLowerCase().includes(query)
         )
       );
+      setFilteredUserPlaylists(
+        userPlaylists.filter((playlist) =>
+          playlist.name.toLowerCase().includes(query)
+        )
+      );
     }
-  }, [searchQuery, systemPlaylists]);
+  }, [searchQuery, systemPlaylists, userPlaylists]);
 
-  if (selectedPlaylist) {
+  if (selectedPlaylist || selectedUserPlaylist) {
+    const displayName = selectedPlaylist?.name || selectedUserPlaylist?.name || "";
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div
@@ -161,7 +176,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
             onClick={handleBack}
           ><ArrowBackIcon /></IconButton>
           <h2 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
-            {selectedPlaylist.name} ({tracks.length} tracks)
+            {displayName} ({tracks.length} tracks)
           </h2>
         </div>
         {loading ? (
@@ -173,7 +188,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
             <VirtualTrackList
               tracks={tracks}
               contextType="library"
-              contextName={selectedPlaylist.name}
+              contextName={displayName}
               showSearch={true}
             />
           </div>
@@ -224,7 +239,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           </div>
         </div>
 
-        {/* User Playlists (placeholder) */}
+        {/* User Playlists */}
         <div>
           <h3
             style={{
@@ -239,18 +254,47 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           >
             My Playlists
           </h3>
-          <div
-            style={{
-              padding: "20px",
-              backgroundColor: "#2a2a2a",
-              borderRadius: "8px",
-              textAlign: "center",
-            }}
-          >
-            <p style={{ color: "#666", fontSize: "14px", margin: 0 }}>
-              Coming soon...
-            </p>
-          </div>
+          {filteredUserPlaylists.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+              {filteredUserPlaylists.map((playlist) => (
+                <div
+                  key={playlist.id}
+                  onClick={() => handleUserPlaylistClick(playlist)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "10px 20px",
+                    cursor: "pointer",
+                    backgroundColor: "transparent",
+                    transition: "background-color 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#2a2a2a";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  <PlaylistPlayIcon sx={{ fontSize: 24, color: "#888" }} />
+                  <span style={{ color: "#fff", fontSize: "14px" }}>{playlist.name}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "20px",
+                backgroundColor: "#2a2a2a",
+                borderRadius: "8px",
+                textAlign: "center",
+              }}
+            >
+              <p style={{ color: "#666", fontSize: "14px", margin: 0 }}>
+                No playlists yet. Right-click on a track to add it to a new playlist.
+              </p>
+            </div>
+          )}
         </div>
         {searchQuery && onClearSearch && (
           <div className="search-tip">
