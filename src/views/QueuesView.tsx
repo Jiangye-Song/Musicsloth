@@ -276,7 +276,18 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       {/* Queue List Sidebar / Dropdown */}
       {isMobile ? (
         // Mobile: Dropdown selector
-        <Box sx={{ p: 2, borderBottom: "1px solid #333" }}>
+        <Box sx={{ px: 2 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "15px 20px",
+              backgroundColor: "#1a1a1a",
+              borderBottom: "1px solid #333",
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
+          </div>
           {queues.length === 0 ? (
             <Box sx={{ color: "text.secondary", fontSize: "14px", textAlign: "center" }}>
               No queues yet. Click any track to create a queue.
@@ -286,62 +297,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
               No queues found matching "{searchQuery}"
             </Box>
           ) : (
-            <FormControl fullWidth>
-              <Select
-                value={selectedQueue?.id || ""}
-                onChange={(e) => {
-                  const queue = queues.find(q => q.id === e.target.value);
-                  if (queue) handleSelectQueue(queue);
-                }}
-                displayEmpty
-                sx={{
-                  bgcolor: "background.paper",
-                  "& .MuiSelect-select": {
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }
-                }}
-              >
-                {!selectedQueue && (
-                  <MenuItem value="" disabled>
-                    Select a queue
-                  </MenuItem>
-                )}
-                {filteredQueues.map((queue) => (
-                  <MenuItem
-                    key={queue.id}
-                    value={queue.id}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}>
-                      <Typography
-                        sx={{
-                          fontWeight: queue.is_active ? 700 : 500,
-                          color: queue.is_active ? "primary.main" : "text.primary",
-                        }}
-                      >
-                        {queue.is_active ? `▶ ${queue.name}` : queue.name}
-                      </Typography>
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteQueue(queue.id);
-                      }}
-                      sx={{ color: "text.secondary" }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <div></div>
           )}
           {searchQuery && onClearSearch && (
             <div className="search-tip">
@@ -375,7 +331,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
           >
             <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
           </div>
-{searchQuery && onClearSearch && (
+          {searchQuery && onClearSearch && (
             <div className="search-tip">
               <span>Searching "{searchQuery}", </span>
               <button
@@ -446,11 +402,67 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
           <>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="h5" component="h2">
+
+                {isMobile ? (<FormControl size="small">
+                  <Select
+                    value={selectedQueue?.id || ""}
+                    onChange={(e) => {
+                      const queue = queues.find(q => q.id === e.target.value);
+                      if (queue) handleSelectQueue(queue);
+                    }}
+                    displayEmpty
+                    sx={{
+                      bgcolor: "background.paper",
+                      "& .MuiSelect-select": {
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }
+                    }}
+                  >
+                    {!selectedQueue && (
+                      <MenuItem value="" disabled>
+                        Select a queue
+                      </MenuItem>
+                    )}
+                    {filteredQueues.map((queue) => (
+                      <MenuItem
+                        key={queue.id}
+                        value={queue.id}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}>
+                          <Typography
+                            sx={{
+                              fontWeight: queue.is_active ? 700 : 500,
+                              color: queue.is_active ? "primary.main" : "text.primary",
+                            }}
+                          >
+                            {queue.is_active ? `▶ ${queue.name}` : queue.name}
+                          </Typography>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteQueue(queue.id);
+                          }}
+                          sx={{ color: "text.secondary" }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>) : (<Typography component="h2" sx={{ margin: "0px", fontSize: "18px" }}>
                   {selectedQueue.name}
-                </Typography>
+                </Typography>)}
                 {selectedQueue.shuffle_seed !== 1 && (
-                  <ShuffleIcon sx={{ color: "primary.main", fontSize: 20 }} />
+                  <ShuffleIcon sx={{ color: "primary.main", fontSize: 18 }} />
                 )}
               </Box>
               <Box sx={{ display: "flex", gap: 1.5 }}>
@@ -458,12 +470,12 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   onClick={() => trackListRef.current?.scrollToActiveTrack()}
                   disabled={queueTracks.length === 0}
                   sx={{
-                    width: 48,
-                    height: 48,
+                    width: 36,
+                    height: 36,
                   }}
                   title="Locate active track"
                 >
-                  <MyLocationIcon />
+                  <MyLocationIcon sx={{ fontSize: "18px" }} />
                 </IconButton>
                 <IconButton
                   onClick={handlePlayQueue}
@@ -471,11 +483,11 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   title={selectedQueue.is_active && isPlaying ? "Pause" : selectedQueue.is_active ? "Play" : "Play this queue"}
                   sx={{
                     color: "primary.main",
-                    width: 48,
-                    height: 48,
+                    width: 36,
+                    height: 36,
                   }}
                 >
-                  {selectedQueue.is_active && isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
+                  {selectedQueue.is_active && isPlaying ? <PauseIcon sx={{ fontSize: "18px" }} /> : <PlayArrowIcon sx={{ fontSize: "18px" }} />}
                 </IconButton>
               </Box>
             </Box>
