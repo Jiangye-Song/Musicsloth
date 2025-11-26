@@ -17,6 +17,7 @@ interface PlayerContextType {
   playPrevious: () => Promise<void>;
   toggleShuffle: () => Promise<void>;
   toggleRepeat: () => void;
+  clearPlayer: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -198,6 +199,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       console.log(`[PlayerContext] Repeat toggled: ${newState ? 'Track Loop' : 'Queue Loop'}`);
       return newState;
     });
+  }, []);
+
+  const clearPlayer = useCallback(() => {
+    console.log('[PlayerContext] Clearing player state');
+    setCurrentTrack(null);
+    setAlbumArt(prevArt => {
+      if (prevArt) {
+        URL.revokeObjectURL(prevArt);
+      }
+      return null;
+    });
+    setCurrentQueueId(null);
+    setCurrentTrackIndex(null);
+    setShuffleSeed(1);
+    setIsShuffled(false);
+    setShuffleAnchor(0);
+    
+    // Clear media session
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+    }
   }, []);
 
   // Load active queue's current track on startup
@@ -435,7 +458,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       playNext,
       playPrevious,
       toggleShuffle,
-      toggleRepeat
+      toggleRepeat,
+      clearPlayer
     }}>
       {children}
     </PlayerContext.Provider>

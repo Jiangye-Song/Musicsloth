@@ -19,7 +19,7 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
-  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex } = usePlayer();
+  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex, clearPlayer } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -265,6 +265,14 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
         setSelectedQueue(null);
         setQueueTracks([]);
       }
+      
+      // Reload queues and check if all are deleted
+      const remainingQueues = await queueApi.getAllQueues();
+      if (remainingQueues.length === 0) {
+        // All queues deleted, clear player state
+        clearPlayer();
+      }
+      
       await loadQueues(true);
     } catch (error) {
       console.error("Failed to delete queue:", error);
