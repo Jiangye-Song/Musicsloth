@@ -152,16 +152,20 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     loadLyrics();
   }, [currentTrack?.file_path]);
 
-  // Automatically switch tabs based on lyrics availability
+  // Automatically switch tabs based on lyrics availability when track changes
   useEffect(() => {
     if (!hasLyrics && activeTab === "lyrics") {
       // If currently on lyrics tab but no lyrics available, switch to details
       setActiveTab(isNarrow ? "albumart" : "details");
-    } else if (hasLyrics && !isNarrow && (activeTab === "details" || activeTab === "albumart")) {
-      // In landscape mode, switch to lyrics tab when lyrics become available
+    }
+  }, [hasLyrics]);
+  
+  // Auto-switch to lyrics tab when a new track with lyrics starts playing (landscape mode only)
+  useEffect(() => {
+    if (hasLyrics && !isNarrow) {
       setActiveTab("lyrics");
     }
-  }, [hasLyrics, activeTab, isNarrow]);
+  }, [currentTrack?.file_path]);
 
   // Track user scroll events
   useEffect(() => {
