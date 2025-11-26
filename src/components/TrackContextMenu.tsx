@@ -10,7 +10,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 interface TrackContextMenuProps {
   anchorPosition: { top: number; left: number } | null;
   onClose: () => void;
-  contextType: "library" | "artist" | "album" | "genre" | "queue";
+  contextType: "library" | "artist" | "album" | "genre" | "queue" | "playlist";
   inQueueOrPlaylist?: boolean;
   onAddToPlaylist?: () => void;
 }
@@ -27,7 +27,7 @@ export default function TrackContextMenu({
   const handleMenuItemClick = (action: string) => {
     if (action === "add-to-playlist" && onAddToPlaylist) {
       onAddToPlaylist();
-      onClose();
+      // Don't call onClose here - let onAddToPlaylist handle closing the menu
       return;
     }
     

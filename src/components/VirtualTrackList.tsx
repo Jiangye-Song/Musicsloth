@@ -17,7 +17,7 @@ export interface VirtualTrackListRef {
 
 interface VirtualTrackListProps {
   tracks: Track[];
-  contextType: "library" | "artist" | "album" | "genre" | "queue";
+  contextType: "library" | "artist" | "album" | "genre" | "queue" | "playlist";
   contextName?: string; // Artist name, album name, or genre name
   queueId?: number; // Queue ID if contextType is "queue"
   isActiveQueue?: boolean; // Whether this queue is the active one
@@ -383,6 +383,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           ? `Artist: ${contextName}`
           : contextType === "album"
           ? `Album: ${contextName}`
+          : contextType === "playlist"
+          ? `Playlist: ${contextName}`
           : `Genre: ${contextName}`;
         
         // Get all track IDs (use original tracks, not filtered)
@@ -765,12 +767,16 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         anchorPosition={contextMenu}
         onClose={() => {
           setContextMenu(null);
-          setSelectedTrackForPlaylist(null);
+          // Only clear selectedTrackForPlaylist if playlist dialog is not being opened
+          if (!showPlaylistDialog) {
+            setSelectedTrackForPlaylist(null);
+          }
         }}
         contextType={contextType}
         inQueueOrPlaylist={contextType === "queue"}
         onAddToPlaylist={() => {
           setShowPlaylistDialog(true);
+          setContextMenu(null); // Close context menu but keep selectedTrackForPlaylist
         }}
       />
 

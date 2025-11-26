@@ -187,7 +187,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
             <VirtualTrackList
               tracks={tracks}
-              contextType="library"
+              contextType="playlist"
               contextName={displayName}
               showSearch={true}
             />
