@@ -19,7 +19,7 @@ import {
   PlaylistPlay,
   Person,
   Album,
-  MusicNote,
+  LocalOffer,
 } from "@mui/icons-material";
 import { TransitionProps } from "@mui/material/transitions";
 import "./App.css";
@@ -88,26 +88,26 @@ function App() {
       case "genres":
         return <GenresView searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       default:
-        return <LibraryView searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <LibraryView searchQuery={globalSearchQuery} />;
     }
   };
 
   const showGlobalSearch = activeTab === "library" || activeTab === "queues" || activeTab === "artists" || activeTab === "albums" || activeTab === "genres" || activeTab === "playlists";
-  const searchPlaceholder = 
+  const searchPlaceholder =
     activeTab === "library" ? "Search tracks..." :
-    activeTab === "queues" ? "Search a queue..." :
-    activeTab === "artists" ? "Search an artist..." :
-    activeTab === "albums" ? "Search an album..." :
-    activeTab === "genres" ? "Search a genre..." :
-    activeTab === "playlists" ? "Search a playlist..." : "";
+      activeTab === "queues" ? "Search a queue..." :
+        activeTab === "artists" ? "Search an artist..." :
+          activeTab === "albums" ? "Search an album..." :
+            activeTab === "genres" ? "Search a genre..." :
+              activeTab === "playlists" ? "Search a playlist..." : "";
 
   const tabs: { key: Tab; label: string; icon: React.ReactElement }[] = [
-    { key: "library", label: "Library", icon: <LibraryMusic /> },
     { key: "queues", label: "Queues", icon: <QueueMusic /> },
+    { key: "library", label: "Library", icon: <LibraryMusic /> },
     { key: "playlists", label: "Playlists", icon: <PlaylistPlay /> },
     { key: "artists", label: "Artists", icon: <Person /> },
     { key: "albums", label: "Albums", icon: <Album /> },
-    { key: "genres", label: "Genres", icon: <MusicNote /> },
+    { key: "genres", label: "Genres", icon: <LocalOffer /> },
   ];
 
   const handleTabChange = (tab: Tab) => {
@@ -122,169 +122,169 @@ function App() {
   return (
     <PlayerProvider>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
-      {/* Mobile Top Navigation */}
-      {isMobile && (
-        <Paper
-          sx={{
-            borderBottom: 1,
-            borderColor: "divider",
-          }}
-          elevation={2}
-        >
-          <List sx={{ display: "flex", flexDirection: "row", p: 0, overflowX: "auto" }}>
-            {tabs.map((tab) => (
-              <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
-                <ListItemButton
-                  selected={activeTab === tab.key}
-                  onClick={() => handleTabChange(tab.key)}
-                  sx={{
-                    flexDirection: "column",
-                    py: 1,
-                    borderBottom: activeTab === tab.key ? 3 : 0,
-                    borderColor: "success.main",
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 0, color: activeTab === tab.key ? "success.main" : "inherit" }}>
-                    {tab.icon}
-                  </ListItemIcon>
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
-      )}
-
-      {/* Search Bar */}
-      {showGlobalSearch && (
-        <SearchBar
-          placeholder={searchPlaceholder}
-          value={globalSearchQuery}
-          onChange={setGlobalSearchQuery}
-        />
-      )}
-
-      {/* Main Layout */}
-      <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Sidebar Navigation */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            width: isMobile ? 0 : drawerWidth,
-            flexShrink: 0,
-            display: isMobile ? "none" : "block",
-            "& .MuiDrawer-paper": {
-              width: drawerWidth,
-              boxSizing: "border-box",
-              bgcolor: "background.paper",
-              borderRight: 1,
+        {/* Mobile Top Navigation */}
+        {isMobile && (
+          <Paper
+            sx={{
+              borderBottom: 1,
               borderColor: "divider",
-              position: "static",
-            },
-          }}
-        >
-          <List>
-            {tabs.map((tab) => (
-              <ListItem key={tab.key} disablePadding>
-                <ListItemButton
-                  selected={activeTab === tab.key}
-                  onClick={() => handleTabChange(tab.key)}
-                  sx={{
-                    borderLeft: activeTab === tab.key ? 3 : 0,
-                    borderColor: "success.main",
-                  }}
-                >
-                  <ListItemIcon sx={{ color: activeTab === tab.key ? "success.main" : "inherit" }}>
-                    {tab.icon}
-                  </ListItemIcon>
-                  <ListItemText primary={tab.label} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </Drawer>
+            }}
+            elevation={2}
+          >
+            <List sx={{ display: "flex", flexDirection: "row", p: 0, overflowX: "auto" }}>
+              {tabs.map((tab) => (
+                <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
+                  <ListItemButton
+                    selected={activeTab === tab.key}
+                    onClick={() => handleTabChange(tab.key)}
+                    sx={{
+                      flexDirection: "column",
+                      py: 1,
+                      borderBottom: activeTab === tab.key ? 3 : 0,
+                      borderColor: "success.main",
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 0, color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                      {tab.icon}
+                    </ListItemIcon>
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
+        )}
 
-        {/* Content Area */}
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            p: 3,
-            pb: 12,
-            overflowY: "auto",
-          }}
-        >
-          {renderTabContent()}
+        {/* Search Bar */}
+        {showGlobalSearch && (
+          <SearchBar
+            placeholder={searchPlaceholder}
+            value={globalSearchQuery}
+            onChange={setGlobalSearchQuery}
+          />
+        )}
+
+        {/* Main Layout */}
+        <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          {/* Sidebar Navigation */}
+          <Drawer
+            variant="permanent"
+            sx={{
+              width: isMobile ? 0 : drawerWidth,
+              flexShrink: 0,
+              display: isMobile ? "none" : "block",
+              "& .MuiDrawer-paper": {
+                width: drawerWidth,
+                boxSizing: "border-box",
+                bgcolor: "background.paper",
+                borderRight: 1,
+                borderColor: "divider",
+                position: "static",
+              },
+            }}
+          >
+            <List>
+              {tabs.map((tab) => (
+                <ListItem key={tab.key} disablePadding>
+                  <ListItemButton
+                    selected={activeTab === tab.key}
+                    onClick={() => handleTabChange(tab.key)}
+                    sx={{
+                      borderLeft: activeTab === tab.key ? 3 : 0,
+                      borderColor: "success.main",
+                    }}
+                  >
+                    <ListItemIcon sx={{ color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                      {tab.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={tab.label} />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Drawer>
+
+          {/* Content Area */}
+          <Box
+            component="main"
+            sx={{
+              flexGrow: 1,
+              p: 3,
+              pb: 12,
+              overflowY: "auto",
+            }}
+          >
+            {renderTabContent()}
+          </Box>
         </Box>
-      </Box>
 
-      {/* Player Controls Footer */}
-      <Paper
-        elevation={3}
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          p: 0,
-          borderTop: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        <PlayerControls 
-          onExpandClick={() => setShowNowPlaying(true)}
-          onQueueClick={() => {
-            setActiveTab("queues");
-            setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
+        {/* Player Controls Footer */}
+        <Paper
+          elevation={3}
+          sx={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            p: 0,
+            borderTop: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
           }}
-        />
-      </Paper>
+        >
+          <PlayerControls
+            onExpandClick={() => setShowNowPlaying(true)}
+            onQueueClick={() => {
+              setActiveTab("queues");
+              setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
+            }}
+          />
+        </Paper>
 
-      {/* Now Playing Dialog */}
-      <Dialog
-        fullScreen
-        open={showNowPlaying}
-        onClose={() => setShowNowPlaying(false)}
-        TransitionComponent={Transition}
-      >
-        <NowPlayingView 
-          isNarrow={isMobile} 
+        {/* Now Playing Dialog */}
+        <Dialog
+          fullScreen
+          open={showNowPlaying}
           onClose={() => setShowNowPlaying(false)}
-          onQueueClick={() => {
-            setShowNowPlaying(false);
-            setActiveTab("queues");
-            setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
-          }}
-          onNavigateToArtist={(artistName, trackId) => {
-            setShowNowPlaying(false);
-            setSelectedArtistName(artistName);
-            setSelectedAlbumName(undefined);
-            setSelectedGenreName(undefined);
-            setSelectedTrackId(trackId);
-            setGlobalSearchQuery("");
-            setActiveTab("artists");
-          }}
-          onNavigateToAlbum={(albumName, trackId) => {
-            setShowNowPlaying(false);
-            setSelectedAlbumName(albumName);
-            setSelectedArtistName(undefined);
-            setSelectedGenreName(undefined);
-            setSelectedTrackId(trackId);
-            setGlobalSearchQuery("");
-            setActiveTab("albums");
-          }}
-          onNavigateToGenre={(genreName, trackId) => {
-            setShowNowPlaying(false);
-            setSelectedGenreName(genreName);
-            setSelectedArtistName(undefined);
-            setSelectedAlbumName(undefined);
-            setSelectedTrackId(trackId);
-            setGlobalSearchQuery("");
-            setActiveTab("genres");
-          }}
-        />
-      </Dialog>
-    </Box>
+          TransitionComponent={Transition}
+        >
+          <NowPlayingView
+            isNarrow={isMobile}
+            onClose={() => setShowNowPlaying(false)}
+            onQueueClick={() => {
+              setShowNowPlaying(false);
+              setActiveTab("queues");
+              setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
+            }}
+            onNavigateToArtist={(artistName, trackId) => {
+              setShowNowPlaying(false);
+              setSelectedArtistName(artistName);
+              setSelectedAlbumName(undefined);
+              setSelectedGenreName(undefined);
+              setSelectedTrackId(trackId);
+              setGlobalSearchQuery("");
+              setActiveTab("artists");
+            }}
+            onNavigateToAlbum={(albumName, trackId) => {
+              setShowNowPlaying(false);
+              setSelectedAlbumName(albumName);
+              setSelectedArtistName(undefined);
+              setSelectedGenreName(undefined);
+              setSelectedTrackId(trackId);
+              setGlobalSearchQuery("");
+              setActiveTab("albums");
+            }}
+            onNavigateToGenre={(genreName, trackId) => {
+              setShowNowPlaying(false);
+              setSelectedGenreName(genreName);
+              setSelectedArtistName(undefined);
+              setSelectedAlbumName(undefined);
+              setSelectedTrackId(trackId);
+              setGlobalSearchQuery("");
+              setActiveTab("genres");
+            }}
+          />
+        </Dialog>
+      </Box>
     </PlayerProvider>
   );
 }

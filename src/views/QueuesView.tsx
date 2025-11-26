@@ -412,6 +412,20 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                       if (queue) handleSelectQueue(queue);
                     }}
                     displayEmpty
+                    renderValue={(value) => {
+                      const queue = queues.find(q => q.id === value);
+                      if (!queue) return "Select a queue";
+                      return (
+                        <Typography
+                          sx={{
+                            fontWeight: queue.is_active ? 700 : 500,
+                            color: queue.is_active ? "primary.main" : "text.primary",
+                          }}
+                        >
+                          {queue.is_active ? `▶ ${queue.name}` : queue.name}
+                        </Typography>
+                      );
+                    }}
                     sx={{
                       bgcolor: "background.paper",
                       "& .MuiSelect-select": {
