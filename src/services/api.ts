@@ -101,6 +101,12 @@ export interface Queue {
   shuffle_seed: number; // 1 = sequential, other = shuffled
 }
 
+export interface Playlist {
+  id: number;
+  name: string;
+  description?: string;
+}
+
 export interface IndexingResult {
   total_files: number;
   successful: number;
@@ -261,6 +267,22 @@ export const playlistApi = {
 
   getUnplayedTracks: async (): Promise<Track[]> => {
     return await invoke("get_unplayed_tracks");
+  },
+
+  getAllPlaylists: async (): Promise<Playlist[]> => {
+    return await invoke("get_all_playlists");
+  },
+
+  createPlaylist: async (name: string, description?: string): Promise<number> => {
+    return await invoke("create_playlist", { name, description });
+  },
+
+  addTrackToPlaylist: async (playlistId: number, trackId: number): Promise<void> => {
+    return await invoke("add_track_to_playlist", { playlistId, trackId });
+  },
+
+  getPlaylistTracks: async (playlistId: number): Promise<Track[]> => {
+    return await invoke("get_playlist_tracks", { playlistId });
   },
 };
 

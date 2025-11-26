@@ -100,6 +100,10 @@ pub fn run() {
             commands::get_recent_tracks,
             commands::get_most_played_tracks,
             commands::get_unplayed_tracks,
+            commands::get_all_playlists,
+            commands::create_playlist,
+            commands::add_track_to_playlist,
+            commands::get_playlist_tracks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

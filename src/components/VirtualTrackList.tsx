@@ -4,6 +4,8 @@ import { usePlayer } from "../contexts/PlayerContext";
 import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener } from "@mui/material";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import SearchIcon from "@mui/icons-material/Search";
+import TrackContextMenu from "./TrackContextMenu";
+import AddToPlaylistDialog from "./AddToPlaylistDialog";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -40,6 +42,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [showDropdown, setShowDropdown] = useState(false);
   const [flashingIndex, setFlashingIndex] = useState<number | null>(null);
   const [dropdownAlbumArtCache, setDropdownAlbumArtCache] = useState<Map<string, string>>(new Map());
+  const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
+  const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState<{ id: number; title: string } | null>(null);
+  const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -642,6 +647,15 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
               <Box
                 key={track.id}
                 onClick={() => handlePlayTrack(track, actualIndex)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedTrackForPlaylist({ id: track.id, title: track.title });
+                  setContextMenu({
+                    top: e.clientY,
+                    left: e.clientX,
+                  });
+                }}
                 sx={{
                   height: ITEM_HEIGHT,
                   display: "flex",
@@ -682,13 +696,14 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     overflow: "hidden",
+                    pointerEvents: "none",
                   }}
                 >
                   {!albumArt && <MusicNoteIcon sx={{ opacity: 0.3, fontSize: 28 }} />}
                 </Box>
 
                 {/* Track Info */}
-                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25 }}>
+                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25, pointerEvents: "none" }}>
                   <Typography
                     sx={{
                       fontSize: "15px",
@@ -744,6 +759,31 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         </div>
       </div>
       </div>
+
+      {/* Context Menu */}
+      <TrackContextMenu
+        anchorPosition={contextMenu}
+        onClose={() => {
+          setContextMenu(null);
+          setSelectedTrackForPlaylist(null);
+        }}
+        contextType={contextType}
+        inQueueOrPlaylist={contextType === "queue"}
+        onAddToPlaylist={() => {
+          setShowPlaylistDialog(true);
+        }}
+      />
+
+      {/* Add to Playlist Dialog */}
+      <AddToPlaylistDialog
+        open={showPlaylistDialog}
+        onClose={() => {
+          setShowPlaylistDialog(false);
+          setSelectedTrackForPlaylist(null);
+        }}
+        trackId={selectedTrackForPlaylist?.id || 0}
+        trackTitle={selectedTrackForPlaylist?.title || ""}
+      />
     </div>
   );
 });

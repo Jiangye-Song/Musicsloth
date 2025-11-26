@@ -1,5 +1,5 @@
 use rusqlite::{params, OptionalExtension};
-use crate::db::models::{Track, Album, Artist};
+use crate::db::models::{Track, Album, Artist, Playlist};
 use crate::db::connection::DatabaseConnection;
 
 /// Database operations for library management
@@ -1493,5 +1493,155 @@ impl DbOperations {
             
             Ok((conn.last_insert_rowid(), true))
         }
+    }
+
+    // ===== User Playlists =====
+
+    /// Get all user-created playlists
+    pub fn get_all_playlists(
+        db: &DatabaseConnection,
+    ) -> Result<Vec<Playlist>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description FROM playlists ORDER BY name"
+        )?;
+        
+        let playlists = stmt.query_map([], |row| {
+            Ok(Playlist {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(playlists)
+    }
+
+    /// Create a new playlist
+    pub fn create_playlist(
+        db: &DatabaseConnection,
+        name: &str,
+        description: Option<&str>,
+    ) -> Result<i64, anyhow::Error> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Check if playlist with same name exists
+        let exists: bool = conn.query_row(
+            "SELECT COUNT(*) > 0 FROM playlists WHERE name = ?1",
+            [name],
+            |row| row.get(0)
+        )?;
+        
+        if exists {
+            return Err(anyhow::anyhow!("Playlist with this name already exists"));
+        }
+        
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        
+        conn.execute(
+            "INSERT INTO playlists (name, description, date_created, date_modified) VALUES (?1, ?2, ?3, ?4)",
+            params![name, description, now, now],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+
+    /// Add a track to a playlist
+    pub fn add_track_to_playlist(
+        db: &DatabaseConnection,
+        playlist_id: i64,
+        track_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Get the next position
+        let position: i32 = conn.query_row(
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_tracks WHERE playlist_id = ?1",
+            [playlist_id],
+            |row| row.get(0)
+        )?;
+        
+        // Check if track already exists in playlist
+        let exists: bool = conn.query_row(
+            "SELECT COUNT(*) > 0 FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+            params![playlist_id, track_id],
+            |row| row.get(0)
+        )?;
+        
+        if exists {
+            return Err(anyhow::anyhow!("Track already exists in playlist"));
+        }
+        
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        
+        conn.execute(
+            "INSERT INTO playlist_tracks (playlist_id, track_id, position, date_added) VALUES (?1, ?2, ?3, ?4)",
+            params![playlist_id, track_id, position, now],
+        )?;
+        
+        Ok(())
+    }
+
+    /// Get all tracks in a playlist
+    pub fn get_playlist_tracks(
+        db: &DatabaseConnection,
+        playlist_id: i64,
+    ) -> Result<Vec<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.file_path, t.title, t.artist, t.album, t.album_artist,
+                    t.year, t.track_number, t.disc_number, t.duration_ms, t.genre,
+                    t.file_size, t.file_format, t.bitrate, t.sample_rate,
+                    t.date_added, t.date_modified, t.play_count, t.last_played, t.file_hash
+             FROM tracks t
+             INNER JOIN playlist_tracks pt ON t.id = pt.track_id
+             WHERE pt.playlist_id = ?1
+             ORDER BY pt.position"
+        )?;
+        
+        let tracks = stmt.query_map([playlist_id], |row| {
+            Ok(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get(6)?,
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                date_added: row.get(15)?,
+                date_modified: row.get(16)?,
+                play_count: row.get(17)?,
+                last_played: row.get(18)?,
+                file_hash: row.get(19)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(tracks)
     }
 }

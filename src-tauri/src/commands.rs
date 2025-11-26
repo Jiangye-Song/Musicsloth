@@ -6,7 +6,7 @@ use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
 use crate::library::indexer::{LibraryIndexer, IndexingResult, IndexingProgress};
 use crate::db::operations::DbOperations;
-use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath};
+use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath, Playlist};
 use lofty::file::TaggedFileExt;
 
 // Backend now only tracks current file - playback is in frontend
@@ -549,4 +549,30 @@ pub fn get_most_played_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, 
 pub fn get_unplayed_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, String> {
     DbOperations::get_unplayed_tracks(&state.db)
         .map_err(|e| format!("Failed to get unplayed tracks: {}", e))
+}
+
+// ===== User Playlists Commands =====
+
+#[tauri::command]
+pub fn get_all_playlists(state: State<'_, AppState>) -> Result<Vec<Playlist>, String> {
+    DbOperations::get_all_playlists(&state.db)
+        .map_err(|e| format!("Failed to get playlists: {}", e))
+}
+
+#[tauri::command]
+pub fn create_playlist(state: State<'_, AppState>, name: String, description: Option<String>) -> Result<i64, String> {
+    DbOperations::create_playlist(&state.db, &name, description.as_deref())
+        .map_err(|e| format!("Failed to create playlist: {}", e))
+}
+
+#[tauri::command]
+pub fn add_track_to_playlist(state: State<'_, AppState>, playlist_id: i64, track_id: i64) -> Result<(), String> {
+    DbOperations::add_track_to_playlist(&state.db, playlist_id, track_id)
+        .map_err(|e| format!("Failed to add track to playlist: {}", e))
+}
+
+#[tauri::command]
+pub fn get_playlist_tracks(state: State<'_, AppState>, playlist_id: i64) -> Result<Vec<Track>, String> {
+    DbOperations::get_playlist_tracks(&state.db, playlist_id)
+        .map_err(|e| format!("Failed to get playlist tracks: {}", e))
 }
