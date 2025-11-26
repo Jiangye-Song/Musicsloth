@@ -45,7 +45,7 @@ interface NowPlayingViewProps {
 
 export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
   const isShortHeight = useMediaQuery('(max-height:600px)'); const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
-  const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "lyrics");
+  const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "details");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -54,6 +54,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   const [seekPosition, setSeekPosition] = useState(0);
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [loadingLyrics, setLoadingLyrics] = useState(false);
+  const [hasLyrics, setHasLyrics] = useState(true);
   const [parsedLyrics, setParsedLyrics] = useState<LyricLine[]>([]);
   const [currentLyricIndex, setCurrentLyricIndex] = useState(-1);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
@@ -115,18 +116,13 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     };
   }, [isSeeking]);
 
-  // Load lyrics when track changes or when switching to lyrics tab
+  // Load lyrics when track changes - always load to determine if lyrics exist
   useEffect(() => {
     const loadLyrics = async () => {
       if (!currentTrack) {
         setLyrics(null);
         setParsedLyrics([]);
-        return;
-      }
-
-      // Only load if we're on the lyrics tab (or it's selected in landscape) and lyrics aren't already loaded/loading
-      const showingLyrics = activeTab === "lyrics" || (!isNarrow && activeTab === "albumart");
-      if (!showingLyrics || loadingLyrics) {
+        setHasLyrics(false);
         return;
       }
 
@@ -134,6 +130,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
       try {
         const lyricsData = await libraryApi.getLyrics(currentTrack.file_path);
         setLyrics(lyricsData);
+        setHasLyrics(!!lyricsData);
         
         // Parse LRC format if available
         if (lyricsData) {
@@ -146,13 +143,25 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         console.error("Failed to load lyrics:", error);
         setLyrics(null);
         setParsedLyrics([]);
+        setHasLyrics(false);
       } finally {
         setLoadingLyrics(false);
       }
     };
 
     loadLyrics();
-  }, [currentTrack?.file_path, activeTab, isNarrow]);
+  }, [currentTrack?.file_path]);
+
+  // Automatically switch tabs based on lyrics availability
+  useEffect(() => {
+    if (!hasLyrics && activeTab === "lyrics") {
+      // If currently on lyrics tab but no lyrics available, switch to details
+      setActiveTab(isNarrow ? "albumart" : "details");
+    } else if (hasLyrics && !isNarrow && (activeTab === "details" || activeTab === "albumart")) {
+      // In landscape mode, switch to lyrics tab when lyrics become available
+      setActiveTab("lyrics");
+    }
+  }, [hasLyrics, activeTab, isNarrow]);
 
   // Track user scroll events
   useEffect(() => {
@@ -783,7 +792,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
             sx={{ pb: 2, flexShrink: 0 }}
           >
             <Tab label="Album Art" value="albumart" />
-            <Tab label="Lyrics" value="lyrics" />
+            {hasLyrics && <Tab label="Lyrics" value="lyrics" />}
             <Tab label="Details" value="details" />
           </Tabs>
 
@@ -821,11 +830,11 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
             {/* Right: Tabs */}
             <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
               <Tabs
-                value={activeTab === "albumart" ? "lyrics" : activeTab}
+                value={activeTab === "albumart" ? (hasLyrics ? "lyrics" : "details") : activeTab}
                 onChange={(_, newValue) => setActiveTab(newValue)}
                 sx={{ mb: 2, flexShrink: 0 }}
               >
-                <Tab label="Lyrics" value="lyrics" />
+                {hasLyrics && <Tab label="Lyrics" value="lyrics" />}
                 <Tab label="Details" value="details" />
               </Tabs>
 
@@ -836,8 +845,8 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
                   minHeight: 0,
                 }}
               >
-                {activeTab === "lyrics" && renderLyrics()}
-                {activeTab === "details" && renderDetails()}
+                {activeTab === "lyrics" && hasLyrics && renderLyrics()}
+                {(activeTab === "details" || !hasLyrics) && renderDetails()}
               </Box>
             </Box>
           </Box>
