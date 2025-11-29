@@ -9,6 +9,7 @@ interface PlayerContextType {
   currentTrackIndex: number | null;
   isShuffled: boolean;
   shuffleSeed: number;
+  shuffleAnchor: number;
   isRepeating: boolean;
   setCurrentTrack: (track: Track | null) => void;
   setAlbumArt: (art: string | null) => void;
@@ -18,6 +19,8 @@ interface PlayerContextType {
   toggleShuffle: () => Promise<void>;
   toggleRepeat: () => void;
   clearPlayer: () => void;
+  loadShuffleStateFromQueue: (queueId: number) => Promise<void>;
+  setShuffleStateForNewQueue: (queueId: number, inheritShuffle: boolean) => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -174,6 +177,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // When toggling shuffle OFF, anchor doesn't matter (seed=1 means sequential)
       const newAnchor = newSeed !== 1 ? originalPosition : 0;
       
+      // Persist the anchor to the database
+      await queueApi.setQueueShuffleAnchor(currentQueueId, newAnchor);
+      
       // Find where the original position ends up in the new order
       const newPosition = await queueApi.findShuffledPosition(originalPosition, newSeed, queueLength, newAnchor);
       console.log(`[PlayerContext] Track will be at position ${newPosition} in new order, anchor: ${newAnchor}, seed: ${newSeed}`);
@@ -223,6 +229,47 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Load shuffle state from a queue (used when switching queues)
+  const loadShuffleStateFromQueue = useCallback(async (queueId: number) => {
+    try {
+      console.log(`[PlayerContext] Loading shuffle state for queue ${queueId}`);
+      const seed = await queueApi.getQueueShuffleSeed(queueId);
+      const anchor = await queueApi.getQueueShuffleAnchor(queueId);
+      console.log(`[PlayerContext] Queue ${queueId} has shuffle seed: ${seed}, anchor: ${anchor}`);
+      setShuffleSeed(seed);
+      setIsShuffled(seed !== 1);
+      setShuffleAnchor(anchor);
+    } catch (error) {
+      console.error('Failed to load shuffle state from queue:', error);
+      // Default to unshuffled if there's an error
+      setShuffleSeed(1);
+      setIsShuffled(false);
+      setShuffleAnchor(0);
+    }
+  }, []);
+
+  // Set shuffle state for a new queue (inheriting from previous queue if needed)
+  const setShuffleStateForNewQueue = useCallback(async (queueId: number, inheritShuffle: boolean) => {
+    try {
+      if (inheritShuffle && isShuffled && shuffleSeed !== 1) {
+        // Generate a new random seed for the new queue (don't reuse the same seed)
+        const newSeed = Math.floor(Math.random() * 1000000) + 2; // +2 to ensure it's never 1
+        console.log(`[PlayerContext] Setting shuffle seed ${newSeed} for new queue ${queueId} (inherited shuffle state)`);
+        await queueApi.setQueueShuffleSeed(queueId, newSeed);
+        setShuffleSeed(newSeed);
+        setIsShuffled(true);
+        setShuffleAnchor(0); // New queue starts from the clicked track
+      } else {
+        console.log(`[PlayerContext] New queue ${queueId} will be sequential (no shuffle inheritance)`);
+        setShuffleSeed(1);
+        setIsShuffled(false);
+        setShuffleAnchor(0);
+      }
+    } catch (error) {
+      console.error('Failed to set shuffle state for new queue:', error);
+    }
+  }, [isShuffled, shuffleSeed]);
+
   // Load active queue's current track on startup
   useEffect(() => {
     const loadActiveQueueTrack = async () => {
@@ -246,9 +293,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           console.log(`[PlayerContext] Active queue current index: ${currentIndex}`);
           setCurrentTrackIndex(currentIndex);
           
-          // For startup, assume anchor is at position 0 (or could be stored separately in DB)
-          const anchor = 0;
+          // Load the persisted anchor from the database
+          const anchor = await queueApi.getQueueShuffleAnchor(activeQueue.id);
           setShuffleAnchor(anchor);
+          console.log(`[PlayerContext] Shuffle anchor loaded: ${anchor}`);
           
           // Get the track at that position (respecting shuffle state)
           const track = await queueApi.getQueueTrackAtShuffledPosition(activeQueue.id, currentIndex, seed, anchor);
@@ -451,6 +499,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentTrackIndex,
       isShuffled,
       shuffleSeed,
+      shuffleAnchor,
       isRepeating,
       setCurrentTrack, 
       setAlbumArt,
@@ -459,7 +508,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       playPrevious,
       toggleShuffle,
       toggleRepeat,
-      clearPlayer
+      clearPlayer,
+      loadShuffleStateFromQueue,
+      setShuffleStateForNewQueue
     }}>
       {children}
     </PlayerContext.Provider>

@@ -251,6 +251,22 @@ export const queueApi = {
     return await invoke("toggle_queue_shuffle", { queueId });
   },
 
+  setQueueShuffleSeed: async (queueId: number, shuffleSeed: number): Promise<void> => {
+    return await invoke("set_queue_shuffle_seed", { queueId, shuffleSeed });
+  },
+
+  getQueueShuffleSeed: async (queueId: number): Promise<number> => {
+    return await invoke("get_queue_shuffle_seed", { queueId });
+  },
+
+  setQueueShuffleAnchor: async (queueId: number, shuffleAnchor: number): Promise<void> => {
+    return await invoke("set_queue_shuffle_anchor", { queueId, shuffleAnchor });
+  },
+
+  getQueueShuffleAnchor: async (queueId: number): Promise<number> => {
+    return await invoke("get_queue_shuffle_anchor", { queueId });
+  },
+
   findShuffledPosition: async (originalIndex: number, seed: number, queueLength: number, anchorPosition: number): Promise<number> => {
     return await invoke("find_shuffled_position", { originalIndex, seed, queueLength, anchorPosition });
   },

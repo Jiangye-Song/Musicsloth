@@ -180,13 +180,13 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
     } else if (dialogMode === "rename" && dialogPlaylist) {
       // Rename existing playlist
       await playlistApi.renamePlaylist(dialogPlaylist.id, name);
-      
+
       // If this playlist was selected, update the selected playlist name
       if (selectedUserPlaylist?.id === dialogPlaylist.id) {
         setSelectedUserPlaylist({ ...selectedUserPlaylist, name });
       }
     }
-    
+
     // Refresh the playlists list
     await loadUserPlaylists();
   };
@@ -326,22 +326,6 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
             >
               My Playlists
             </h3>
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={handleOpenCreateDialog}
-              sx={{
-                color: "#888",
-                textTransform: "none",
-                fontSize: "12px",
-                "&:hover": {
-                  color: "#fff",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
-                },
-              }}
-            >
-              New Playlist
-            </Button>
           </div>
           {filteredUserPlaylists.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
@@ -370,12 +354,18 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
                   <span style={{ color: "#fff", fontSize: "14px" }}>{playlist.name}</span>
                 </div>
               ))}
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleOpenCreateDialog}
+              >
+                New Playlist
+              </Button>
             </div>
           ) : (
             <div
               style={{
                 padding: "20px",
-                backgroundColor: "#2a2a2a",
                 borderRadius: "8px",
                 textAlign: "center",
               }}

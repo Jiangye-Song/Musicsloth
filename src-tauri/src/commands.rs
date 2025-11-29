@@ -526,6 +526,30 @@ pub fn toggle_queue_shuffle(queue_id: i64, state: State<'_, AppState>) -> Result
 }
 
 #[tauri::command]
+pub fn set_queue_shuffle_seed(queue_id: i64, shuffle_seed: i64, state: State<'_, AppState>) -> Result<(), String> {
+    DbOperations::set_queue_shuffle_seed(&state.db, queue_id, shuffle_seed)
+        .map_err(|e| format!("Failed to set queue shuffle seed: {}", e))
+}
+
+#[tauri::command]
+pub fn get_queue_shuffle_seed(queue_id: i64, state: State<'_, AppState>) -> Result<i64, String> {
+    DbOperations::get_queue_shuffle_seed(&state.db, queue_id)
+        .map_err(|e| format!("Failed to get queue shuffle seed: {}", e))
+}
+
+#[tauri::command]
+pub fn set_queue_shuffle_anchor(queue_id: i64, shuffle_anchor: i64, state: State<'_, AppState>) -> Result<(), String> {
+    DbOperations::set_queue_shuffle_anchor(&state.db, queue_id, shuffle_anchor)
+        .map_err(|e| format!("Failed to set queue shuffle anchor: {}", e))
+}
+
+#[tauri::command]
+pub fn get_queue_shuffle_anchor(queue_id: i64, state: State<'_, AppState>) -> Result<i64, String> {
+    DbOperations::get_queue_shuffle_anchor(&state.db, queue_id)
+        .map_err(|e| format!("Failed to get queue shuffle anchor: {}", e))
+}
+
+#[tauri::command]
 pub fn find_shuffled_position(original_index: i32, seed: i64, queue_length: i32, anchor_position: i32) -> Result<i32, String> {
     DbOperations::find_shuffled_position(original_index, seed, queue_length, anchor_position)
         .map_err(|e| format!("Failed to find shuffled position: {}", e))

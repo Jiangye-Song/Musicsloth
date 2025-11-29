@@ -1165,6 +1165,76 @@ impl DbOperations {
         Ok(new_seed)
     }
 
+    /// Set shuffle seed for a queue directly
+    /// Used when creating a new queue that should inherit shuffle state from previous queue
+    pub fn set_queue_shuffle_seed(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        shuffle_seed: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute(
+            "UPDATE queues SET shuffle_seed = ?1 WHERE id = ?2",
+            rusqlite::params![shuffle_seed, queue_id]
+        )?;
+        
+        Ok(())
+    }
+
+    /// Get the shuffle seed for a queue
+    pub fn get_queue_shuffle_seed(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let seed: Option<i64> = conn.query_row(
+            "SELECT shuffle_seed FROM queues WHERE id = ?1",
+            [queue_id],
+            |row| row.get(0)
+        )?;
+        
+        Ok(seed.unwrap_or(1))
+    }
+
+    /// Set shuffle anchor for a queue
+    /// The anchor is the original position of the track that was playing when shuffle was activated
+    pub fn set_queue_shuffle_anchor(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        shuffle_anchor: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        conn.execute(
+            "UPDATE queues SET shuffle_anchor = ?1 WHERE id = ?2",
+            rusqlite::params![shuffle_anchor, queue_id]
+        )?;
+        
+        Ok(())
+    }
+
+    /// Get the shuffle anchor for a queue
+    pub fn get_queue_shuffle_anchor(
+        db: &DatabaseConnection,
+        queue_id: i64,
+    ) -> Result<i64, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let anchor: Option<i64> = conn.query_row(
+            "SELECT shuffle_anchor FROM queues WHERE id = ?1",
+            [queue_id],
+            |row| row.get(0)
+        )?;
+        
+        Ok(anchor.unwrap_or(0))
+    }
+
     /// Calculate shuffled index using seed-based algorithm
     /// Given current index, seed, and queue length, calculate next/previous index
     pub fn calculate_shuffled_index(

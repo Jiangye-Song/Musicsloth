@@ -32,7 +32,7 @@ interface VirtualTrackListProps {
 
 const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, showSearch = false, activeTrackFilePath, initialTrackId }, ref) => {
   // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
-  const { updateQueuePosition, currentQueueId, currentTrackIndex } = usePlayer();
+  const { updateQueuePosition, currentQueueId, currentTrackIndex, isShuffled, loadShuffleStateFromQueue, setShuffleStateForNewQueue } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(20);
@@ -367,6 +367,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         // If we're in a queue view, just play the track directly
         // and set this queue as active
         await queueApi.setActiveQueue(queueId);
+        // Load shuffle state for this queue (to update the shuffle button)
+        await loadShuffleStateFromQueue(queueId);
         // Immediately update the current playing file and queue index for instant visual feedback
         setCurrentPlayingFile(track.file_path);
         setQueueCurrentIndex(index);
@@ -389,6 +391,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 ? `Playlist: ${contextName}`
                 : `Genre: ${contextName}`;
 
+        // Check if we should inherit shuffle state from the current queue
+        const shouldInheritShuffle = isShuffled;
+
         // Get all track IDs (use original tracks, not filtered)
         console.log(`[Frontend] Getting track IDs from ${tracks.length} tracks...`);
         const trackIds = tracks.map(t => t.id);
@@ -398,6 +403,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         console.log(`[Frontend] Creating queue "${queueName}"...`);
         const newQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, index);
         console.log(`[Frontend] Queue created successfully with ID: ${newQueueId}`);
+
+        // Set shuffle state for the new queue (inherit from previous queue if it was shuffled)
+        await setShuffleStateForNewQueue(newQueueId, shouldInheritShuffle);
 
         // Play the clicked track immediately (don't wait for full queue to load)
         console.log(`[Frontend] Playing track: ${track.file_path}`);

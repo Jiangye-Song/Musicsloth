@@ -137,6 +137,19 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    // Migration: Add shuffle_anchor column to existing queues table if it doesn't exist
+    let shuffle_anchor_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('queues') WHERE name='shuffle_anchor'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = shuffle_anchor_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE queues ADD COLUMN shuffle_anchor INTEGER DEFAULT 0", [])?;
+        }
+    }
+
     // Create queue_tracks junction table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS queue_tracks (

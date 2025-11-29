@@ -19,7 +19,7 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
-  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex, clearPlayer } = usePlayer();
+  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -211,6 +211,9 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       // If this queue is not active, switch to it
       await queueApi.setActiveQueue(selectedQueue.id);
 
+      // Load shuffle state for this queue (to sync PlayerContext)
+      await loadShuffleStateFromQueue(selectedQueue.id);
+
       // Get the saved position in this queue
       const currentIndex = await queueApi.getQueueCurrentIndex(selectedQueue.id);
 
@@ -218,6 +221,9 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       if (queueTracks.length > 0) {
         const trackIndex = Math.max(0, Math.min(currentIndex, queueTracks.length - 1));
         await playerApi.playFile(queueTracks[trackIndex].file_path);
+        
+        // Update PlayerContext with the new queue position
+        await updateQueuePosition(selectedQueue.id, trackIndex);
       }
 
       // Refresh queue list to update active status
