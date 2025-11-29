@@ -102,6 +102,7 @@ pub fn run() {
             commands::get_unplayed_tracks,
             commands::get_all_playlists,
             commands::create_playlist,
+            commands::rename_playlist,
             commands::add_track_to_playlist,
             commands::get_playlist_tracks,
         ])

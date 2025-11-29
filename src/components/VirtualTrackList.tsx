@@ -21,6 +21,8 @@ interface VirtualTrackListProps {
   contextName?: string; // Artist name, album name, or genre name
   queueId?: number; // Queue ID if contextType is "queue"
   isActiveQueue?: boolean; // Whether this queue is the active one
+  playlistId?: string | number; // Playlist ID if contextType is "playlist"
+  isSystemPlaylist?: boolean; // Whether this is a system playlist (All Songs, Recently Added, etc.)
   showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
   onQueueActivated?: () => void; // Callback when queue is activated
   showSearch?: boolean; // Whether to show the search bar
@@ -28,8 +30,8 @@ interface VirtualTrackListProps {
   initialTrackId?: number; // Track ID to scroll to and flash on mount
 }
 
-const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, showPlayingIndicator = false, onQueueActivated, showSearch = false, activeTrackFilePath, initialTrackId }, ref) => {
-// console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, showSearch = false, activeTrackFilePath, initialTrackId }, ref) => {
+  // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
@@ -60,31 +62,31 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
       console.log(`[VirtualTrackList] handleScroll - no containerRef`);
       return;
     }
-    
+
     if (scrollTimeoutRef.current !== null) {
       clearTimeout(scrollTimeoutRef.current);
     }
-    
+
     scrollTimeoutRef.current = window.setTimeout(() => {
       if (!containerRef.current) return;
-      
+
       const scrollTop = containerRef.current.scrollTop;
       const viewportHeight = containerRef.current.clientHeight;
-      
+
       console.log(`[VirtualTrackList] handleScroll - scrollTop: ${scrollTop}, viewportHeight: ${viewportHeight}`);
-      
+
       // Don't calculate if container not properly sized yet
       if (viewportHeight === 0) {
         console.log(`[VirtualTrackList] Scroll - container not sized yet, skipping`);
         return;
       }
-      
+
       const start = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN);
       const end = Math.min(
         tracks.length,
         Math.ceil((scrollTop + viewportHeight) / ITEM_HEIGHT) + OVERSCAN
       );
-      
+
       console.log(`[VirtualTrackList] Scroll - calculated range: ${start}-${end}, total: ${tracks.length}`);
       setVisibleStart(start);
       setVisibleEnd(end);
@@ -210,7 +212,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         console.log(`[VirtualTrackList] Container initialization timeout after ${attempts} attempts`);
       }
     };
-    
+
     requestAnimationFrame(initializeVisibleRange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks.length]);
@@ -261,15 +263,15 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
     while (loadQueueRef.current.length > 0 && activeLoadsRef.current < MAX_CONCURRENT_LOADS) {
       const filePath = loadQueueRef.current.shift();
       if (!filePath) continue;
-      
+
       // Skip if already loaded or currently loading
       if (albumArtCacheRef.current.has(filePath) || loadingArtRef.current.has(filePath)) {
         continue;
       }
-      
+
       loadingArtRef.current.add(filePath);
       activeLoadsRef.current++;
-      
+
       // Load in background
       (async () => {
         try {
@@ -308,7 +310,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
       }
     });
     console.log(`[VirtualTrackList] Queued ${queuedCount} tracks for album art loading`);
-    
+
     processLoadQueue();
   }, [visibleStart, visibleEnd, tracks, processLoadQueue]);
 
@@ -322,18 +324,18 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         Math.min(tracks.length, visibleEnd + OVERSCAN * 2)
       ).map(t => t.file_path)
     );
-    
+
     // Remove cached art that's far from viewport
     const cache = albumArtCacheRef.current;
     const toDelete: string[] = [];
-    
+
     cache.forEach((url, filePath) => {
       if (!visibleFilePaths.has(filePath)) {
         URL.revokeObjectURL(url);
         toDelete.push(filePath);
       }
     });
-    
+
     toDelete.forEach(filePath => cache.delete(filePath));
   }, [visibleStart, visibleEnd, tracks]);
 
@@ -377,31 +379,31 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         }
       } else {
         // Create queue name based on context
-        const queueName = contextType === "library" 
+        const queueName = contextType === "library"
           ? "Library"
           : contextType === "artist"
-          ? `Artist: ${contextName}`
-          : contextType === "album"
-          ? `Album: ${contextName}`
-          : contextType === "playlist"
-          ? `Playlist: ${contextName}`
-          : `Genre: ${contextName}`;
-        
+            ? `Artist: ${contextName}`
+            : contextType === "album"
+              ? `Album: ${contextName}`
+              : contextType === "playlist"
+                ? `Playlist: ${contextName}`
+                : `Genre: ${contextName}`;
+
         // Get all track IDs (use original tracks, not filtered)
         console.log(`[Frontend] Getting track IDs from ${tracks.length} tracks...`);
         const trackIds = tracks.map(t => t.id);
         console.log(`[Frontend] Got ${trackIds.length} track IDs`);
-        
+
         // Create or reuse queue (backend handles duplicate detection and returns immediately after first batch)
         console.log(`[Frontend] Creating queue "${queueName}"...`);
         const newQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, index);
         console.log(`[Frontend] Queue created successfully with ID: ${newQueueId}`);
-        
+
         // Play the clicked track immediately (don't wait for full queue to load)
         console.log(`[Frontend] Playing track: ${track.file_path}`);
         await playerApi.playFile(track.file_path);
         console.log(`[Frontend] Track playback started`);
-        
+
         // Update queue position for new queue
         await updateQueuePosition(newQueueId, index);
       }
@@ -421,17 +423,17 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
 
   const scrollToTrack = (index: number) => {
     if (!containerRef.current) return;
-    
+
     const scrollTop = index * ITEM_HEIGHT;
     containerRef.current.scrollTo({
       top: scrollTop,
       behavior: "smooth",
     });
-    
+
     // Flash the item
     setFlashingIndex(index);
     setTimeout(() => setFlashingIndex(null), 1000);
-    
+
     // Close dropdown and clear search
     setShowDropdown(false);
     setSearchQuery("");
@@ -524,7 +526,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 }}
               />
             </Paper>
-            
+
             {/* Dropdown Results */}
             {showDropdown && searchResults.length > 0 && (
               <Paper
@@ -543,10 +545,10 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 <List dense sx={{ py: 0 }}>
                   {searchResults.map(({ track, index }) => {
                     const albumArt = dropdownAlbumArtCache.get(track.file_path) || albumArtCacheRef.current.get(track.file_path);
-                    
+
                     return (
-                      <ListItem 
-                        key={`${track.id}-${index}`} 
+                      <ListItem
+                        key={`${track.id}-${index}`}
                         disablePadding
                         data-file-path={track.file_path}
                         ref={(el) => {
@@ -603,7 +605,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           </Box>
         </ClickAwayListener>
       )}
-      
+
       {/* Track List */}
       <div
         ref={containerRef}
@@ -619,147 +621,147 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
       >
         {/* Spacer for virtual scrolling */}
         <div style={{ height: `${tracks.length * ITEM_HEIGHT}px`, position: "relative" }}>
-        {/* Only render visible items */}
-        <div
-          style={{
-            position: "absolute",
-            top: `${visibleStart * ITEM_HEIGHT}px`,
-            left: 0,
-            right: 0,
-          }}
-        >
-          {visibleTracks.map((track, visibleIndex) => {
-            const albumArt = albumArtCacheRef.current.get(track.file_path);
-            const actualIndex = visibleStart + visibleIndex;
-            const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
-            // For active queue in queue view, check by file path instead of index to handle shuffle
-            const isQueueCurrentTrack = contextType === "queue" && isActiveQueue && activeTrackFilePath 
-              ? track.file_path === activeTrackFilePath 
-              : contextType === "queue" && actualIndex === queueCurrentIndex;
-            const isInactiveQueue = contextType === "queue" && !isActiveQueue;
-            const shouldHighlight = isPlaying || isQueueCurrentTrack;
-            const isFlashing = flashingIndex === actualIndex;
-            
-            // Debug log for first few tracks
-            if (actualIndex < 3) {
-              console.log(`[VirtualTrackList] Track ${actualIndex}: ${track.title}, albumArt exists: ${!!albumArt}, albumArt value: ${albumArt?.substring(0, 50)}`);
-            }
-            
-            return (
-              <Box
-                key={track.id}
-                onClick={() => handlePlayTrack(track, actualIndex)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setSelectedTrackForPlaylist({ id: track.id, title: track.title });
-                  setContextMenu({
-                    top: e.clientY,
-                    left: e.clientX,
-                  });
-                }}
-                sx={{
-                  height: ITEM_HEIGHT,
-                  display: "flex",
-                  alignItems: "center",
-                  px: 2,
-                  py: 1.25,
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  cursor: "pointer",
-                  transition: "background-color 0.2s",
-                  bgcolor: isFlashing ? "primary.dark" : (shouldHighlight ? "action.selected" : "transparent"),
-                  borderLeft: 3,
-                  borderLeftColor: shouldHighlight ? "primary.main" : "transparent",
-                  opacity: isInactiveQueue ? 0.6 : 1,
-                  animation: isFlashing ? "flash 1s ease-in-out" : "none",
-                  "@keyframes flash": {
-                    "0%": { bgcolor: "primary.dark" },
-                    "50%": { bgcolor: "primary.main" },
-                    "100%": { bgcolor: "transparent" },
-                  },
-                  "&:hover": {
-                    bgcolor: shouldHighlight ? "action.selected" : "action.hover",
-                  },
-                }}
-              >
-                {/* Album Art */}
+          {/* Only render visible items */}
+          <div
+            style={{
+              position: "absolute",
+              top: `${visibleStart * ITEM_HEIGHT}px`,
+              left: 0,
+              right: 0,
+            }}
+          >
+            {visibleTracks.map((track, visibleIndex) => {
+              const albumArt = albumArtCacheRef.current.get(track.file_path);
+              const actualIndex = visibleStart + visibleIndex;
+              const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
+              // For active queue in queue view, check by file path instead of index to handle shuffle
+              const isQueueCurrentTrack = contextType === "queue" && isActiveQueue && activeTrackFilePath
+                ? track.file_path === activeTrackFilePath
+                : contextType === "queue" && actualIndex === queueCurrentIndex;
+              const isInactiveQueue = contextType === "queue" && !isActiveQueue;
+              const shouldHighlight = isPlaying || isQueueCurrentTrack;
+              const isFlashing = flashingIndex === actualIndex;
+
+              // Debug log for first few tracks
+              if (actualIndex < 3) {
+                console.log(`[VirtualTrackList] Track ${actualIndex}: ${track.title}, albumArt exists: ${!!albumArt}, albumArt value: ${albumArt?.substring(0, 50)}`);
+              }
+
+              return (
                 <Box
+                  key={track.id}
+                  onClick={() => handlePlayTrack(track, actualIndex)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedTrackForPlaylist({ id: track.id, title: track.title });
+                    setContextMenu({
+                      top: e.clientY,
+                      left: e.clientX,
+                    });
+                  }}
                   sx={{
-                    width: 60,
-                    height: 60,
-                    mr: 2,
-                    borderRadius: 1,
-                    bgcolor: "background.default",
+                    height: ITEM_HEIGHT,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    backgroundImage: albumArt ? `url(${albumArt})` : "none",
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    overflow: "hidden",
-                    pointerEvents: "none",
+                    px: 2,
+                    py: 1.25,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s",
+                    bgcolor: isFlashing ? "primary.dark" : (shouldHighlight ? "action.selected" : "transparent"),
+                    borderLeft: 3,
+                    borderLeftColor: shouldHighlight ? "primary.main" : "transparent",
+                    opacity: isInactiveQueue ? 0.6 : 1,
+                    animation: isFlashing ? "flash 1s ease-in-out" : "none",
+                    "@keyframes flash": {
+                      "0%": { bgcolor: "primary.dark" },
+                      "50%": { bgcolor: "primary.main" },
+                      "100%": { bgcolor: "transparent" },
+                    },
+                    "&:hover": {
+                      bgcolor: shouldHighlight ? "action.selected" : "action.hover",
+                    },
                   }}
                 >
-                  {!albumArt && <MusicNoteIcon sx={{ opacity: 0.3, fontSize: 28 }} />}
-                </Box>
+                  {/* Album Art */}
+                  <Box
+                    sx={{
+                      width: 60,
+                      height: 60,
+                      mr: 2,
+                      borderRadius: 1,
+                      bgcolor: "background.default",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundImage: albumArt ? `url(${albumArt})` : "none",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      overflow: "hidden",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {!albumArt && <MusicNoteIcon sx={{ opacity: 0.3, fontSize: 28 }} />}
+                  </Box>
 
-                {/* Track Info */}
-                <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25, pointerEvents: "none" }}>
+                  {/* Track Info */}
+                  <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 0.25, pointerEvents: "none" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "15px",
+                        fontWeight: 500,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        fontStyle: isInactiveQueue ? "italic" : "normal",
+                      }}
+                    >
+                      {track.title}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "13px",
+                        color: "text.secondary",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        fontStyle: isInactiveQueue ? "italic" : "normal",
+                      }}
+                    >
+                      {track.artist || "Unknown Artist"}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "13px",
+                        color: "text.disabled",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        fontStyle: isInactiveQueue ? "italic" : "normal",
+                      }}
+                    >
+                      {track.album || "Unknown Album"}
+                    </Typography>
+                  </Box>
+
+                  {/* Duration */}
                   <Typography
                     sx={{
-                      fontSize: "15px",
-                      fontWeight: 500,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      fontStyle: isInactiveQueue ? "italic" : "normal",
-                    }}
-                  >
-                    {track.title}
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: "13px",
-                      color: "text.secondary",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      fontStyle: isInactiveQueue ? "italic" : "normal",
-                    }}
-                  >
-                    {track.artist || "Unknown Artist"}
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: "13px",
+                      fontSize: "14px",
                       color: "text.disabled",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      fontStyle: isInactiveQueue ? "italic" : "normal",
+                      ml: 2,
+                      flexShrink: 0,
                     }}
                   >
-                    {track.album || "Unknown Album"}
+                    {formatDuration(track.duration_ms)}
                   </Typography>
                 </Box>
-
-                {/* Duration */}
-                <Typography
-                  sx={{
-                    fontSize: "14px",
-                    color: "text.disabled",
-                    ml: 2,
-                    flexShrink: 0,
-                  }}
-                >
-                  {formatDuration(track.duration_ms)}
-                </Typography>
-              </Box>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Context Menu */}
@@ -772,8 +774,15 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             setSelectedTrackForPlaylist(null);
           }
         }}
-        contextType={contextType}
-        inQueueOrPlaylist={contextType === "queue"}
+        inQueue={contextType === "queue" && queueId !== undefined ? {
+          queueId: queueId,
+          isActiveQueue: isActiveQueue
+        } : null}
+        inPlaylist={contextType === "playlist" && playlistId !== undefined ? {
+          playlistId: playlistId,
+          isSystemPlaylist: isSystemPlaylist
+        } : null}
+        hasActiveQueue={currentQueueId !== null}
         onAddToPlaylist={() => {
           setShowPlaylistDialog(true);
           setContextMenu(null); // Close context menu but keep selectedTrackForPlaylist

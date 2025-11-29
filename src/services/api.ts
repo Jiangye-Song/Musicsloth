@@ -277,6 +277,10 @@ export const playlistApi = {
     return await invoke("create_playlist", { name, description });
   },
 
+  renamePlaylist: async (playlistId: number, newName: string): Promise<void> => {
+    return await invoke("rename_playlist", { playlistId, newName });
+  },
+
   addTrackToPlaylist: async (playlistId: number, trackId: number): Promise<void> => {
     return await invoke("add_track_to_playlist", { playlistId, trackId });
   },

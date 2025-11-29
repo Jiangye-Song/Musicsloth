@@ -1555,6 +1555,45 @@ impl DbOperations {
         Ok(conn.last_insert_rowid())
     }
 
+    /// Rename a playlist
+    pub fn rename_playlist(
+        db: &DatabaseConnection,
+        playlist_id: i64,
+        new_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Check if another playlist with same name exists
+        let exists: bool = conn.query_row(
+            "SELECT COUNT(*) > 0 FROM playlists WHERE name = ?1 AND id != ?2",
+            params![new_name, playlist_id],
+            |row| row.get(0)
+        )?;
+        
+        if exists {
+            return Err(anyhow::anyhow!("Playlist with this name already exists"));
+        }
+        
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        
+        let rows_affected = conn.execute(
+            "UPDATE playlists SET name = ?1, date_modified = ?2 WHERE id = ?3",
+            params![new_name, now, playlist_id],
+        )?;
+        
+        if rows_affected == 0 {
+            return Err(anyhow::anyhow!("Playlist not found"));
+        }
+        
+        Ok(())
+    }
+
     /// Add a track to a playlist
     pub fn add_track_to_playlist(
         db: &DatabaseConnection,

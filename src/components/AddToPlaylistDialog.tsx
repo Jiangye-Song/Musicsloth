@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { playlistApi, Playlist } from "../services/api";
-import CreatePlaylistDialog from "./CreatePlaylistDialog";
+import TextInputDialog from "./TextInputDialog";
 
 interface AddToPlaylistDialogProps {
   open: boolean;
@@ -66,18 +66,18 @@ export default function AddToPlaylistDialog({
     }
   };
 
-  const handleCreatePlaylist = async (name: string, description?: string) => {
-    try {
-      const newPlaylistId = await playlistApi.createPlaylist(name, description);
-      setCreateDialogOpen(false);
-      await loadPlaylists();
-      // Automatically add the track to the newly created playlist
-      await handleAddToPlaylist(newPlaylistId);
-    } catch (err: any) {
-      console.error("Failed to create playlist:", err);
-      throw err; // Re-throw to let CreatePlaylistDialog handle it
-    }
+  const handleCreatePlaylist = async (name: string) => {
+    const newPlaylistId = await playlistApi.createPlaylist(name);
+    setCreateDialogOpen(false);
+    await loadPlaylists();
+    // Automatically add the track to the newly created playlist
+    await handleAddToPlaylist(newPlaylistId);
   };
+
+  const validatePlaylistName = useCallback(async (name: string): Promise<boolean> => {
+    const allPlaylists = await playlistApi.getAllPlaylists();
+    return !allPlaylists.some((p) => p.name.toLowerCase() === name.toLowerCase());
+  }, []);
 
   return (
     <>
@@ -128,10 +128,15 @@ export default function AddToPlaylistDialog({
         </DialogContent>
       </Dialog>
 
-      <CreatePlaylistDialog
+      <TextInputDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
-        onCreate={handleCreatePlaylist}
+        onSubmit={handleCreatePlaylist}
+        title="New Playlist"
+        label="Playlist Name"
+        submitLabel="Create"
+        validateUnique={validatePlaylistName}
+        duplicateErrorMessage="A playlist with this name already exists"
       />
     </>
   );

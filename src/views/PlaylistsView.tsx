@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { libraryApi, playlistApi, Track, Playlist } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
+import PlaylistContextMenu from "../components/PlaylistContextMenu";
+import TextInputDialog from "../components/TextInputDialog";
 
-import { IconButton } from "@mui/material";
+import { IconButton, Button } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PlaylistPlayIcon from "@mui/icons-material/PlaylistPlay";
+import AddIcon from "@mui/icons-material/Add";
 import { ReactNode } from "react";
 import { LibraryMusic, Input as InputIcon, Replay as ReplayIcon, PlayDisabled } from "@mui/icons-material";
 
@@ -87,6 +90,15 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
+  const [contextMenuPlaylist, setContextMenuPlaylist] = useState<Playlist | null>(null);
+
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"create" | "rename">("create");
+  const [dialogPlaylist, setDialogPlaylist] = useState<Playlist | null>(null);
+
   // Load user playlists on mount
   useEffect(() => {
     loadUserPlaylists();
@@ -137,6 +149,55 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
     // Refresh user playlists in case new ones were added
     loadUserPlaylists();
   };
+
+  const handlePlaylistContextMenu = (e: React.MouseEvent, playlist: Playlist) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenuPlaylist(playlist);
+    setContextMenu({ top: e.clientY, left: e.clientX });
+  };
+
+  const handleOpenRenameDialog = () => {
+    if (!contextMenuPlaylist) return;
+    setDialogPlaylist(contextMenuPlaylist);
+    setDialogMode("rename");
+    setDialogOpen(true);
+    // Close context menu
+    setContextMenu(null);
+    setContextMenuPlaylist(null);
+  };
+
+  const handleOpenCreateDialog = () => {
+    setDialogPlaylist(null);
+    setDialogMode("create");
+    setDialogOpen(true);
+  };
+
+  const handleDialogSubmit = async (name: string) => {
+    if (dialogMode === "create") {
+      // Create new playlist
+      await playlistApi.createPlaylist(name);
+    } else if (dialogMode === "rename" && dialogPlaylist) {
+      // Rename existing playlist
+      await playlistApi.renamePlaylist(dialogPlaylist.id, name);
+      
+      // If this playlist was selected, update the selected playlist name
+      if (selectedUserPlaylist?.id === dialogPlaylist.id) {
+        setSelectedUserPlaylist({ ...selectedUserPlaylist, name });
+      }
+    }
+    
+    // Refresh the playlists list
+    await loadUserPlaylists();
+  };
+
+  const validatePlaylistName = useCallback(async (name: string): Promise<boolean> => {
+    const allPlaylists = await playlistApi.getAllPlaylists();
+    const lowerName = name.toLowerCase();
+    return !allPlaylists.some(
+      (p) => p.name.toLowerCase() === lowerName && p.id !== dialogPlaylist?.id
+    );
+  }, [dialogPlaylist?.id]);
 
 
   useEffect(() => {
@@ -189,6 +250,8 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
               tracks={tracks}
               contextType="playlist"
               contextName={displayName}
+              playlistId={selectedPlaylist?.id || selectedUserPlaylist?.id}
+              isSystemPlaylist={selectedPlaylist !== null}
               showSearch={true}
             />
           </div>
@@ -241,25 +304,52 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
 
         {/* User Playlists */}
         <div>
-          <h3
+          <div
             style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#888",
-              textTransform: "uppercase",
-              letterSpacing: "1px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
               marginBottom: "12px",
               paddingLeft: "20px",
+              paddingRight: "20px",
             }}
           >
-            My Playlists
-          </h3>
+            <h3
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#888",
+                textTransform: "uppercase",
+                letterSpacing: "1px",
+                margin: 0,
+              }}
+            >
+              My Playlists
+            </h3>
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleOpenCreateDialog}
+              sx={{
+                color: "#888",
+                textTransform: "none",
+                fontSize: "12px",
+                "&:hover": {
+                  color: "#fff",
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                },
+              }}
+            >
+              New Playlist
+            </Button>
+          </div>
           {filteredUserPlaylists.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
               {filteredUserPlaylists.map((playlist) => (
                 <div
                   key={playlist.id}
                   onClick={() => handleUserPlaylistClick(playlist)}
+                  onContextMenu={(e) => handlePlaylistContextMenu(e, playlist)}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -307,6 +397,36 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           </div>
         )}
       </div>
+
+      {/* Playlist Context Menu */}
+      {contextMenuPlaylist && (
+        <PlaylistContextMenu
+          anchorPosition={contextMenu}
+          onClose={() => {
+            setContextMenu(null);
+            setContextMenuPlaylist(null);
+          }}
+          playlistId={contextMenuPlaylist.id}
+          playlistName={contextMenuPlaylist.name}
+          onRename={handleOpenRenameDialog}
+        />
+      )}
+
+      {/* Shared Playlist Name Dialog (Create/Rename) */}
+      <TextInputDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setDialogPlaylist(null);
+        }}
+        onSubmit={handleDialogSubmit}
+        title={dialogMode === "create" ? "New Playlist" : "Rename Playlist"}
+        label="Playlist Name"
+        submitLabel={dialogMode === "create" ? "Create" : "Rename"}
+        initialValue={dialogPlaylist?.name || ""}
+        validateUnique={validatePlaylistName}
+        duplicateErrorMessage="A playlist with this name already exists"
+      />
     </div>
   );
 }

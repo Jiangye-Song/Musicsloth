@@ -58,6 +58,7 @@ function App() {
   const [selectedAlbumName, setSelectedAlbumName] = useState<string | undefined>(undefined);
   const [selectedGenreName, setSelectedGenreName] = useState<string | undefined>(undefined);
   const [selectedTrackId, setSelectedTrackId] = useState<number | undefined>(undefined);
+  const [navigationKey, setNavigationKey] = useState(0); // Force re-navigation when same item is clicked
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const queuesViewRef = useRef<QueuesViewRef>(null);
@@ -82,11 +83,11 @@ function App() {
       case "playlists":
         return <PlaylistsView searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "artists":
-        return <ArtistsView searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <ArtistsView key={`artists-${navigationKey}`} searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "albums":
-        return <AlbumsView searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <AlbumsView key={`albums-${navigationKey}`} searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       case "genres":
-        return <GenresView searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <GenresView key={`genres-${navigationKey}`} searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
       default:
         return <LibraryView searchQuery={globalSearchQuery} />;
     }
@@ -262,6 +263,7 @@ function App() {
               setSelectedGenreName(undefined);
               setSelectedTrackId(trackId);
               setGlobalSearchQuery("");
+              setNavigationKey(k => k + 1);
               setActiveTab("artists");
             }}
             onNavigateToAlbum={(albumName, trackId) => {
@@ -271,6 +273,7 @@ function App() {
               setSelectedGenreName(undefined);
               setSelectedTrackId(trackId);
               setGlobalSearchQuery("");
+              setNavigationKey(k => k + 1);
               setActiveTab("albums");
             }}
             onNavigateToGenre={(genreName, trackId) => {
@@ -280,6 +283,7 @@ function App() {
               setSelectedAlbumName(undefined);
               setSelectedTrackId(trackId);
               setGlobalSearchQuery("");
+              setNavigationKey(k => k + 1);
               setActiveTab("genres");
             }}
           />

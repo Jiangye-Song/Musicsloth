@@ -19,20 +19,13 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
   const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
 
+  // Load genres on mount
   useEffect(() => {
     const loadGenres = async () => {
       try {
         const allGenres = await libraryApi.getAllGenres();
         setGenres(allGenres);
         setFilteredGenres(allGenres);
-
-        // Auto-select genre if initialGenreName is provided
-        if (initialGenreName) {
-          const genre = allGenres.find(g => g.name === initialGenreName);
-          if (genre) {
-            handleGenreClick(genre);
-          }
-        }
       } catch (error) {
         console.error("Failed to load genres:", error);
       } finally {
@@ -41,7 +34,19 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
     };
 
     loadGenres();
-  }, [initialGenreName]);
+  }, []);
+
+  // Handle navigation from Now Playing view
+  useEffect(() => {
+    if (initialGenreName && genres.length > 0) {
+      const genre = genres.find(g => g.name === initialGenreName);
+      if (genre) {
+        // Update trackIdToFlash before navigating
+        setTrackIdToFlash(initialTrackId);
+        handleGenreClick(genre);
+      }
+    }
+  }, [initialGenreName, initialTrackId, genres]);
 
   const handleGenreClick = async (genre: Genre) => {
     setSelectedGenre(genre);

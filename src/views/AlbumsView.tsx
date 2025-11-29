@@ -209,20 +209,13 @@ export default function AlbumsView({ searchQuery = "", initialAlbumName, initial
     const [albumTracks, setAlbumTracks] = useState<Track[]>([]);
     const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
 
+    // Load albums on mount
     useEffect(() => {
         const loadAlbums = async () => {
             try {
                 const allAlbums = await libraryApi.getAllAlbums();
                 setAlbums(allAlbums);
                 setFilteredAlbums(allAlbums);
-
-                // Auto-select album if initialAlbumName is provided
-                if (initialAlbumName) {
-                    const album = allAlbums.find(a => a.name === initialAlbumName);
-                    if (album) {
-                        handleAlbumClick(album);
-                    }
-                }
             } catch (error) {
                 console.error("Failed to load albums:", error);
             } finally {
@@ -231,7 +224,19 @@ export default function AlbumsView({ searchQuery = "", initialAlbumName, initial
         };
 
         loadAlbums();
-    }, [initialAlbumName]);
+    }, []);
+
+    // Handle navigation from Now Playing view
+    useEffect(() => {
+        if (initialAlbumName && albums.length > 0) {
+            const album = albums.find(a => a.name === initialAlbumName);
+            if (album) {
+                // Update trackIdToFlash before navigating
+                setTrackIdToFlash(initialTrackId);
+                handleAlbumClick(album);
+            }
+        }
+    }, [initialAlbumName, initialTrackId, albums]);
 
     const handleAlbumClick = async (album: Album) => {
         setSelectedAlbum(album);

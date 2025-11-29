@@ -10,19 +10,39 @@ import DeleteIcon from "@mui/icons-material/Delete";
 interface TrackContextMenuProps {
   anchorPosition: { top: number; left: number } | null;
   onClose: () => void;
-  contextType: "library" | "artist" | "album" | "genre" | "queue" | "playlist";
-  inQueueOrPlaylist?: boolean;
+  // Queue context - pass queueId if viewing a queue, isActiveQueue if it's the currently playing queue
+  inQueue?: {
+    queueId: number;
+    isActiveQueue: boolean;
+  } | null;
+  // Playlist context - pass playlistId if viewing a playlist, isSystemPlaylist for system playlists like "All Songs"
+  inPlaylist?: {
+    playlistId: string | number;
+    isSystemPlaylist: boolean;
+  } | null;
+  // Whether there's an active queue to add to (false if no queues exist)
+  hasActiveQueue?: boolean;
   onAddToPlaylist?: () => void;
+  onRemoveFromQueue?: () => void;
+  onRemoveFromPlaylist?: () => void;
 }
 
 export default function TrackContextMenu({
   anchorPosition,
   onClose,
-  contextType,
-  inQueueOrPlaylist = false,
+  inQueue = null,
+  inPlaylist = null,
+  hasActiveQueue = false,
   onAddToPlaylist,
+  onRemoveFromQueue,
+  onRemoveFromPlaylist,
 }: TrackContextMenuProps) {
   const open = Boolean(anchorPosition);
+
+  // Determine what to show
+  const showAddToCurrentQueue = hasActiveQueue && !(inQueue?.isActiveQueue);
+  const showRemoveFromQueue = inQueue !== null;
+  const showRemoveFromPlaylist = inPlaylist !== null && !inPlaylist.isSystemPlaylist;
 
   const handleMenuItemClick = (action: string) => {
     if (action === "add-to-playlist" && onAddToPlaylist) {
@@ -31,6 +51,18 @@ export default function TrackContextMenu({
       return;
     }
     
+    if (action === "remove-from-queue" && onRemoveFromQueue) {
+      onRemoveFromQueue();
+      onClose();
+      return;
+    }
+    
+    if (action === "remove-from-playlist" && onRemoveFromPlaylist) {
+      onRemoveFromPlaylist();
+      onClose();
+      return;
+    }
+
     console.log(`Context menu action: ${action}`);
     // TODO: Implement other actions
     onClose();
@@ -79,12 +111,14 @@ export default function TrackContextMenu({
         <ListItemText>Play After Current Song</ListItemText>
       </MenuItem>
 
-      <MenuItem onClick={() => handleMenuItemClick("add-to-current-queue")}>
-        <ListItemIcon>
-          <AddToQueueIcon fontSize="small" />
-        </ListItemIcon>
-        <ListItemText>Add to Current Playing Queue</ListItemText>
-      </MenuItem>
+      {showAddToCurrentQueue && (
+        <MenuItem onClick={() => handleMenuItemClick("add-to-current-queue")}>
+          <ListItemIcon>
+            <AddToQueueIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Add to Current Playing Queue</ListItemText>
+        </MenuItem>
+      )}
 
       <MenuItem onClick={() => handleMenuItemClick("add-to-queue")}>
         <ListItemIcon>
@@ -100,15 +134,25 @@ export default function TrackContextMenu({
         <ListItemText>Add to Playlist...</ListItemText>
       </MenuItem>
 
-      {inQueueOrPlaylist && (
+      {(showRemoveFromQueue || showRemoveFromPlaylist) && (
         <>
           <Divider />
-          <MenuItem onClick={() => handleMenuItemClick("remove")}>
-            <ListItemIcon>
-              <DeleteIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Remove from List</ListItemText>
-          </MenuItem>
+          {showRemoveFromQueue && (
+            <MenuItem onClick={() => handleMenuItemClick("remove-from-queue")}>
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Remove from this Queue</ListItemText>
+            </MenuItem>
+          )}
+          {showRemoveFromPlaylist && (
+            <MenuItem onClick={() => handleMenuItemClick("remove-from-playlist")}>
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Remove from this Playlist</ListItemText>
+            </MenuItem>
+          )}
         </>
       )}
     </Menu>

@@ -19,20 +19,13 @@ export default function ArtistsView({ searchQuery = "", initialArtistName, initi
     const [artistTracks, setArtistTracks] = useState<Track[]>([]);
     const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
 
+    // Load artists on mount
     useEffect(() => {
         const loadArtists = async () => {
             try {
                 const allArtists = await libraryApi.getAllArtists();
                 setArtists(allArtists);
                 setFilteredArtists(allArtists);
-
-                // Auto-select artist if initialArtistName is provided
-                if (initialArtistName) {
-                    const artist = allArtists.find(a => a.name === initialArtistName);
-                    if (artist) {
-                        handleArtistClick(artist);
-                    }
-                }
             } catch (error) {
                 console.error("Failed to load artists:", error);
             } finally {
@@ -41,7 +34,19 @@ export default function ArtistsView({ searchQuery = "", initialArtistName, initi
         };
 
         loadArtists();
-    }, [initialArtistName]);
+    }, []);
+
+    // Handle navigation from Now Playing view
+    useEffect(() => {
+        if (initialArtistName && artists.length > 0) {
+            const artist = artists.find(a => a.name === initialArtistName);
+            if (artist) {
+                // Update trackIdToFlash before navigating
+                setTrackIdToFlash(initialTrackId);
+                handleArtistClick(artist);
+            }
+        }
+    }, [initialArtistName, initialTrackId, artists]);
 
     const handleArtistClick = async (artist: Artist) => {
         setSelectedArtist(artist);

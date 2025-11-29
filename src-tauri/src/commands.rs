@@ -566,6 +566,12 @@ pub fn create_playlist(state: State<'_, AppState>, name: String, description: Op
 }
 
 #[tauri::command]
+pub fn rename_playlist(state: State<'_, AppState>, playlist_id: i64, new_name: String) -> Result<(), String> {
+    DbOperations::rename_playlist(&state.db, playlist_id, &new_name)
+        .map_err(|e| format!("Failed to rename playlist: {}", e))
+}
+
+#[tauri::command]
 pub fn add_track_to_playlist(state: State<'_, AppState>, playlist_id: i64, track_id: i64) -> Result<(), String> {
     DbOperations::add_track_to_playlist(&state.db, playlist_id, track_id)
         .map_err(|e| format!("Failed to add track to playlist: {}", e))
