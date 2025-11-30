@@ -43,6 +43,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     await queueApi.updateQueueCurrentIndex(queueId, trackIndex);
   };
 
+  // Helper function to update Media Session metadata
+  const updateMediaSessionMetadata = useCallback((track: Track, artUrl: string | null) => {
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist || "Unknown Artist",
+        album: track.album || "Unknown Album",
+        artwork: artUrl ? [{ src: artUrl, sizes: "512x512", type: "image/jpeg" }] : [],
+      });
+      console.log(`[PlayerContext] Updated Media Session metadata: ${track.title}`);
+    }
+  }, []);
+
   const playNext = useCallback(async () => {
     if (currentQueueId === null || currentTrackIndex === null) {
       console.log('[PlayerContext] playNext - no active queue or track index');
@@ -67,17 +80,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         await updateQueuePosition(currentQueueId, nextIndex);
         setCurrentTrack(nextTrack);
         
-        // Load album art
+        // Load album art and update Media Session
+        let artUrl: string | null = null;
         try {
           const artBytes = await libraryApi.getAlbumArt(nextTrack.file_path);
           if (artBytes && artBytes.length > 0) {
             const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
-            const url = URL.createObjectURL(blob);
+            artUrl = URL.createObjectURL(blob);
             setAlbumArt(prevArt => {
               if (prevArt) {
                 URL.revokeObjectURL(prevArt);
               }
-              return url;
+              return artUrl;
             });
           } else {
             setAlbumArt(null);
@@ -87,13 +101,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           setAlbumArt(null);
         }
 
+        // Update Media Session metadata immediately
+        updateMediaSessionMetadata(nextTrack, artUrl);
+
         // Play the track
         await playerApi.playFile(nextTrack.file_path);
       }
     } catch (error) {
       console.error('Failed to play next track:', error);
     }
-  }, [currentQueueId, currentTrackIndex, shuffleSeed, shuffleAnchor, updateQueuePosition]);
+  }, [currentQueueId, currentTrackIndex, shuffleSeed, shuffleAnchor, updateQueuePosition, updateMediaSessionMetadata]);
 
   const playPrevious = useCallback(async () => {
     if (currentQueueId === null || currentTrackIndex === null) {
@@ -119,17 +136,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         await updateQueuePosition(currentQueueId, prevIndex);
         setCurrentTrack(prevTrack);
         
-        // Load album art
+        // Load album art and update Media Session
+        let artUrl: string | null = null;
         try {
           const artBytes = await libraryApi.getAlbumArt(prevTrack.file_path);
           if (artBytes && artBytes.length > 0) {
             const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
-            const url = URL.createObjectURL(blob);
+            artUrl = URL.createObjectURL(blob);
             setAlbumArt(prevArt => {
               if (prevArt) {
                 URL.revokeObjectURL(prevArt);
               }
-              return url;
+              return artUrl;
             });
           } else {
             setAlbumArt(null);
@@ -139,13 +157,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           setAlbumArt(null);
         }
 
+        // Update Media Session metadata immediately
+        updateMediaSessionMetadata(prevTrack, artUrl);
+
         // Play the track
         await playerApi.playFile(prevTrack.file_path);
       }
     } catch (error) {
       console.error('Failed to play previous track:', error);
     }
-  }, [currentQueueId, currentTrackIndex, shuffleSeed, shuffleAnchor, updateQueuePosition]);
+  }, [currentQueueId, currentTrackIndex, shuffleSeed, shuffleAnchor, updateQueuePosition, updateMediaSessionMetadata]);
 
   const toggleShuffle = useCallback(async () => {
     if (currentQueueId === null || currentTrackIndex === null || !currentTrack) {

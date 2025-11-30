@@ -137,6 +137,25 @@ class AudioPlayer {
   private notifyStateChange(): void {
     const state = this.getState();
     this.stateCallbacks.forEach(callback => callback(state));
+    
+    // Update Media Session position state for Windows SMTC seekbar sync
+    if ("mediaSession" in navigator && this.audio) {
+      try {
+        const duration = this.audio.duration;
+        const position = this.audio.currentTime;
+        
+        // Only update if we have valid duration
+        if (duration && !isNaN(duration) && duration > 0) {
+          navigator.mediaSession.setPositionState({
+            duration: duration,
+            playbackRate: this.audio.playbackRate || 1,
+            position: Math.min(position, duration), // Ensure position doesn't exceed duration
+          });
+        }
+      } catch (e) {
+        // Ignore errors - some browsers don't support setPositionState
+      }
+    }
   }
 
   private notifyTrackEnded(): void {
