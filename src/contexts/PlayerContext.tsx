@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { playerApi, libraryApi, queueApi, Track } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface PlayerContextType {
   currentTrack: Track | null;
@@ -360,6 +361,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     
     loadActiveQueueTrack();
   }, []); // Run only once on mount
+
+  // Update window title when current track changes
+  useEffect(() => {
+    const updateWindowTitle = async () => {
+      try {
+        const window = getCurrentWindow();
+        if (currentTrack) {
+          const artist = currentTrack.artist || "Unknown Artist";
+          await window.setTitle(`${currentTrack.title} by ${artist} - Musicsloth`);
+        } else {
+          await window.setTitle("Musicsloth");
+        }
+      } catch (error) {
+        console.error("Failed to update window title:", error);
+      }
+    };
+    
+    updateWindowTitle();
+  }, [currentTrack]);
 
   // Set up track ended listener to auto-play next track or repeat
   useEffect(() => {
