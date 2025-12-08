@@ -19,7 +19,7 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
-  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition } = usePlayer();
+  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition, toggleShuffle } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -192,6 +192,35 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
     await loadQueueTracks(queue.id);
   };
 
+  const handleToggleShuffle = async () => {
+    if (!selectedQueue) return;
+
+    try {
+      if (selectedQueue.is_active) {
+        // For active queue, use PlayerContext's toggleShuffle which handles
+        // anchor position, current track index, and state updates properly
+        await toggleShuffle();
+        
+        // Update the selectedQueue state - get the new seed from DB
+        const newSeed = await queueApi.getQueueShuffleSeed(selectedQueue.id);
+        setSelectedQueue({ ...selectedQueue, shuffle_seed: newSeed });
+      } else {
+        // For non-active queues, just toggle the seed in DB
+        // The anchor will be set when this queue becomes active and starts playing
+        const newSeed = await queueApi.toggleQueueShuffle(selectedQueue.id);
+        setSelectedQueue({ ...selectedQueue, shuffle_seed: newSeed });
+      }
+      
+      // Reload tracks to show new order
+      await loadQueueTracks(selectedQueue.id, true);
+      
+      // Refresh queues list
+      await loadQueues(true);
+    } catch (error) {
+      console.error("Failed to toggle shuffle:", error);
+    }
+  };
+
   const handlePlayQueue = async () => {
     if (!selectedQueue) return;
 
@@ -256,6 +285,9 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
 
           // Set the next queue as active
           await queueApi.setActiveQueue(nextQueue.id);
+
+          // Sync shuffle state from the new active queue
+          await loadShuffleStateFromQueue(nextQueue.id);
 
           // Resume playback from that track
           if (trackToPlay) {
@@ -490,9 +522,6 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                 </FormControl>) : (<Typography component="h2" sx={{ margin: "0px", fontSize: "18px" }}>
                   {selectedQueue.name}
                 </Typography>)}
-                {selectedQueue.shuffle_seed !== 1 && (
-                  <ShuffleIcon sx={{ color: "primary.main", fontSize: 18 }} />
-                )}
               </Box>
               <Box sx={{ display: "flex", gap: 1.5 }}>
                 <IconButton
@@ -505,6 +534,18 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   title="Locate active track"
                 >
                   <MyLocationIcon sx={{ fontSize: "18px" }} />
+                </IconButton>
+                <IconButton
+                  onClick={handleToggleShuffle}
+                  disabled={queueTracks.length === 0}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    color: selectedQueue.shuffle_seed !== 1 ? "primary.main" : "text.secondary",
+                  }}
+                  title={selectedQueue.shuffle_seed !== 1 ? "Disable shuffle" : "Enable shuffle"}
+                >
+                  <ShuffleIcon sx={{ fontSize: "18px" }} />
                 </IconButton>
                 <IconButton
                   onClick={handlePlayQueue}
