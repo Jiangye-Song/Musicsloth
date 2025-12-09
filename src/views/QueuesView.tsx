@@ -19,7 +19,7 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
-  const { currentQueueId, shuffleSeed, currentTrack, currentTrackIndex, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition, toggleShuffle } = usePlayer();
+  const { currentQueueId, shuffleSeed, currentTrackIndex, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition, toggleShuffle } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
@@ -582,7 +582,6 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                     showPlayingIndicator={true}
                     onQueueActivated={() => loadQueues(true)}
                     showSearch={true}
-                    activeTrackFilePath={selectedQueue.is_active ? currentTrack?.file_path : null}
                   />
                 </div>
               </>
