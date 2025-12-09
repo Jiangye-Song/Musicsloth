@@ -277,21 +277,26 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
         const nextQueue = await queueApi.getNextQueue(queueId);
 
         if (nextQueue) {
-          // Get the current track index from the next queue
-          const currentIndex = await queueApi.getQueueCurrentIndex(nextQueue.id);
-
-          // Get the track at that position
-          const trackToPlay = await queueApi.getQueueTrackAtPosition(nextQueue.id, currentIndex);
-
-          // Set the next queue as active
+          // Set the next queue as active first
           await queueApi.setActiveQueue(nextQueue.id);
 
-          // Sync shuffle state from the new active queue
+          // Load shuffle state for this queue (to sync PlayerContext)
           await loadShuffleStateFromQueue(nextQueue.id);
 
-          // Resume playback from that track
+          // Get the saved position and shuffle state
+          const currentIndex = await queueApi.getQueueCurrentIndex(nextQueue.id);
+          const seed = await queueApi.getQueueShuffleSeed(nextQueue.id);
+          const anchor = await queueApi.getQueueShuffleAnchor(nextQueue.id);
+
+          // Get the track at the shuffled position
+          const trackToPlay = await queueApi.getQueueTrackAtShuffledPosition(nextQueue.id, currentIndex, seed, anchor);
+
+          // Play from the saved position
           if (trackToPlay) {
             await playerApi.playFile(trackToPlay.file_path);
+
+            // Update PlayerContext with the new queue position
+            await updateQueuePosition(nextQueue.id, currentIndex);
           }
         }
       }
