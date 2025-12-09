@@ -642,11 +642,15 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             {visibleTracks.map((track, visibleIndex) => {
               const albumArt = albumArtCacheRef.current.get(track.file_path);
               const actualIndex = visibleStart + visibleIndex;
+              // For queues, use position-based highlighting to support duplicate tracks
+              // For non-queue contexts (library, playlist), use file_path matching
               const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
-              // For queues, always use position-based comparison to support duplicate tracks
               const isQueueCurrentTrack = contextType === "queue" && isActiveQueue && actualIndex === queueCurrentIndex;
               const isInactiveQueue = contextType === "queue" && !isActiveQueue;
-              const shouldHighlight = isPlaying || isQueueCurrentTrack;
+              // In queue context, only highlight by position (not by file_path) to handle duplicates
+              const shouldHighlight = contextType === "queue" 
+                ? isQueueCurrentTrack 
+                : isPlaying;
               const isFlashing = flashingIndex === actualIndex;
 
               // Debug log for first few tracks
