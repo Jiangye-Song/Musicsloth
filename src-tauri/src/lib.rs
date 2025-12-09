@@ -111,6 +111,7 @@ pub fn run() {
             commands::get_playlist_tracks,
             commands::append_tracks_to_queue,
             commands::insert_tracks_after_position,
+            commands::remove_track_at_position,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

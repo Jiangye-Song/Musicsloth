@@ -1815,4 +1815,28 @@ impl DbOperations {
         tx.commit()?;
         Ok(())
     }
+
+    /// Remove a track at a specific position from a queue
+    pub fn remove_track_at_position(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        position: i32,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+
+        // Delete the track at the specified position
+        conn.execute(
+            "DELETE FROM queue_tracks WHERE queue_id = ?1 AND position = ?2",
+            params![queue_id, position],
+        )?;
+
+        // Shift all positions after the removed track down by 1
+        conn.execute(
+            "UPDATE queue_tracks SET position = position - 1 WHERE queue_id = ?1 AND position > ?2",
+            params![queue_id, position],
+        )?;
+
+        Ok(())
+    }
 }

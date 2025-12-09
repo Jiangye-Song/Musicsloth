@@ -46,7 +46,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [flashingIndex, setFlashingIndex] = useState<number | null>(null);
   const [dropdownAlbumArtCache, setDropdownAlbumArtCache] = useState<Map<string, string>>(new Map());
   const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
-  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState<{ id: number; title: string } | null>(null);
+  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState<{ id: number; title: string; position: number } | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showQueueDialog, setShowQueueDialog] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -666,7 +666,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                   onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setSelectedTrackForMenu({ id: track.id, title: track.title });
+                    setSelectedTrackForMenu({ id: track.id, title: track.title, position: actualIndex });
                     setContextMenu({
                       top: e.clientY,
                       left: e.clientX,
@@ -824,6 +824,16 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         onAddToPlaylist={() => {
           setShowPlaylistDialog(true);
           setContextMenu(null);
+        }}
+        onRemoveFromQueue={async () => {
+          if (!selectedTrackForMenu || queueId === undefined) return;
+          try {
+            await queueApi.removeTrackAtPosition(queueId, selectedTrackForMenu.position);
+            // Notify that queue tracks changed
+            onQueueTracksChanged?.(queueId);
+          } catch (err) {
+            console.error("Failed to remove track from queue:", err);
+          }
         }}
       />
 

@@ -278,6 +278,10 @@ export const queueApi = {
   insertTracksAfterPosition: async (queueId: number, trackIds: number[], afterPosition: number): Promise<void> => {
     return await invoke("insert_tracks_after_position", { queueId, trackIds, afterPosition });
   },
+
+  removeTrackAtPosition: async (queueId: number, position: number): Promise<void> => {
+    return await invoke("remove_track_at_position", { queueId, position });
+  },
 };
 
 export const playlistApi = {

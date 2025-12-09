@@ -618,3 +618,9 @@ pub fn insert_tracks_after_position(state: State<'_, AppState>, queue_id: i64, t
     DbOperations::insert_tracks_after_position(&state.db, queue_id, &track_ids, after_position)
         .map_err(|e| format!("Failed to insert tracks after position: {}", e))
 }
+
+#[tauri::command]
+pub fn remove_track_at_position(state: State<'_, AppState>, queue_id: i64, position: i32) -> Result<(), String> {
+    DbOperations::remove_track_at_position(&state.db, queue_id, position)
+        .map_err(|e| format!("Failed to remove track at position: {}", e))
+}
