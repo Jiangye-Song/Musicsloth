@@ -135,7 +135,7 @@ export default function TrackContextMenu({
           <ListItemIcon>
             <CheckBoxOutlineBlankIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Start Multi-select</ListItemText>
+          <ListItemText>Select</ListItemText>
         </MenuItem>
       )}
 
