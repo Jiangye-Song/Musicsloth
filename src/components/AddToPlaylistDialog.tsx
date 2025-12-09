@@ -19,14 +19,14 @@ import TextInputDialog from "./TextInputDialog";
 interface AddToPlaylistDialogProps {
   open: boolean;
   onClose: () => void;
-  trackId: number;
-  trackTitle: string;
+  trackIds: number[]; // Support multiple track IDs
+  trackTitle: string; // Display title (can be "X tracks" for multi-select)
 }
 
 export default function AddToPlaylistDialog({
   open,
   onClose,
-  trackId,
+  trackIds,
   trackTitle,
 }: AddToPlaylistDialogProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -56,10 +56,13 @@ export default function AddToPlaylistDialog({
 
   const handleAddToPlaylist = async (playlistId: number) => {
     try {
-      await playlistApi.addTrackToPlaylist(playlistId, trackId);
+      // Add all tracks to the playlist
+      for (const trackId of trackIds) {
+        await playlistApi.addTrackToPlaylist(playlistId, trackId);
+      }
       onClose();
     } catch (err: any) {
-      console.error("Failed to add track to playlist:", err);
+      console.error("Failed to add track(s) to playlist:", err);
       // Error will be logged to console - could add a Snackbar here for better UX
       // Still close the dialog on error for now
       onClose();

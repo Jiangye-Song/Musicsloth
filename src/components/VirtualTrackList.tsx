@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { libraryApi, Track, playerApi, queueApi } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
-import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener } from "@mui/material";
+import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener, Checkbox, Button, IconButton } from "@mui/material";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
 import TrackContextMenu from "./TrackContextMenu";
 import AddToPlaylistDialog from "./AddToPlaylistDialog";
 import AddToQueueDialog from "./AddToQueueDialog";
@@ -49,6 +50,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [selectedTrackForMenu, setSelectedTrackForMenu] = useState<{ id: number; title: string; position: number } | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showQueueDialog, setShowQueueDialog] = useState(false);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedPositions, setSelectedPositions] = useState<Set<number>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -363,7 +366,50 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showDropdown]);
 
+  // Toggle selection of a track in multi-select mode
+  const toggleTrackSelection = (position: number) => {
+    setSelectedPositions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(position)) {
+        newSet.delete(position);
+      } else {
+        newSet.add(position);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all visible tracks
+  const selectAllTracks = () => {
+    setSelectedPositions(new Set(tracks.map((_, i) => i)));
+  };
+
+  // Clear selection and exit multi-select mode
+  const exitMultiSelectMode = () => {
+    setIsMultiSelectMode(false);
+    setSelectedPositions(new Set());
+  };
+
+  // Get selected track IDs (for bulk operations)
+  const getSelectedTrackIds = (): number[] => {
+    return Array.from(selectedPositions)
+      .sort((a, b) => a - b)
+      .map(pos => tracks[pos]?.id)
+      .filter((id): id is number => id !== undefined);
+  };
+
+  // Get selected positions as sorted array
+  const getSelectedPositionsSorted = (): number[] => {
+    return Array.from(selectedPositions).sort((a, b) => a - b);
+  };
+
   const handlePlayTrack = async (track: Track, index: number) => {
+    // In multi-select mode, toggle selection instead of playing
+    if (isMultiSelectMode) {
+      toggleTrackSelection(index);
+      return;
+    }
+
     try {
       if (contextType === "queue" && queueId !== undefined) {
         // If we're in a queue view, just play the track directly
@@ -490,6 +536,105 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative" }}>
+      {/* Multi-select Action Bar */}
+      {isMultiSelectMode && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            p: 1,
+            bgcolor: "primary.dark",
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+        >
+          <IconButton size="small" onClick={exitMultiSelectMode} sx={{ color: "white" }}>
+            <CloseIcon />
+          </IconButton>
+          <Typography sx={{ color: "white", fontWeight: 500 }}>
+            {selectedPositions.size} selected
+          </Typography>
+          <Button size="small" onClick={selectAllTracks} sx={{ color: "white", ml: 1 }}>
+            Select All
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            size="small"
+            variant="contained"
+            disabled={selectedPositions.size === 0}
+            onClick={async () => {
+              if (currentQueueId === null) return;
+              try {
+                const trackIds = getSelectedTrackIds();
+                const currentIdx = currentTrackIndex ?? 0;
+                await queueApi.insertTracksAfterPosition(currentQueueId, trackIds, currentIdx);
+                onQueueTracksChanged?.(currentQueueId);
+                exitMultiSelectMode();
+              } catch (err) {
+                console.error("Failed to insert tracks:", err);
+              }
+            }}
+            sx={{ mr: 1 }}
+          >
+            Play Next
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={selectedPositions.size === 0}
+            onClick={async () => {
+              if (currentQueueId === null) return;
+              try {
+                const trackIds = getSelectedTrackIds();
+                await queueApi.appendTracksToQueue(currentQueueId, trackIds);
+                onQueueTracksChanged?.(currentQueueId);
+                exitMultiSelectMode();
+              } catch (err) {
+                console.error("Failed to add tracks:", err);
+              }
+            }}
+            sx={{ mr: 1 }}
+          >
+            Add to Queue
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={selectedPositions.size === 0}
+            onClick={() => {
+              setShowPlaylistDialog(true);
+            }}
+            sx={{ mr: 1 }}
+          >
+            Add to Playlist
+          </Button>
+          {contextType === "queue" && queueId !== undefined && (
+            <Button
+              size="small"
+              variant="contained"
+              color="error"
+              disabled={selectedPositions.size === 0}
+              onClick={async () => {
+                try {
+                  // Remove in reverse order to maintain correct positions
+                  const positions = getSelectedPositionsSorted().reverse();
+                  for (const pos of positions) {
+                    await queueApi.removeTrackAtPosition(queueId, pos);
+                  }
+                  onQueueTracksChanged?.(queueId);
+                  exitMultiSelectMode();
+                } catch (err) {
+                  console.error("Failed to remove tracks:", err);
+                }
+              }}
+            >
+              Remove
+            </Button>
+          )}
+        </Box>
+      )}
+
       {/* Search Bar with Dropdown */}
       {showSearch && (
         <ClickAwayListener onClickAway={() => setShowDropdown(false)}>
@@ -653,6 +798,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 ? isQueueCurrentTrack 
                 : isPlaying;
               const isFlashing = flashingIndex === actualIndex;
+              const isSelected = isMultiSelectMode && selectedPositions.has(actualIndex);
 
               // Debug log for first few tracks
               if (actualIndex < 3) {
@@ -682,9 +828,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                     borderColor: "divider",
                     cursor: "pointer",
                     transition: "background-color 0.2s",
-                    bgcolor: isFlashing ? "primary.dark" : (shouldHighlight ? "action.selected" : "transparent"),
+                    bgcolor: isFlashing ? "primary.dark" : (isSelected ? "action.selected" : (shouldHighlight ? "action.selected" : "transparent")),
                     borderLeft: 3,
-                    borderLeftColor: shouldHighlight ? "primary.main" : "transparent",
+                    borderLeftColor: isSelected ? "primary.main" : (shouldHighlight ? "primary.main" : "transparent"),
                     opacity: isInactiveQueue ? 0.6 : 1,
                     animation: isFlashing ? "flash 1s ease-in-out" : "none",
                     "@keyframes flash": {
@@ -693,10 +839,20 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                       "100%": { bgcolor: "transparent" },
                     },
                     "&:hover": {
-                      bgcolor: shouldHighlight ? "action.selected" : "action.hover",
+                      bgcolor: shouldHighlight || isSelected ? "action.selected" : "action.hover",
                     },
                   }}
                 >
+                  {/* Checkbox for multi-select mode */}
+                  {isMultiSelectMode && (
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={() => toggleTrackSelection(actualIndex)}
+                      onClick={(e) => e.stopPropagation()}
+                      sx={{ mr: 1 }}
+                    />
+                  )}
+
                   {/* Album Art */}
                   <Box
                     sx={{
@@ -795,6 +951,13 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           isSystemPlaylist: isSystemPlaylist
         } : null}
         hasActiveQueue={currentQueueId !== null}
+        onStartMultiSelect={() => {
+          if (selectedTrackForMenu) {
+            // Start multi-select with the right-clicked track already selected
+            setIsMultiSelectMode(true);
+            setSelectedPositions(new Set([selectedTrackForMenu.position]));
+          }
+        }}
         onPlayNext={async () => {
           if (!selectedTrackForMenu || currentQueueId === null) return;
           try {
@@ -843,9 +1006,12 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         onClose={() => {
           setShowPlaylistDialog(false);
           setSelectedTrackForMenu(null);
+          if (isMultiSelectMode) {
+            exitMultiSelectMode();
+          }
         }}
-        trackId={selectedTrackForMenu?.id || 0}
-        trackTitle={selectedTrackForMenu?.title || ""}
+        trackIds={isMultiSelectMode ? getSelectedTrackIds() : (selectedTrackForMenu ? [selectedTrackForMenu.id] : [])}
+        trackTitle={isMultiSelectMode ? `${selectedPositions.size} tracks` : (selectedTrackForMenu?.title || "")}
       />
 
       {/* Add to Queue Dialog */}

@@ -22,6 +22,7 @@ interface TrackContextMenuProps {
   } | null;
   // Whether there's an active queue to add to (false if no queues exist)
   hasActiveQueue?: boolean;
+  onStartMultiSelect?: () => void;
   onPlayNext?: () => void;
   onAddToCurrentQueue?: () => void;
   onAddToQueue?: () => void;
@@ -36,6 +37,7 @@ export default function TrackContextMenu({
   inQueue = null,
   inPlaylist = null,
   hasActiveQueue = false,
+  onStartMultiSelect,
   onPlayNext,
   onAddToCurrentQueue,
   onAddToQueue,
@@ -51,6 +53,12 @@ export default function TrackContextMenu({
   const showRemoveFromPlaylist = inPlaylist !== null && !inPlaylist.isSystemPlaylist;
 
   const handleMenuItemClick = (action: string) => {
+    if (action === "multiselect" && onStartMultiSelect) {
+      onStartMultiSelect();
+      onClose();
+      return;
+    }
+
     if (action === "play-next" && onPlayNext) {
       onPlayNext();
       onClose();
