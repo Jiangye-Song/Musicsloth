@@ -22,6 +22,8 @@ interface TrackContextMenuProps {
   } | null;
   // Whether there's an active queue to add to (false if no queues exist)
   hasActiveQueue?: boolean;
+  // Whether multi-select mode is currently active
+  isMultiSelectMode?: boolean;
   onStartMultiSelect?: () => void;
   onPlayNext?: () => void;
   onAddToCurrentQueue?: () => void;
@@ -37,6 +39,7 @@ export default function TrackContextMenu({
   inQueue = null,
   inPlaylist = null,
   hasActiveQueue = false,
+  isMultiSelectMode = false,
   onStartMultiSelect,
   onPlayNext,
   onAddToCurrentQueue,
@@ -127,12 +130,14 @@ export default function TrackContextMenu({
         <ListItemText>Song Info</ListItemText>
       </MenuItem>
 
-      <MenuItem onClick={() => handleMenuItemClick("multiselect")}>
-        <ListItemIcon>
-          <CheckBoxOutlineBlankIcon fontSize="small" />
-        </ListItemIcon>
-        <ListItemText>Start Multi-select</ListItemText>
-      </MenuItem>
+      {!isMultiSelectMode && (
+        <MenuItem onClick={() => handleMenuItemClick("multiselect")}>
+          <ListItemIcon>
+            <CheckBoxOutlineBlankIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Start Multi-select</ListItemText>
+        </MenuItem>
+      )}
 
       <Divider />
 

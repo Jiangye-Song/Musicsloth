@@ -555,83 +555,45 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           <Typography sx={{ color: "white", fontWeight: 500 }}>
             {selectedPositions.size} selected
           </Typography>
-          <Button size="small" onClick={selectAllTracks} sx={{ color: "white", ml: 1 }}>
+          <Box sx={{ flex: 1 }} />
+          <Button size="small" onClick={selectAllTracks} sx={{ color: "white" }}>
             Select All
           </Button>
-          <Box sx={{ flex: 1 }} />
-          <Button
-            size="small"
-            variant="contained"
-            disabled={selectedPositions.size === 0}
-            onClick={async () => {
-              if (currentQueueId === null) return;
-              try {
-                const trackIds = getSelectedTrackIds();
-                const currentIdx = currentTrackIndex ?? 0;
-                await queueApi.insertTracksAfterPosition(currentQueueId, trackIds, currentIdx);
-                onQueueTracksChanged?.(currentQueueId);
-                exitMultiSelectMode();
-              } catch (err) {
-                console.error("Failed to insert tracks:", err);
-              }
-            }}
-            sx={{ mr: 1 }}
-          >
-            Play Next
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={selectedPositions.size === 0}
-            onClick={async () => {
-              if (currentQueueId === null) return;
-              try {
-                const trackIds = getSelectedTrackIds();
-                await queueApi.appendTracksToQueue(currentQueueId, trackIds);
-                onQueueTracksChanged?.(currentQueueId);
-                exitMultiSelectMode();
-              } catch (err) {
-                console.error("Failed to add tracks:", err);
-              }
-            }}
-            sx={{ mr: 1 }}
-          >
-            Add to Queue
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={selectedPositions.size === 0}
+          <Button 
+            size="small" 
             onClick={() => {
-              setShowPlaylistDialog(true);
-            }}
-            sx={{ mr: 1 }}
-          >
-            Add to Playlist
-          </Button>
-          {contextType === "queue" && queueId !== undefined && (
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              disabled={selectedPositions.size === 0}
-              onClick={async () => {
-                try {
-                  // Remove in reverse order to maintain correct positions
-                  const positions = getSelectedPositionsSorted().reverse();
-                  for (const pos of positions) {
-                    await queueApi.removeTrackAtPosition(queueId, pos);
-                  }
-                  onQueueTracksChanged?.(queueId);
-                  exitMultiSelectMode();
-                } catch (err) {
-                  console.error("Failed to remove tracks:", err);
+              // Invert selection
+              const newSet = new Set<number>();
+              for (let i = 0; i < tracks.length; i++) {
+                if (!selectedPositions.has(i)) {
+                  newSet.add(i);
                 }
-              }}
-            >
-              Remove
-            </Button>
-          )}
+              }
+              setSelectedPositions(newSet);
+            }} 
+            sx={{ color: "white" }}
+          >
+            Invert
+          </Button>
+          <Button 
+            size="small" 
+            disabled={selectedPositions.size < 2}
+            onClick={() => {
+              // Select in-between first and last selected
+              const positions = getSelectedPositionsSorted();
+              if (positions.length < 2) return;
+              const first = positions[0];
+              const last = positions[positions.length - 1];
+              const newSet = new Set<number>();
+              for (let i = first; i <= last; i++) {
+                newSet.add(i);
+              }
+              setSelectedPositions(newSet);
+            }} 
+            sx={{ color: "white" }}
+          >
+            Select In-between
+          </Button>
         </Box>
       )}
 
@@ -951,6 +913,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           isSystemPlaylist: isSystemPlaylist
         } : null}
         hasActiveQueue={currentQueueId !== null}
+        isMultiSelectMode={isMultiSelectMode}
         onStartMultiSelect={() => {
           if (selectedTrackForMenu) {
             // Start multi-select with the right-clicked track already selected
