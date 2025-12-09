@@ -606,3 +606,15 @@ pub fn get_playlist_tracks(state: State<'_, AppState>, playlist_id: i64) -> Resu
     DbOperations::get_playlist_tracks(&state.db, playlist_id)
         .map_err(|e| format!("Failed to get playlist tracks: {}", e))
 }
+
+#[tauri::command]
+pub fn append_tracks_to_queue(state: State<'_, AppState>, queue_id: i64, track_ids: Vec<i64>) -> Result<(), String> {
+    DbOperations::append_tracks_to_queue(&state.db, queue_id, &track_ids)
+        .map_err(|e| format!("Failed to append tracks to queue: {}", e))
+}
+
+#[tauri::command]
+pub fn insert_tracks_after_position(state: State<'_, AppState>, queue_id: i64, track_ids: Vec<i64>, after_position: i32) -> Result<(), String> {
+    DbOperations::insert_tracks_after_position(&state.db, queue_id, &track_ids, after_position)
+        .map_err(|e| format!("Failed to insert tracks after position: {}", e))
+}

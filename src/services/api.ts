@@ -270,6 +270,14 @@ export const queueApi = {
   findShuffledPosition: async (originalIndex: number, seed: number, queueLength: number, anchorPosition: number): Promise<number> => {
     return await invoke("find_shuffled_position", { originalIndex, seed, queueLength, anchorPosition });
   },
+
+  appendTracksToQueue: async (queueId: number, trackIds: number[]): Promise<void> => {
+    return await invoke("append_tracks_to_queue", { queueId, trackIds });
+  },
+
+  insertTracksAfterPosition: async (queueId: number, trackIds: number[], afterPosition: number): Promise<void> => {
+    return await invoke("insert_tracks_after_position", { queueId, trackIds, afterPosition });
+  },
 };
 
 export const playlistApi = {

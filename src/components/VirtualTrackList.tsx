@@ -6,6 +6,7 @@ import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import SearchIcon from "@mui/icons-material/Search";
 import TrackContextMenu from "./TrackContextMenu";
 import AddToPlaylistDialog from "./AddToPlaylistDialog";
+import AddToQueueDialog from "./AddToQueueDialog";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -45,8 +46,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [flashingIndex, setFlashingIndex] = useState<number | null>(null);
   const [dropdownAlbumArtCache, setDropdownAlbumArtCache] = useState<Map<string, string>>(new Map());
   const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
-  const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState<{ id: number; title: string } | null>(null);
+  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState<{ id: number; title: string } | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
+  const [showQueueDialog, setShowQueueDialog] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -662,7 +664,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                   onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setSelectedTrackForPlaylist({ id: track.id, title: track.title });
+                    setSelectedTrackForMenu({ id: track.id, title: track.title });
                     setContextMenu({
                       top: e.clientY,
                       left: e.clientX,
@@ -777,9 +779,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         anchorPosition={contextMenu}
         onClose={() => {
           setContextMenu(null);
-          // Only clear selectedTrackForPlaylist if playlist dialog is not being opened
-          if (!showPlaylistDialog) {
-            setSelectedTrackForPlaylist(null);
+          // Only clear selectedTrackForMenu if no dialog is being opened
+          if (!showPlaylistDialog && !showQueueDialog) {
+            setSelectedTrackForMenu(null);
           }
         }}
         inQueue={contextType === "queue" && queueId !== undefined ? {
@@ -791,9 +793,31 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           isSystemPlaylist: isSystemPlaylist
         } : null}
         hasActiveQueue={currentQueueId !== null}
+        onPlayNext={async () => {
+          if (!selectedTrackForMenu || currentQueueId === null) return;
+          try {
+            // Insert after current track index
+            const currentIdx = currentTrackIndex ?? 0;
+            await queueApi.insertTracksAfterPosition(currentQueueId, [selectedTrackForMenu.id], currentIdx);
+          } catch (err) {
+            console.error("Failed to insert track after current:", err);
+          }
+        }}
+        onAddToCurrentQueue={async () => {
+          if (!selectedTrackForMenu || currentQueueId === null) return;
+          try {
+            await queueApi.appendTracksToQueue(currentQueueId, [selectedTrackForMenu.id]);
+          } catch (err) {
+            console.error("Failed to add track to current queue:", err);
+          }
+        }}
+        onAddToQueue={() => {
+          setShowQueueDialog(true);
+          setContextMenu(null);
+        }}
         onAddToPlaylist={() => {
           setShowPlaylistDialog(true);
-          setContextMenu(null); // Close context menu but keep selectedTrackForPlaylist
+          setContextMenu(null);
         }}
       />
 
@@ -802,10 +826,21 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         open={showPlaylistDialog}
         onClose={() => {
           setShowPlaylistDialog(false);
-          setSelectedTrackForPlaylist(null);
+          setSelectedTrackForMenu(null);
         }}
-        trackId={selectedTrackForPlaylist?.id || 0}
-        trackTitle={selectedTrackForPlaylist?.title || ""}
+        trackId={selectedTrackForMenu?.id || 0}
+        trackTitle={selectedTrackForMenu?.title || ""}
+      />
+
+      {/* Add to Queue Dialog */}
+      <AddToQueueDialog
+        open={showQueueDialog}
+        onClose={() => {
+          setShowQueueDialog(false);
+          setSelectedTrackForMenu(null);
+        }}
+        trackId={selectedTrackForMenu?.id || 0}
+        trackTitle={selectedTrackForMenu?.title || ""}
       />
     </div>
   );

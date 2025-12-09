@@ -1753,4 +1753,66 @@ impl DbOperations {
         
         Ok(tracks)
     }
+
+    /// Append tracks to the end of a queue
+    pub fn append_tracks_to_queue(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_ids: &[i64],
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let mut conn = conn.lock().unwrap();
+
+        // Get current max position
+        let max_position: i32 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(position), -1) FROM queue_tracks WHERE queue_id = ?1",
+                [queue_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(-1);
+
+        let tx = conn.transaction()?;
+
+        for (index, track_id) in track_ids.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![queue_id, track_id, max_position + 1 + index as i32],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Insert tracks after a specific position, shifting existing tracks
+    pub fn insert_tracks_after_position(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_ids: &[i64],
+        after_position: i32,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let mut conn = conn.lock().unwrap();
+
+        let tx = conn.transaction()?;
+
+        // Shift existing tracks after the insertion point
+        let shift_amount = track_ids.len() as i32;
+        tx.execute(
+            "UPDATE queue_tracks SET position = position + ?1 WHERE queue_id = ?2 AND position > ?3",
+            params![shift_amount, queue_id, after_position],
+        )?;
+
+        // Insert new tracks
+        for (index, track_id) in track_ids.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![queue_id, track_id, after_position + 1 + index as i32],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
 }

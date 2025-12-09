@@ -22,6 +22,9 @@ interface TrackContextMenuProps {
   } | null;
   // Whether there's an active queue to add to (false if no queues exist)
   hasActiveQueue?: boolean;
+  onPlayNext?: () => void;
+  onAddToCurrentQueue?: () => void;
+  onAddToQueue?: () => void;
   onAddToPlaylist?: () => void;
   onRemoveFromQueue?: () => void;
   onRemoveFromPlaylist?: () => void;
@@ -33,6 +36,9 @@ export default function TrackContextMenu({
   inQueue = null,
   inPlaylist = null,
   hasActiveQueue = false,
+  onPlayNext,
+  onAddToCurrentQueue,
+  onAddToQueue,
   onAddToPlaylist,
   onRemoveFromQueue,
   onRemoveFromPlaylist,
@@ -45,9 +51,27 @@ export default function TrackContextMenu({
   const showRemoveFromPlaylist = inPlaylist !== null && !inPlaylist.isSystemPlaylist;
 
   const handleMenuItemClick = (action: string) => {
+    if (action === "play-next" && onPlayNext) {
+      onPlayNext();
+      onClose();
+      return;
+    }
+
+    if (action === "add-to-current-queue" && onAddToCurrentQueue) {
+      onAddToCurrentQueue();
+      onClose();
+      return;
+    }
+
+    if (action === "add-to-queue" && onAddToQueue) {
+      onAddToQueue();
+      // Don't call onClose here - dialog will open
+      return;
+    }
+
     if (action === "add-to-playlist" && onAddToPlaylist) {
       onAddToPlaylist();
-      // Don't call onClose here - let onAddToPlaylist handle closing the menu
+      // Don't call onClose here - dialog will open
       return;
     }
     

@@ -109,6 +109,8 @@ pub fn run() {
             commands::rename_playlist,
             commands::add_track_to_playlist,
             commands::get_playlist_tracks,
+            commands::append_tracks_to_queue,
+            commands::insert_tracks_after_position,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
