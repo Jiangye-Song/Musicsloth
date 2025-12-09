@@ -19,6 +19,7 @@ interface AddToQueueDialogProps {
   onClose: () => void;
   trackId: number;
   trackTitle: string;
+  onTrackAdded?: (queueId: number) => void; // Callback when track is successfully added
 }
 
 export default function AddToQueueDialog({
@@ -26,6 +27,7 @@ export default function AddToQueueDialog({
   onClose,
   trackId,
   trackTitle,
+  onTrackAdded,
 }: AddToQueueDialogProps) {
   const [queues, setQueues] = useState<Queue[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,7 @@ export default function AddToQueueDialog({
   const handleAddToQueue = async (queueId: number) => {
     try {
       await queueApi.appendTracksToQueue(queueId, [trackId]);
+      onTrackAdded?.(queueId);
       onClose();
     } catch (err: any) {
       console.error("Failed to add track to queue:", err);

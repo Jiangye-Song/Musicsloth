@@ -581,6 +581,12 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                     isActiveQueue={selectedQueue.is_active}
                     showPlayingIndicator={true}
                     onQueueActivated={() => loadQueues(true)}
+                    onQueueTracksChanged={(changedQueueId) => {
+                      // Reload the queue if it's the one being displayed
+                      if (selectedQueue?.id === changedQueueId) {
+                        loadQueueTracks(changedQueueId, true);
+                      }
+                    }}
                     showSearch={true}
                   />
                 </div>

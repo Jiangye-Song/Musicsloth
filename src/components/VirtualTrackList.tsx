@@ -26,11 +26,12 @@ interface VirtualTrackListProps {
   isSystemPlaylist?: boolean; // Whether this is a system playlist (All Songs, Recently Added, etc.)
   showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
   onQueueActivated?: () => void; // Callback when queue is activated
+  onQueueTracksChanged?: (queueId: number) => void; // Callback when tracks are added/removed from a queue
   showSearch?: boolean; // Whether to show the search bar
   initialTrackId?: number; // Track ID to scroll to and flash on mount
 }
 
-const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, showSearch = false, initialTrackId }, ref) => {
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, onQueueTracksChanged, showSearch = false, initialTrackId }, ref) => {
   // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex, isShuffled, loadShuffleStateFromQueue, setShuffleStateForNewQueue } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
@@ -800,6 +801,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             // Insert after current track index
             const currentIdx = currentTrackIndex ?? 0;
             await queueApi.insertTracksAfterPosition(currentQueueId, [selectedTrackForMenu.id], currentIdx);
+            // Notify that queue tracks changed
+            onQueueTracksChanged?.(currentQueueId);
           } catch (err) {
             console.error("Failed to insert track after current:", err);
           }
@@ -808,6 +811,8 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           if (!selectedTrackForMenu || currentQueueId === null) return;
           try {
             await queueApi.appendTracksToQueue(currentQueueId, [selectedTrackForMenu.id]);
+            // Notify that queue tracks changed
+            onQueueTracksChanged?.(currentQueueId);
           } catch (err) {
             console.error("Failed to add track to current queue:", err);
           }
@@ -842,6 +847,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         }}
         trackId={selectedTrackForMenu?.id || 0}
         trackTitle={selectedTrackForMenu?.title || ""}
+        onTrackAdded={(addedQueueId) => {
+          onQueueTracksChanged?.(addedQueueId);
+        }}
       />
     </div>
   );
