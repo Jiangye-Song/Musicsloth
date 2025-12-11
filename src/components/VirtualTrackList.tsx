@@ -460,8 +460,9 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         await playerApi.playFile(track.file_path);
         console.log(`[Frontend] Track playback started`);
 
-        // Update queue position for new queue
-        await updateQueuePosition(newQueueId, index);
+        // Update queue position - clicked track is always at position 0 after reordering
+        await updateQueuePosition(newQueueId, 0);
+        setQueueCurrentIndex(0);
       }
     } catch (error) {
       console.error("Failed to play track:", error);
@@ -750,13 +751,12 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             {visibleTracks.map((track, visibleIndex) => {
               const albumArt = albumArtCacheRef.current.get(track.file_path);
               const actualIndex = visibleStart + visibleIndex;
-              // For active queues: use file_path matching (same as locate button) for reliable highlighting
-              // For inactive queues: use position-based (shows where playback would resume)
+              // For queues: use position-based highlighting to correctly handle duplicate tracks
               // For non-queue contexts (library, playlist): use file_path matching
               const isPlaying = showPlayingIndicator && currentPlayingFile === track.file_path;
-              const isQueueCurrentTrack = contextType === "queue" && isActiveQueue && isPlaying;
-              const isInactiveQueueCurrentTrack = contextType === "queue" && !isActiveQueue && actualIndex === queueCurrentIndex;
+              const isQueueCurrentTrack = contextType === "queue" && isActiveQueue && actualIndex === queueCurrentIndex;
               const isInactiveQueue = contextType === "queue" && !isActiveQueue;
+              const isInactiveQueueCurrentTrack = isInactiveQueue && actualIndex === queueCurrentIndex;
               // Highlight currently playing track
               const shouldHighlight = contextType === "queue" 
                 ? (isQueueCurrentTrack || isInactiveQueueCurrentTrack)
