@@ -555,25 +555,6 @@ impl DbOperations {
         Ok(conn.last_insert_rowid())
     }
 
-    /// Update queue track hash after all tracks are added
-    pub fn update_queue_track_hash(
-        db: &DatabaseConnection,
-        queue_id: i64,
-        track_ids: &[i64],
-    ) -> Result<(), anyhow::Error> {
-        let conn = db.get_connection();
-        let conn = conn.lock().unwrap();
-        
-        let hash = Self::calculate_track_hash(track_ids);
-        
-        conn.execute(
-            "UPDATE queues SET track_hash = ?1 WHERE id = ?2",
-            params![hash, queue_id],
-        )?;
-        
-        Ok(())
-    }
-
     /// Add tracks to queue
     pub fn add_tracks_to_queue(
         db: &DatabaseConnection,
@@ -634,7 +615,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, track_hash, shuffle_seed FROM queues ORDER BY id DESC"
+            "SELECT id, name, is_active, shuffle_seed FROM queues ORDER BY id DESC"
         )?;
         
         let queues = stmt.query_map([], |row| {
@@ -642,8 +623,7 @@ impl DbOperations {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 is_active: row.get(2)?,
-                track_hash: row.get(3)?,
-                shuffle_seed: row.get::<_, Option<i64>>(4)?.unwrap_or(1),
+                shuffle_seed: row.get::<_, Option<i64>>(3)?.unwrap_or(1),
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -699,41 +679,58 @@ impl DbOperations {
         Ok(tracks)
     }
 
-    /// Calculate SHA-256 hash of sorted track IDs
-    fn calculate_track_hash(track_ids: &[i64]) -> String {
-        use sha2::{Sha256, Digest};
-        
-        let mut sorted = track_ids.to_vec();
-        sorted.sort();
-        
-        let mut hasher = Sha256::new();
-        for id in sorted {
-            hasher.update(id.to_le_bytes());
-        }
-        
-        format!("{:x}", hasher.finalize())
-    }
-
-    /// Find queue with same tracks (ignoring order) using hash comparison
-    pub fn find_queue_with_tracks(
+    /// Find queue by name (source-based matching)
+    pub fn find_queue_by_name(
         db: &DatabaseConnection,
-        track_ids: &[i64],
+        name: &str,
     ) -> Result<Option<i64>, anyhow::Error> {
         let conn = db.get_connection();
         let conn = conn.lock().unwrap();
         
-        // Calculate hash of input track IDs
-        let hash = Self::calculate_track_hash(track_ids);
-        
-        // Look up queue by hash (instant with index)
-        let mut stmt = conn.prepare("SELECT id FROM queues WHERE track_hash = ?1")?;
-        let mut rows = stmt.query([&hash])?;
+        let mut stmt = conn.prepare("SELECT id FROM queues WHERE name = ?1")?;
+        let mut rows = stmt.query([name])?;
         
         if let Some(row) = rows.next()? {
             return Ok(Some(row.get(0)?));
         }
         
         Ok(None)
+    }
+
+    /// Replace all tracks in a queue with new tracks
+    pub fn replace_queue_tracks(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        track_ids: &[i64],
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let mut conn = conn.lock().unwrap();
+        
+        let tx = conn.transaction()?;
+        
+        // Clear existing tracks
+        tx.execute("DELETE FROM queue_tracks WHERE queue_id = ?1", params![queue_id])?;
+        
+        // Insert new tracks
+        for (index, track_id) in track_ids.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
+                params![queue_id, track_id, index as i32],
+            )?;
+        }
+        
+        // Update modified timestamp
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        tx.execute(
+            "UPDATE queues SET date_modified = ?1 WHERE id = ?2",
+            params![now, queue_id],
+        )?;
+        
+        tx.commit()?;
+        Ok(())
     }
 
     /// Set active queue
@@ -761,7 +758,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, track_hash, shuffle_seed FROM queues WHERE is_active = 1 LIMIT 1"
+            "SELECT id, name, is_active, shuffle_seed FROM queues WHERE is_active = 1 LIMIT 1"
         )?;
         
         let mut rows = stmt.query([])?;
@@ -771,8 +768,7 @@ impl DbOperations {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 is_active: row.get(2)?,
-                track_hash: row.get(3)?,
-                shuffle_seed: row.get::<_, Option<i64>>(4)?.unwrap_or(1),
+                shuffle_seed: row.get::<_, Option<i64>>(3)?.unwrap_or(1),
             }))
         } else {
             Ok(None)
@@ -836,7 +832,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, track_hash, shuffle_seed
+            "SELECT id, name, is_active, shuffle_seed
              FROM queues
              WHERE id != ?1
              ORDER BY id DESC
@@ -848,8 +844,7 @@ impl DbOperations {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 is_active: row.get(2)?,
-                track_hash: row.get(3)?,
-                shuffle_seed: row.get::<_, Option<i64>>(4)?.unwrap_or(1),
+                shuffle_seed: row.get::<_, Option<i64>>(3)?.unwrap_or(1),
             })
         }).optional()?;
         
@@ -913,13 +908,18 @@ impl DbOperations {
         shuffle_seed: i64,
         anchor_position: i32,
     ) -> Result<Option<Track>, anyhow::Error> {
+        println!("[Backend] get_queue_track_at_shuffled_position called with queue_id={}, shuffled_position={}, shuffle_seed={}, anchor_position={}", 
+            queue_id, shuffled_position, shuffle_seed, anchor_position);
+        
         // If seed is 1 (sequential), just use the regular position
         if shuffle_seed == 1 {
+            println!("[Backend] Seed is 1, using sequential order");
             return Self::get_queue_track_at_position(db, queue_id, shuffled_position);
         }
 
         // Get the queue length
         let queue_length = Self::get_queue_length(db, queue_id)?;
+        println!("[Backend] Queue length: {}", queue_length);
         
         if queue_length == 0 {
             return Ok(None);
@@ -927,12 +927,14 @@ impl DbOperations {
 
         // If this is the anchor position, return the track at anchor position
         if shuffled_position == anchor_position {
+            println!("[Backend] Shuffled position equals anchor, returning track at position {}", anchor_position);
             return Self::get_queue_track_at_position(db, queue_id, anchor_position);
         }
 
         // Generate the shuffled order starting from anchor position
         let step = (shuffle_seed.abs() % queue_length as i64) as i32;
         let step = if step == 0 { 1 } else { step };
+        println!("[Backend] step={}, seed.abs()={}, queue_length={}", step, shuffle_seed.abs(), queue_length);
         
         let mut current_pos = anchor_position; // Start from anchor
         let mut used = std::collections::HashSet::new();
@@ -954,6 +956,7 @@ impl DbOperations {
             // Check if this is the shuffled position we're looking for
             if i == shuffled_position {
                 // current_pos is the original position for this shuffled position
+                println!("[Backend] Found: shuffled position {} maps to original position {}", shuffled_position, current_pos);
                 return Self::get_queue_track_at_position(db, queue_id, current_pos);
             }
             
@@ -961,6 +964,7 @@ impl DbOperations {
         }
         
         // Shouldn't reach here, but return None as fallback
+        println!("[Backend] WARNING: Did not find mapping for shuffled position {}", shuffled_position);
         Ok(None)
     }
 
