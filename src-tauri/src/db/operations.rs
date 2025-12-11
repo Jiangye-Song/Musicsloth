@@ -719,13 +719,14 @@ impl DbOperations {
             )?;
         }
         
-        // Update modified timestamp
+        // Update modified timestamp and reset current_track_index to 0
+        // (the clicked track is always at position 0 after reordering)
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
         tx.execute(
-            "UPDATE queues SET date_modified = ?1 WHERE id = ?2",
+            "UPDATE queues SET date_modified = ?1, current_track_index = 0 WHERE id = ?2",
             params![now, queue_id],
         )?;
         
