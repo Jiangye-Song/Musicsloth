@@ -1822,26 +1822,66 @@ impl DbOperations {
     }
 
     /// Remove a track at a specific position from a queue
+    /// Returns the new current_track_index after adjustment (-1 if queue becomes empty)
     pub fn remove_track_at_position(
         db: &DatabaseConnection,
         queue_id: i64,
         position: i32,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<i32, anyhow::Error> {
         let conn = db.get_connection();
-        let conn = conn.lock().unwrap();
+        let mut conn = conn.lock().unwrap();
+        
+        let tx = conn.transaction()?;
+
+        // Get current track index before removal
+        let current_index: i32 = tx.query_row(
+            "SELECT current_track_index FROM queues WHERE id = ?1",
+            params![queue_id],
+            |row| row.get(0)
+        )?;
+
+        // Get total track count before removal
+        let track_count: i32 = tx.query_row(
+            "SELECT COUNT(*) FROM queue_tracks WHERE queue_id = ?1",
+            params![queue_id],
+            |row| row.get(0)
+        )?;
 
         // Delete the track at the specified position
-        conn.execute(
+        tx.execute(
             "DELETE FROM queue_tracks WHERE queue_id = ?1 AND position = ?2",
             params![queue_id, position],
         )?;
 
         // Shift all positions after the removed track down by 1
-        conn.execute(
+        tx.execute(
             "UPDATE queue_tracks SET position = position - 1 WHERE queue_id = ?1 AND position > ?2",
             params![queue_id, position],
         )?;
 
-        Ok(())
+        // Calculate new current index
+        let new_index = if track_count <= 1 {
+            // Queue becomes empty
+            0
+        } else if position < current_index {
+            // Removed before current: shift current index down
+            current_index - 1
+        } else if position == current_index {
+            // Removed current track: stay at same position (next track slides into this position)
+            // But clamp to valid range (in case we removed the last track)
+            std::cmp::min(current_index, track_count - 2)
+        } else {
+            // Removed after current: no change needed
+            current_index
+        };
+
+        // Update current_track_index in database
+        tx.execute(
+            "UPDATE queues SET current_track_index = ?1 WHERE id = ?2",
+            params![new_index, queue_id],
+        )?;
+
+        tx.commit()?;
+        Ok(new_index)
     }
 }

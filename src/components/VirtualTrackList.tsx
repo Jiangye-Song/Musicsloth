@@ -956,7 +956,13 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         onRemoveFromQueue={async () => {
           if (!selectedTrackForMenu || queueId === undefined) return;
           try {
-            await queueApi.removeTrackAtPosition(queueId, selectedTrackForMenu.position);
+            const newIndex = await queueApi.removeTrackAtPosition(queueId, selectedTrackForMenu.position);
+            // Update PlayerContext if this is the active queue
+            if (isActiveQueue && currentQueueId === queueId) {
+              setQueueCurrentIndex(newIndex);
+              // Also update PlayerContext's currentTrackIndex
+              await updateQueuePosition(queueId, newIndex);
+            }
             // Notify that queue tracks changed
             onQueueTracksChanged?.(queueId);
           } catch (err) {

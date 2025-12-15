@@ -279,7 +279,7 @@ export const queueApi = {
     return await invoke("insert_tracks_after_position", { queueId, trackIds, afterPosition });
   },
 
-  removeTrackAtPosition: async (queueId: number, position: number): Promise<void> => {
+  removeTrackAtPosition: async (queueId: number, position: number): Promise<number> => {
     return await invoke("remove_track_at_position", { queueId, position });
   },
 };

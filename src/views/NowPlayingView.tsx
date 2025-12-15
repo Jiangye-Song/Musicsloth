@@ -5,7 +5,6 @@ import {
   Typography,
   Tabs,
   Tab,
-  Paper,
   Slider,
   useMediaQuery,
 } from "@mui/material";
