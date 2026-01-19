@@ -1,7 +1,8 @@
-﻿use lofty::{Probe, Accessor};
+﻿use lofty::probe::Probe;
+use lofty::prelude::{TaggedFileExt, Accessor};
 
 fn main() {
-    let path = r"C:\Users\songj\Desktop\1\阳光彩虹小白马 - 大张伟.mp3";
+    let path = r"C:\Users\songj\Desktop\Test\Σntrance Archon.mp3";
     
     match Probe::open(path).and_then(|p| p.read()) {
         Ok(tagged_file) => {

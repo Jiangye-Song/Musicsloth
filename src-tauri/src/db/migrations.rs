@@ -264,10 +264,6 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         [],
     )?;
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_queues_track_hash ON queues(track_hash)",
-        [],
-    )?;
-    conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_track_artists_track ON track_artists(track_id)",
         [],
     )?;

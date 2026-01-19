@@ -231,56 +231,103 @@ pub fn get_current_track(state: State<'_, AppState>) -> Result<Option<Track>, St
 pub async fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
     use lofty::probe::Probe;
     use lofty::picture::PictureType;
+    use std::path::Path;
     
     // Run file I/O in a blocking task to avoid blocking the async runtime
     tokio::task::spawn_blocking(move || {
-        let tagged_file = Probe::open(&file_path)
-            .map_err(|e| format!("Failed to open file: {}", e))?
-            .read()
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-    
-    // Priority order for picture types (matching foobar2000 behavior)
-    let picture_priority = [
-        PictureType::CoverFront,      // Front Cover (most common)
-        PictureType::Media,            // Media (e.g., label side of CD)
-        PictureType::CoverBack,        // Back Cover
-        PictureType::Leaflet,          // Leaflet page
-        PictureType::Other,            // Other/Undefined
-        PictureType::Icon,             // Icon
-        PictureType::OtherIcon,        // Other Icon
-        PictureType::Artist,           // Artist/Performer
-        PictureType::Band,             // Band/Orchestra
-        PictureType::Composer,         // Composer
-        PictureType::Lyricist,         // Lyricist/Text writer
-        PictureType::RecordingLocation, // Recording Location
-        PictureType::DuringRecording,  // During Recording
-        PictureType::DuringPerformance, // During Performance
-        PictureType::ScreenCapture,    // Screen Capture
-        PictureType::BrightFish,       // Bright Colored Fish
-        PictureType::Illustration,     // Illustration
-        PictureType::BandLogo,         // Band/Artist Logotype
-        PictureType::PublisherLogo,    // Publisher/Studio Logotype
-    ];
-    
-        // Try to get the primary tag first
-        if let Some(tag) = tagged_file.primary_tag() {
-            // Try each picture type in priority order
-            for pic_type in &picture_priority {
-                for picture in tag.pictures() {
-                    if picture.pic_type() == *pic_type {
-                        return Ok(Some(picture.data().to_vec()));
+        let path = Path::new(&file_path);
+        
+        // Try lofty first
+        let lofty_result = Probe::open(&file_path)
+            .and_then(|p| p.read());
+        
+        if let Ok(tagged_file) = lofty_result {
+            // Priority order for picture types (matching foobar2000 behavior)
+            let picture_priority = [
+                PictureType::CoverFront,      // Front Cover (most common)
+                PictureType::Media,            // Media (e.g., label side of CD)
+                PictureType::CoverBack,        // Back Cover
+                PictureType::Leaflet,          // Leaflet page
+                PictureType::Other,            // Other/Undefined
+                PictureType::Icon,             // Icon
+                PictureType::OtherIcon,        // Other Icon
+                PictureType::Artist,           // Artist/Performer
+                PictureType::Band,             // Band/Orchestra
+                PictureType::Composer,         // Composer
+                PictureType::Lyricist,         // Lyricist/Text writer
+                PictureType::RecordingLocation, // Recording Location
+                PictureType::DuringRecording,  // During Recording
+                PictureType::DuringPerformance, // During Performance
+                PictureType::ScreenCapture,    // Screen Capture
+                PictureType::BrightFish,       // Bright Colored Fish
+                PictureType::Illustration,     // Illustration
+                PictureType::BandLogo,         // Band/Artist Logotype
+                PictureType::PublisherLogo,    // Publisher/Studio Logotype
+            ];
+            
+            // Try to get the primary tag first
+            if let Some(tag) = tagged_file.primary_tag() {
+                // Try each picture type in priority order
+                for pic_type in &picture_priority {
+                    for picture in tag.pictures() {
+                        if picture.pic_type() == *pic_type {
+                            return Ok(Some(picture.data().to_vec()));
+                        }
                     }
                 }
             }
+            
+            // Try all tags if primary tag didn't have cover art
+            for tag in tagged_file.tags() {
+                // Try each picture type in priority order
+                for pic_type in &picture_priority {
+                    for picture in tag.pictures() {
+                        if picture.pic_type() == *pic_type {
+                            return Ok(Some(picture.data().to_vec()));
+                        }
+                    }
+                }
+            }
+            
+            return Ok(None);
         }
         
-        // Try all tags if primary tag didn't have cover art
-        for tag in tagged_file.tags() {
-            // Try each picture type in priority order
-            for pic_type in &picture_priority {
-                for picture in tag.pictures() {
-                    if picture.pic_type() == *pic_type {
-                        return Ok(Some(picture.data().to_vec()));
+        // Fallback: try id3 crate for MP3 files if lofty failed
+        let extension = path.extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase());
+        
+        if extension.as_deref() == Some("mp3") {
+            if let Ok(tag) = id3::Tag::read_from_path(&file_path) {
+                // id3 crate picture type priority (similar to lofty)
+                use id3::frame::PictureType as Id3PictureType;
+                let id3_priority = [
+                    Id3PictureType::CoverFront,
+                    Id3PictureType::Media,
+                    Id3PictureType::CoverBack,
+                    Id3PictureType::Leaflet,
+                    Id3PictureType::Other,
+                    Id3PictureType::Icon,
+                    Id3PictureType::OtherIcon,
+                    Id3PictureType::Artist,
+                    Id3PictureType::Band,
+                    Id3PictureType::Composer,
+                    Id3PictureType::Lyricist,
+                    Id3PictureType::RecordingLocation,
+                    Id3PictureType::DuringRecording,
+                    Id3PictureType::DuringPerformance,
+                    Id3PictureType::ScreenCapture,
+                    Id3PictureType::BrightFish,
+                    Id3PictureType::Illustration,
+                    Id3PictureType::BandLogo,
+                    Id3PictureType::PublisherLogo,
+                ];
+                
+                for pic_type in &id3_priority {
+                    for picture in tag.pictures() {
+                        if picture.picture_type == *pic_type {
+                            return Ok(Some(picture.data.clone()));
+                        }
                     }
                 }
             }
@@ -387,44 +434,6 @@ pub fn create_queue_from_tracks(
 ) -> Result<i64, String> {
     println!("[Queue] Starting queue creation with {} tracks", track_ids.len());
     
-    // Check if queue with same tracks already exists
-    println!("[Queue] Checking for existing queue...");
-    if let Some(existing_queue_id) = DbOperations::find_queue_with_tracks(&state.db, &track_ids)
-        .map_err(|e| format!("Failed to check for existing queue: {}", e))? 
-    {
-        println!("[Queue] Found existing queue ID: {}", existing_queue_id);
-        // Set as active and return existing queue ID
-        DbOperations::set_active_queue(&state.db, existing_queue_id)
-            .map_err(|e| format!("Failed to set active queue: {}", e))?;
-        println!("[Queue] Reusing existing queue");
-        return Ok(existing_queue_id);
-    }
-    
-    println!("[Queue] No existing queue found, creating new one");
-    
-    // Generate unique queue name (Windows-style: name, name (2), name (3), etc.)
-    let mut queue_name = name.clone();
-    let mut counter = 2;
-    let queue_id: Result<i64, String> = loop {
-        match DbOperations::create_queue(&state.db, &queue_name) {
-            Ok(queue_id) => {
-                println!("[Queue] Created queue '{}' with ID: {}", queue_name, queue_id);
-                break Ok(queue_id);
-            },
-            Err(e) => {
-                // Check if it's a UNIQUE constraint error
-                if e.to_string().contains("UNIQUE constraint failed") {
-                    queue_name = format!("{} ({})", name, counter);
-                    counter += 1;
-                } else {
-                    return Err(format!("Failed to create queue: {}", e));
-                }
-            }
-        }
-    };
-    let queue_id = queue_id?;
-    
-    println!("[Queue] Reordering tracks (clicked index: {})...", clicked_index);
     // Reorder tracks: clicked track first, then remaining after, then before clicked
     let mut reordered_tracks = Vec::new();
     reordered_tracks.push(track_ids[clicked_index]);
@@ -439,15 +448,32 @@ pub fn create_queue_from_tracks(
         reordered_tracks.push(track_ids[i]);
     }
     
+    // Check if queue with same name (source) already exists
+    println!("[Queue] Checking for existing queue with name: {}", name);
+    if let Some(existing_queue_id) = DbOperations::find_queue_by_name(&state.db, &name)
+        .map_err(|e| format!("Failed to check for existing queue: {}", e))? 
+    {
+        println!("[Queue] Found existing queue ID: {}, replacing tracks", existing_queue_id);
+        // Replace tracks in existing queue
+        DbOperations::replace_queue_tracks(&state.db, existing_queue_id, &reordered_tracks)
+            .map_err(|e| format!("Failed to replace queue tracks: {}", e))?;
+        // Set as active
+        DbOperations::set_active_queue(&state.db, existing_queue_id)
+            .map_err(|e| format!("Failed to set active queue: {}", e))?;
+        println!("[Queue] Replaced tracks in existing queue");
+        return Ok(existing_queue_id);
+    }
+    
+    println!("[Queue] No existing queue found, creating new one");
+    
+    // Create new queue (name is unique, so this should succeed)
+    let queue_id = DbOperations::create_queue(&state.db, &name)
+        .map_err(|e| format!("Failed to create queue: {}", e))?;
+    println!("[Queue] Created queue '{}' with ID: {}", name, queue_id);
+    
     println!("[Queue] Adding {} tracks to queue...", reordered_tracks.len());
-    // Add all tracks immediately - only inserting IDs is fast
     DbOperations::add_tracks_to_queue(&state.db, queue_id, &reordered_tracks)
         .map_err(|e| format!("Failed to add tracks to queue: {}", e))?;
-    
-    println!("[Queue] Updating queue hash...");
-    // Update queue hash for duplicate detection
-    DbOperations::update_queue_track_hash(&state.db, queue_id, &reordered_tracks)
-        .map_err(|e| format!("Failed to update queue track hash: {}", e))?;
     
     println!("[Queue] Queue creation complete, ID: {}", queue_id);
     Ok(queue_id)
@@ -608,6 +634,12 @@ pub fn get_playlist_tracks(state: State<'_, AppState>, playlist_id: i64) -> Resu
 }
 
 #[tauri::command]
+pub fn remove_track_from_playlist(state: State<'_, AppState>, playlist_id: i64, track_id: i64) -> Result<(), String> {
+    DbOperations::remove_track_from_playlist(&state.db, playlist_id, track_id)
+        .map_err(|e| format!("Failed to remove track from playlist: {}", e))
+}
+
+#[tauri::command]
 pub fn append_tracks_to_queue(state: State<'_, AppState>, queue_id: i64, track_ids: Vec<i64>) -> Result<(), String> {
     DbOperations::append_tracks_to_queue(&state.db, queue_id, &track_ids)
         .map_err(|e| format!("Failed to append tracks to queue: {}", e))
@@ -620,7 +652,7 @@ pub fn insert_tracks_after_position(state: State<'_, AppState>, queue_id: i64, t
 }
 
 #[tauri::command]
-pub fn remove_track_at_position(state: State<'_, AppState>, queue_id: i64, position: i32) -> Result<(), String> {
+pub fn remove_track_at_position(state: State<'_, AppState>, queue_id: i64, position: i32) -> Result<i32, String> {
     DbOperations::remove_track_at_position(&state.db, queue_id, position)
         .map_err(|e| format!("Failed to remove track at position: {}", e))
 }
