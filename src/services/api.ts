@@ -320,6 +320,10 @@ export const playlistApi = {
   removeTrackFromPlaylist: async (playlistId: number, trackId: number): Promise<void> => {
     return await invoke("remove_track_from_playlist", { playlistId, trackId });
   },
+
+  deletePlaylist: async (playlistId: number): Promise<void> => {
+    return await invoke("delete_playlist", { playlistId });
+  },
 };
 
 export const fileApi = {

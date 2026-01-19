@@ -167,6 +167,28 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
     setContextMenuPlaylist(null);
   };
 
+  const handleDeletePlaylist = async () => {
+    if (!contextMenuPlaylist) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the playlist "${contextMenuPlaylist.name}"? This action cannot be undone.`
+    );
+    if (!confirmed) {
+      setContextMenu(null);
+      setContextMenuPlaylist(null);
+      return;
+    }
+    try {
+      await playlistApi.deletePlaylist(contextMenuPlaylist.id);
+      // Refresh the playlists list
+      await loadUserPlaylists();
+    } catch (error) {
+      console.error("Failed to delete playlist:", error);
+      alert(`Failed to delete playlist: ${error}`);
+    }
+    setContextMenu(null);
+    setContextMenuPlaylist(null);
+  };
+
   const handleOpenCreateDialog = () => {
     setDialogPlaylist(null);
     setDialogMode("create");
@@ -413,6 +435,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           playlistId={contextMenuPlaylist.id}
           playlistName={contextMenuPlaylist.name}
           onRename={handleOpenRenameDialog}
+          onDelete={handleDeletePlaylist}
         />
       )}
 

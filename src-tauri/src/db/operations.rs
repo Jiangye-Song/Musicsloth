@@ -1803,6 +1803,33 @@ impl DbOperations {
         Ok(())
     }
 
+    /// Delete a playlist and all its tracks
+    pub fn delete_playlist(
+        db: &DatabaseConnection,
+        playlist_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        // Delete all tracks in the playlist first
+        conn.execute(
+            "DELETE FROM playlist_tracks WHERE playlist_id = ?1",
+            params![playlist_id],
+        )?;
+        
+        // Delete the playlist itself
+        let rows_affected = conn.execute(
+            "DELETE FROM playlists WHERE id = ?1",
+            params![playlist_id],
+        )?;
+        
+        if rows_affected == 0 {
+            return Err(anyhow::anyhow!("Playlist not found"));
+        }
+        
+        Ok(())
+    }
+
     /// Append tracks to the end of a queue
     pub fn append_tracks_to_queue(
         db: &DatabaseConnection,

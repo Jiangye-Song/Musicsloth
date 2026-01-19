@@ -640,6 +640,12 @@ pub fn remove_track_from_playlist(state: State<'_, AppState>, playlist_id: i64, 
 }
 
 #[tauri::command]
+pub fn delete_playlist(state: State<'_, AppState>, playlist_id: i64) -> Result<(), String> {
+    DbOperations::delete_playlist(&state.db, playlist_id)
+        .map_err(|e| format!("Failed to delete playlist: {}", e))
+}
+
+#[tauri::command]
 pub fn append_tracks_to_queue(state: State<'_, AppState>, queue_id: i64, track_ids: Vec<i64>) -> Result<(), String> {
     DbOperations::append_tracks_to_queue(&state.db, queue_id, &track_ids)
         .map_err(|e| format!("Failed to append tracks to queue: {}", e))
