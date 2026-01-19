@@ -49,3 +49,6 @@ chrono = "0.4"
 sha2 = "0.10"
 blake3 = "1.5"
 
+# Random number generation for shuffle
+rand = "0.8"
+

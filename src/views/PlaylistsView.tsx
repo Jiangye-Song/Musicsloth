@@ -8,6 +8,7 @@ import { IconButton, Button } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PlaylistPlayIcon from "@mui/icons-material/PlaylistPlay";
 import AddIcon from "@mui/icons-material/Add";
+import SwapVertIcon from "@mui/icons-material/SwapVert";
 import { ReactNode } from "react";
 import { LibraryMusic, Input as InputIcon, Replay as ReplayIcon, PlayDisabled } from "@mui/icons-material";
 
@@ -89,6 +90,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
   const [selectedUserPlaylist, setSelectedUserPlaylist] = useState<Playlist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isReorderMode, setIsReorderMode] = useState(false);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
@@ -146,6 +148,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
     setSelectedPlaylist(null);
     setSelectedUserPlaylist(null);
     setTracks([]);
+    setIsReorderMode(false);
     // Refresh user playlists in case new ones were added
     loadUserPlaylists();
   };
@@ -243,6 +246,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
 
   if (selectedPlaylist || selectedUserPlaylist) {
     const displayName = selectedPlaylist?.name || selectedUserPlaylist?.name || "";
+    const canReorder = selectedUserPlaylist !== null; // Only user playlists can be reordered
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div
@@ -258,9 +262,20 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
           <IconButton
             onClick={handleBack}
           ><ArrowBackIcon /></IconButton>
-          <h2 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <h2 style={{ margin: 0, fontSize: "18px", display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
             {displayName} ({tracks.length} tracks)
           </h2>
+          {canReorder && tracks.length > 1 && (
+            <IconButton
+              onClick={() => setIsReorderMode(!isReorderMode)}
+              sx={{
+                color: isReorderMode ? "primary.main" : "text.secondary",
+              }}
+              title={isReorderMode ? "Exit reorder mode" : "Reorder tracks"}
+            >
+              <SwapVertIcon />
+            </IconButton>
+          )}
         </div>
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>
@@ -275,6 +290,8 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
               playlistId={selectedPlaylist?.id || selectedUserPlaylist?.id}
               isSystemPlaylist={selectedPlaylist !== null}
               showSearch={true}
+              isReorderMode={isReorderMode}
+              onReorderModeChange={setIsReorderMode}
               onPlaylistTracksChanged={async (playlistId) => {
                 // Refresh tracks when a track is removed from the playlist
                 try {

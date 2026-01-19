@@ -150,6 +150,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    // Migration: Add original_order column to queues table for storing pre-shuffle order
+    // This stores a JSON array of track IDs representing the original order before shuffling
+    let original_order_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('queues') WHERE name='original_order'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = original_order_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE queues ADD COLUMN original_order TEXT", [])?;
+        }
+    }
+
     // Create queue_tracks junction table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS queue_tracks (

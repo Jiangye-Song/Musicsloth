@@ -5,6 +5,7 @@ import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButt
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import TrackContextMenu from "./TrackContextMenu";
 import AddToPlaylistDialog from "./AddToPlaylistDialog";
 import AddToQueueDialog from "./AddToQueueDialog";
@@ -35,9 +36,11 @@ interface VirtualTrackListProps {
   onNavigateToArtist?: (artistName: string, trackId: number) => void;
   onNavigateToAlbum?: (albumName: string, trackId: number) => void;
   onNavigateToGenre?: (genreName: string, trackId: number) => void;
+  isReorderMode?: boolean; // Whether drag-and-drop reorder mode is active
+  onReorderModeChange?: (isReorderMode: boolean) => void; // Callback when reorder mode changes
 }
 
-const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, onQueueTracksChanged, onPlaylistTracksChanged, showSearch = false, initialTrackId, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }, ref) => {
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, onQueueTracksChanged, onPlaylistTracksChanged, showSearch = false, initialTrackId, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre, isReorderMode = false, onReorderModeChange }, ref) => {
   // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex, isShuffled, loadShuffleStateFromQueue, setShuffleStateForNewQueue } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
@@ -58,6 +61,11 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [showSongInfoDialog, setShowSongInfoDialog] = useState(false);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedPositions, setSelectedPositions] = useState<Set<number>>(new Set());
+  // Drag and drop state (mouse-based for better webview compatibility)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartY = useRef<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingArtRef = useRef<Set<string>>(new Set());
   const loadQueueRef = useRef<string[]>([]);
@@ -409,6 +417,89 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
     return Array.from(selectedPositions).sort((a, b) => a - b);
   };
 
+  // Drag and drop handlers for reorder mode (mouse-based for better webview compatibility)
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>, index: number) => {
+    if (!isReorderMode) return;
+    e.preventDefault();
+    console.log(`[VirtualTrackList] Mouse down: index ${index}`);
+    setDraggedIndex(index);
+    setIsDragging(true);
+    dragStartY.current = e.clientY;
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || draggedIndex === null || !containerRef.current) return;
+    
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const scrollTop = containerRef.current.scrollTop;
+    const relativeY = e.clientY - containerRect.top + scrollTop;
+    const newIndex = Math.floor(relativeY / ITEM_HEIGHT);
+    const clampedIndex = Math.max(0, Math.min(tracks.length - 1, newIndex));
+    
+    if (clampedIndex !== dragOverIndex) {
+      console.log(`[VirtualTrackList] Mouse move: over index ${clampedIndex}`);
+      setDragOverIndex(clampedIndex);
+    }
+  }, [isDragging, draggedIndex, tracks.length, dragOverIndex]);
+
+  const handleMouseUp = useCallback(async () => {
+    if (!isDragging || draggedIndex === null) {
+      setIsDragging(false);
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const fromIndex = draggedIndex;
+    const toIndex = dragOverIndex;
+    
+    console.log(`[VirtualTrackList] Mouse up: from ${fromIndex} to ${toIndex}`);
+    
+    // Reset state
+    setIsDragging(false);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    if (toIndex === null || fromIndex === toIndex) {
+      console.log(`[VirtualTrackList] Drop ignored: fromIndex=${fromIndex}, toIndex=${toIndex}`);
+      return;
+    }
+
+    try {
+      if (contextType === "queue" && queueId !== undefined) {
+        console.log(`[VirtualTrackList] Reordering queue track: queueId=${queueId}, from=${fromIndex}, to=${toIndex}`);
+        const newIndex = await queueApi.reorderQueueTrack(queueId, fromIndex, toIndex);
+        console.log(`[VirtualTrackList] Queue reorder complete, new current index: ${newIndex}`);
+        if (isActiveQueue && currentQueueId === queueId) {
+          setQueueCurrentIndex(newIndex);
+          await updateQueuePosition(queueId, newIndex);
+        }
+        onQueueTracksChanged?.(queueId);
+      } else if (contextType === "playlist" && playlistId !== undefined && !isSystemPlaylist) {
+        console.log(`[VirtualTrackList] Reordering playlist track: playlistId=${playlistId}, from=${fromIndex}, to=${toIndex}`);
+        await playlistApi.reorderPlaylistTrack(Number(playlistId), fromIndex, toIndex);
+        console.log(`[VirtualTrackList] Playlist reorder complete`);
+        onPlaylistTracksChanged?.(Number(playlistId));
+      } else {
+        console.log(`[VirtualTrackList] Cannot reorder: contextType=${contextType}, playlistId=${playlistId}, isSystemPlaylist=${isSystemPlaylist}`);
+      }
+    } catch (error) {
+      console.error("Failed to reorder track:", error);
+    }
+  }, [isDragging, draggedIndex, dragOverIndex, contextType, queueId, playlistId, isSystemPlaylist, isActiveQueue, currentQueueId, updateQueuePosition, onQueueTracksChanged, onPlaylistTracksChanged]);
+
+  // Global mouse event listeners for drag
+  useEffect(() => {
+    if (isReorderMode && isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [isReorderMode, isDragging, handleMouseMove, handleMouseUp]);
+
   const handlePlayTrack = async (track: Track, index: number) => {
     // In multi-select mode, toggle selection instead of playing
     if (isMultiSelectMode) {
@@ -741,10 +832,13 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           height: "600px",
           maxHeight: "70vh",
           position: "relative",
+          userSelect: isReorderMode ? "none" : "auto",
         }}
       >
         {/* Spacer for virtual scrolling */}
-        <div style={{ height: `${tracks.length * ITEM_HEIGHT}px`, position: "relative" }}>
+        <div 
+          style={{ height: `${tracks.length * ITEM_HEIGHT}px`, position: "relative" }}
+        >
           {/* Only render visible items */}
           <div
             style={{
@@ -769,50 +863,42 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 : isPlaying;
               const isFlashing = flashingIndex === actualIndex;
               const isSelected = isMultiSelectMode && selectedPositions.has(actualIndex);
+              const isThisDragged = draggedIndex === actualIndex;
+              const isDragOver = dragOverIndex === actualIndex && draggedIndex !== actualIndex;
+
+              // Calculate visual shift for items during drag
+              // If dragging down (dragOverIndex > draggedIndex): items between need to shift UP
+              // If dragging up (dragOverIndex < draggedIndex): items between need to shift DOWN
+              let translateY = 0;
+              if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex && !isThisDragged) {
+                if (draggedIndex < dragOverIndex) {
+                  // Dragging DOWN: shift items between draggedIndex+1 and dragOverIndex UP
+                  if (actualIndex > draggedIndex && actualIndex <= dragOverIndex) {
+                    translateY = -ITEM_HEIGHT;
+                  }
+                } else {
+                  // Dragging UP: shift items between dragOverIndex and draggedIndex-1 DOWN
+                  if (actualIndex >= dragOverIndex && actualIndex < draggedIndex) {
+                    translateY = ITEM_HEIGHT;
+                  }
+                }
+              }
 
               // Debug log for first few tracks
               if (actualIndex < 3) {
                 console.log(`[VirtualTrackList] Track ${actualIndex}: ${track.title}, albumArt exists: ${!!albumArt}, albumArt value: ${albumArt?.substring(0, 50)}`);
               }
 
-              return (
-                <Box
-                  key={`${contextType}-${actualIndex}`}
-                  onClick={() => handlePlayTrack(track, actualIndex)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSelectedTrackForMenu({ id: track.id, title: track.title, position: actualIndex, track: track });
-                    setContextMenu({
-                      top: e.clientY,
-                      left: e.clientX,
-                    });
-                  }}
-                  sx={{
-                    height: ITEM_HEIGHT,
-                    display: "flex",
-                    alignItems: "center",
-                    px: 2,
-                    py: 1.25,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                    bgcolor: isFlashing ? "primary.dark" : (isSelected ? "action.selected" : (shouldHighlight ? "action.selected" : "transparent")),
-                    borderLeft: 3,
-                    borderLeftColor: isSelected ? "primary.main" : (shouldHighlight ? "primary.main" : "transparent"),
-                    opacity: isInactiveQueue ? 0.6 : 1,
-                    animation: isFlashing ? "flash 1s ease-in-out" : "none",
-                    "@keyframes flash": {
-                      "0%": { bgcolor: "primary.dark" },
-                      "50%": { bgcolor: "primary.main" },
-                      "100%": { bgcolor: "transparent" },
-                    },
-                    "&:hover": {
-                      bgcolor: shouldHighlight || isSelected ? "action.selected" : "action.hover",
-                    },
-                  }}
-                >
+              // Use native div for drag support when in reorder mode
+              const rowContent = (
+                <>
+                  {/* Drag handle for reorder mode */}
+                  {isReorderMode && (
+                    <Box sx={{ mr: 1, display: "flex", alignItems: "center", cursor: "grab" }}>
+                      <DragIndicatorIcon sx={{ color: "text.secondary", fontSize: 24 }} />
+                    </Box>
+                  )}
+
                   {/* Checkbox for multi-select mode */}
                   {isMultiSelectMode && (
                     <Checkbox
@@ -895,6 +981,75 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                   >
                     {formatDuration(track.duration_ms)}
                   </Typography>
+                </>
+              );
+
+              return isReorderMode ? (
+                <div
+                  key={`${contextType}-${actualIndex}`}
+                  onMouseDown={(e) => handleMouseDown(e, actualIndex)}
+                  style={{
+                    height: ITEM_HEIGHT,
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "10px 16px",
+                    borderBottom: "1px solid rgba(255,255,255,0.12)",
+                    cursor: isThisDragged ? "grabbing" : "grab",
+                    transition: draggedIndex !== null ? "transform 0.15s ease-out, background-color 0.15s" : "background-color 0.2s",
+                    transform: isThisDragged && dragOverIndex !== null 
+                      ? `translateY(${(dragOverIndex - draggedIndex) * ITEM_HEIGHT}px)` 
+                      : `translateY(${translateY}px)`,
+                    backgroundColor: isThisDragged ? "#1976d2" : (shouldHighlight ? "rgba(255,255,255,0.08)" : "transparent"),
+                    borderLeft: shouldHighlight ? "3px solid #1976d2" : "3px solid transparent",
+                    opacity: isInactiveQueue ? 0.6 : 1,
+                    boxSizing: "border-box",
+                    userSelect: "none",
+                    zIndex: isThisDragged ? 10 : 1,
+                    position: "relative",
+                    boxShadow: isThisDragged ? "0 4px 12px rgba(0,0,0,0.4)" : "none",
+                  }}
+                >
+                  {rowContent}
+                </div>
+              ) : (
+                <Box
+                  key={`${contextType}-${actualIndex}`}
+                  onClick={() => handlePlayTrack(track, actualIndex)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedTrackForMenu({ id: track.id, title: track.title, position: actualIndex, track: track });
+                    setContextMenu({
+                      top: e.clientY,
+                      left: e.clientX,
+                    });
+                  }}
+                  sx={{
+                    height: ITEM_HEIGHT,
+                    display: "flex",
+                    alignItems: "center",
+                    px: 2,
+                    py: 1.25,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s, opacity 0.2s",
+                    bgcolor: isFlashing ? "primary.dark" : (isSelected ? "action.selected" : (shouldHighlight ? "action.selected" : "transparent")),
+                    borderLeft: 3,
+                    borderLeftColor: isSelected ? "primary.main" : (shouldHighlight ? "primary.main" : "transparent"),
+                    opacity: isInactiveQueue ? 0.6 : 1,
+                    animation: isFlashing ? "flash 1s ease-in-out" : "none",
+                    "@keyframes flash": {
+                      "0%": { bgcolor: "primary.dark" },
+                      "50%": { bgcolor: "primary.main" },
+                      "100%": { bgcolor: "transparent" },
+                    },
+                    "&:hover": {
+                      bgcolor: shouldHighlight || isSelected ? "action.selected" : "action.hover",
+                    },
+                  }}
+                >
+                  {rowContent}
                 </Box>
               );
             })}

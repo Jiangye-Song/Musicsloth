@@ -7,6 +7,7 @@ import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import ShuffleIcon from "@mui/icons-material/Shuffle";
+import SwapVertIcon from "@mui/icons-material/SwapVert";
 import { usePlayer } from "../contexts/PlayerContext";
 
 interface QueuesViewProps {
@@ -19,13 +20,14 @@ export interface QueuesViewRef {
 }
 
 const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
-  const { currentQueueId, shuffleSeed, currentTrackIndex, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition, toggleShuffle } = usePlayer();
+  const { currentQueueId, shuffleSeed, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition, toggleShuffle } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [queueTracks, setQueueTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isReorderMode, setIsReorderMode] = useState(false);
   const trackListRef = useRef<VirtualTrackListRef>(null);
   const isMobile = useMediaQuery('(max-width:660px)');
 
@@ -136,50 +138,9 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
         setSelectedQueue(queue);
       }
 
+      // Get tracks directly - shuffle order is already applied in the database
       const tracks = await queueApi.getQueueTracks(queueId);
-
-      // Apply shuffle if the queue has a shuffle seed that's not 1
-      if (queue && queue.shuffle_seed !== null && queue.shuffle_seed !== 1) {
-        // Get current index to use as anchor
-        const currentIndex = queue.is_active && currentQueueId === queueId && currentTrackIndex !== null
-          ? currentTrackIndex
-          : await queueApi.getQueueCurrentIndex(queueId);
-
-        // Create shuffled order based on seed, anchored at current track
-        const shuffled = [...tracks];
-        const seed = queue.shuffle_seed;
-        const step = Math.abs(seed) % tracks.length || 1;
-        const anchor = currentIndex;
-
-        const newOrder: typeof tracks = [];
-        const used = new Set<number>();
-        let currentPos = anchor;
-
-        // First, place the anchor track at its position
-        used.add(anchor);
-
-        // Generate shuffled order by following the step pattern from anchor
-        for (let i = 0; i < tracks.length; i++) {
-          if (i === anchor) {
-            // Anchor stays at its position
-            newOrder.push(shuffled[anchor]);
-            continue;
-          }
-
-          // Find next unused position using step pattern
-          currentPos = (currentPos + step) % tracks.length;
-          while (used.has(currentPos)) {
-            currentPos = (currentPos + 1) % tracks.length;
-          }
-
-          newOrder.push(shuffled[currentPos]);
-          used.add(currentPos);
-        }
-
-        setQueueTracks(newOrder);
-      } else {
-        setQueueTracks(tracks);
-      }
+      setQueueTracks(tracks);
     } catch (error) {
       console.error("Failed to load queue tracks:", error);
     } finally {
@@ -198,16 +159,16 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
     try {
       if (selectedQueue.is_active) {
         // For active queue, use PlayerContext's toggleShuffle which handles
-        // anchor position, current track index, and state updates properly
+        // current track and state updates properly
         await toggleShuffle();
         
         // Update the selectedQueue state - get the new seed from DB
         const newSeed = await queueApi.getQueueShuffleSeed(selectedQueue.id);
         setSelectedQueue({ ...selectedQueue, shuffle_seed: newSeed });
       } else {
-        // For non-active queues, just toggle the seed in DB
-        // The anchor will be set when this queue becomes active and starts playing
-        const newSeed = await queueApi.toggleQueueShuffle(selectedQueue.id);
+        // For non-active queues, toggle shuffle with no current track
+        // This will shuffle from the start of the queue
+        const [newSeed, _newIndex] = await queueApi.toggleQueueShuffle(selectedQueue.id, null);
         setSelectedQueue({ ...selectedQueue, shuffle_seed: newSeed });
       }
       
@@ -283,13 +244,11 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
           // Load shuffle state for this queue (to sync PlayerContext)
           await loadShuffleStateFromQueue(nextQueue.id);
 
-          // Get the saved position and shuffle state
+          // Get the saved position
           const currentIndex = await queueApi.getQueueCurrentIndex(nextQueue.id);
-          const seed = await queueApi.getQueueShuffleSeed(nextQueue.id);
-          const anchor = await queueApi.getQueueShuffleAnchor(nextQueue.id);
 
-          // Get the track at the shuffled position
-          const trackToPlay = await queueApi.getQueueTrackAtShuffledPosition(nextQueue.id, currentIndex, seed, anchor);
+          // Get the track at position (shuffle order is already in the queue)
+          const trackToPlay = await queueApi.getQueueTrackAtPosition(nextQueue.id, currentIndex);
 
           // Play from the saved position
           if (trackToPlay) {
@@ -541,6 +500,18 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   <MyLocationIcon sx={{ fontSize: "18px" }} />
                 </IconButton>
                 <IconButton
+                  onClick={() => setIsReorderMode(!isReorderMode)}
+                  disabled={queueTracks.length === 0}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    color: isReorderMode ? "primary.main" : "text.secondary",
+                  }}
+                  title={isReorderMode ? "Exit reorder mode" : "Reorder tracks"}
+                >
+                  <SwapVertIcon sx={{ fontSize: "18px" }} />
+                </IconButton>
+                <IconButton
                   onClick={handleToggleShuffle}
                   disabled={queueTracks.length === 0}
                   sx={{
@@ -588,6 +559,8 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                       }
                     }}
                     showSearch={true}
+                    isReorderMode={isReorderMode}
+                    onReorderModeChange={setIsReorderMode}
                   />
                 </div>
               </>

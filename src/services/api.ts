@@ -247,8 +247,8 @@ export const queueApi = {
     return await invoke("get_queue_length", { queueId });
   },
 
-  toggleQueueShuffle: async (queueId: number): Promise<number> => {
-    return await invoke("toggle_queue_shuffle", { queueId });
+  toggleQueueShuffle: async (queueId: number, currentTrackId: number | null): Promise<[number, number]> => {
+    return await invoke("toggle_queue_shuffle", { queueId, currentTrackId });
   },
 
   setQueueShuffleSeed: async (queueId: number, shuffleSeed: number): Promise<void> => {
@@ -281,6 +281,10 @@ export const queueApi = {
 
   removeTrackAtPosition: async (queueId: number, position: number): Promise<number> => {
     return await invoke("remove_track_at_position", { queueId, position });
+  },
+
+  reorderQueueTrack: async (queueId: number, fromPosition: number, toPosition: number): Promise<number> => {
+    return await invoke("reorder_queue_track", { queueId, fromPosition, toPosition });
   },
 };
 
@@ -323,6 +327,10 @@ export const playlistApi = {
 
   deletePlaylist: async (playlistId: number): Promise<void> => {
     return await invoke("delete_playlist", { playlistId });
+  },
+
+  reorderPlaylistTrack: async (playlistId: number, fromPosition: number, toPosition: number): Promise<void> => {
+    return await invoke("reorder_playlist_track", { playlistId, fromPosition, toPosition });
   },
 };
 

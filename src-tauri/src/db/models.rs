@@ -70,6 +70,10 @@ pub struct Queue {
     pub is_active: bool,
     #[serde(default = "default_shuffle_seed")]
     pub shuffle_seed: i64,
+    /// JSON array of track IDs representing the original order before shuffling.
+    /// Only populated when shuffle is enabled.
+    #[serde(default)]
+    pub original_order: Option<String>,
 }
 
 fn default_shuffle_seed() -> i64 {

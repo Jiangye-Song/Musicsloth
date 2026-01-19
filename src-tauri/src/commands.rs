@@ -546,8 +546,8 @@ pub fn get_queue_length(queue_id: i64, state: State<'_, AppState>) -> Result<i32
 }
 
 #[tauri::command]
-pub fn toggle_queue_shuffle(queue_id: i64, state: State<'_, AppState>) -> Result<i64, String> {
-    DbOperations::toggle_queue_shuffle(&state.db, queue_id)
+pub fn toggle_queue_shuffle(queue_id: i64, current_track_id: Option<i64>, state: State<'_, AppState>) -> Result<(i64, i32), String> {
+    DbOperations::toggle_queue_shuffle(&state.db, queue_id, current_track_id)
         .map_err(|e| format!("Failed to toggle queue shuffle: {}", e))
 }
 
@@ -643,6 +643,18 @@ pub fn remove_track_from_playlist(state: State<'_, AppState>, playlist_id: i64, 
 pub fn delete_playlist(state: State<'_, AppState>, playlist_id: i64) -> Result<(), String> {
     DbOperations::delete_playlist(&state.db, playlist_id)
         .map_err(|e| format!("Failed to delete playlist: {}", e))
+}
+
+#[tauri::command]
+pub fn reorder_playlist_track(state: State<'_, AppState>, playlist_id: i64, from_position: i32, to_position: i32) -> Result<(), String> {
+    DbOperations::reorder_playlist_track(&state.db, playlist_id, from_position, to_position)
+        .map_err(|e| format!("Failed to reorder playlist track: {}", e))
+}
+
+#[tauri::command]
+pub fn reorder_queue_track(state: State<'_, AppState>, queue_id: i64, from_position: i32, to_position: i32) -> Result<i32, String> {
+    DbOperations::reorder_queue_track(&state.db, queue_id, from_position, to_position)
+        .map_err(|e| format!("Failed to reorder queue track: {}", e))
 }
 
 #[tauri::command]

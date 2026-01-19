@@ -618,7 +618,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, shuffle_seed FROM queues ORDER BY id DESC"
+            "SELECT id, name, is_active, shuffle_seed, original_order FROM queues ORDER BY id DESC"
         )?;
         
         let queues = stmt.query_map([], |row| {
@@ -627,6 +627,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 is_active: row.get(2)?,
                 shuffle_seed: row.get::<_, Option<i64>>(3)?.unwrap_or(1),
+                original_order: row.get(4)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -762,7 +763,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, shuffle_seed FROM queues WHERE is_active = 1 LIMIT 1"
+            "SELECT id, name, is_active, shuffle_seed, original_order FROM queues WHERE is_active = 1 LIMIT 1"
         )?;
         
         let mut rows = stmt.query([])?;
@@ -773,6 +774,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 is_active: row.get(2)?,
                 shuffle_seed: row.get::<_, Option<i64>>(3)?.unwrap_or(1),
+                original_order: row.get(4)?,
             }))
         } else {
             Ok(None)
@@ -836,7 +838,7 @@ impl DbOperations {
         let conn = conn.lock().unwrap();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, is_active, shuffle_seed
+            "SELECT id, name, is_active, shuffle_seed, original_order
              FROM queues
              WHERE id != ?1
              ORDER BY id DESC
@@ -849,6 +851,7 @@ impl DbOperations {
                 name: row.get(1)?,
                 is_active: row.get(2)?,
                 shuffle_seed: row.get::<_, Option<i64>>(3)?.unwrap_or(1),
+                original_order: row.get(4)?,
             })
         }).optional()?;
         
@@ -1128,49 +1131,142 @@ impl DbOperations {
         Ok(count)
     }
 
-    /// Toggle shuffle for a queue
-    /// If shuffle_seed is 1 (sequential), generate a random seed and enable shuffle
-    /// If shuffle_seed is not 1, set it to 1 and disable shuffle
+    /// Toggle shuffle for a queue using the original_order approach
+    /// When enabling shuffle:
+    ///   - Save current track order to original_order
+    ///   - Shuffle the queue_tracks positions in place
+    ///   - Set shuffle_seed to a non-1 value to indicate shuffled state
+    /// When disabling shuffle:
+    ///   - Restore track positions from original_order
+    ///   - Clear original_order
+    ///   - Set shuffle_seed to 1
+    /// Returns (new_seed, new_current_track_index)
     pub fn toggle_queue_shuffle(
         db: &DatabaseConnection,
         queue_id: i64,
-    ) -> Result<i64, anyhow::Error> {
+        current_track_id: Option<i64>,
+    ) -> Result<(i64, i32), anyhow::Error> {
+        use rand::seq::SliceRandom;
+        use rand::SeedableRng;
         use std::time::{SystemTime, UNIX_EPOCH};
         
         let conn = db.get_connection();
-        let conn = conn.lock().unwrap();
+        let mut conn = conn.lock().unwrap();
         
-        // Get current shuffle_seed (default to 1 if NULL)
-        let current_seed: Option<i64> = conn.query_row(
-            "SELECT shuffle_seed FROM queues WHERE id = ?1",
+        // Get current shuffle state and original_order
+        let (current_seed, original_order_json): (Option<i64>, Option<String>) = conn.query_row(
+            "SELECT shuffle_seed, original_order FROM queues WHERE id = ?1",
             [queue_id],
-            |row| row.get(0)
+            |row| Ok((row.get(0)?, row.get(1)?))
         )?;
         
         let current_seed = current_seed.unwrap_or(1);
+        let is_currently_shuffled = current_seed != 1;
         
-        let new_seed = if current_seed == 1 {
-            // Enable shuffle - generate random seed (ensure it's not 1)
-            let mut seed = SystemTime::now()
+        let tx = conn.transaction()?;
+        
+        if !is_currently_shuffled {
+            // Enable shuffle: save original order, then shuffle
+            
+            // Get current track IDs in order
+            let mut stmt = tx.prepare(
+                "SELECT track_id FROM queue_tracks WHERE queue_id = ?1 ORDER BY position"
+            )?;
+            let track_ids: Vec<i64> = stmt.query_map([queue_id], |row| row.get(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            drop(stmt);
+            
+            if track_ids.is_empty() {
+                return Ok((1, 0));
+            }
+            
+            // Save original order as JSON
+            let original_order_json = serde_json::to_string(&track_ids)?;
+            
+            // Create shuffled order, keeping current track at its position
+            let mut shuffled_ids = track_ids.clone();
+            let seed_value = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_millis() as i64;
-            if seed == 1 {
-                seed = 2; // Avoid seed of 1
+                .as_nanos() as u64;
+            let mut rng = rand::rngs::StdRng::seed_from_u64(seed_value);
+            
+            // Remove the current track, shuffle the rest, then put current track at position 0
+            if let Some(track_id) = current_track_id {
+                shuffled_ids.retain(|&id| id != track_id);
+                shuffled_ids.shuffle(&mut rng);
+                shuffled_ids.insert(0, track_id); // Current track goes to front
+            } else {
+                shuffled_ids.shuffle(&mut rng);
             }
-            seed
+            
+            // Update positions in database
+            for (new_pos, track_id) in shuffled_ids.iter().enumerate() {
+                tx.execute(
+                    "UPDATE queue_tracks SET position = ?1 WHERE queue_id = ?2 AND track_id = ?3",
+                    rusqlite::params![new_pos as i32, queue_id, track_id]
+                )?;
+            }
+            
+            // Generate a new seed (just needs to be != 1 to indicate shuffled)
+            let new_seed = (seed_value % 1000000) as i64 + 2; // Ensure it's never 1
+            
+            // Update queue with new seed, original_order, and current_track_index = 0 (since current track is now at front)
+            tx.execute(
+                "UPDATE queues SET shuffle_seed = ?1, original_order = ?2, current_track_index = 0 WHERE id = ?3",
+                rusqlite::params![new_seed, original_order_json, queue_id]
+            )?;
+            
+            tx.commit()?;
+            println!("[Backend] Shuffle enabled: saved {} tracks to original_order, current track at position 0", track_ids.len());
+            Ok((new_seed, 0))
         } else {
-            // Disable shuffle - set to 1 (sequential)
-            1
-        };
-        
-        // Update the queue
-        conn.execute(
-            "UPDATE queues SET shuffle_seed = ?1 WHERE id = ?2",
-            rusqlite::params![new_seed, queue_id]
-        )?;
-        
-        Ok(new_seed)
+            // Disable shuffle: restore original order
+            
+            if let Some(original_order_json) = original_order_json {
+                let original_ids: Vec<i64> = serde_json::from_str(&original_order_json)?;
+                
+                // Find where the current track will be in the restored order
+                let new_current_index = if let Some(track_id) = current_track_id {
+                    original_ids.iter().position(|&id| id == track_id).unwrap_or(0) as i32
+                } else {
+                    0
+                };
+                
+                // Restore positions from original order
+                for (pos, track_id) in original_ids.iter().enumerate() {
+                    tx.execute(
+                        "UPDATE queue_tracks SET position = ?1 WHERE queue_id = ?2 AND track_id = ?3",
+                        rusqlite::params![pos as i32, queue_id, track_id]
+                    )?;
+                }
+                
+                // Clear shuffle state
+                tx.execute(
+                    "UPDATE queues SET shuffle_seed = 1, original_order = NULL, current_track_index = ?1 WHERE id = ?2",
+                    rusqlite::params![new_current_index, queue_id]
+                )?;
+                
+                tx.commit()?;
+                println!("[Backend] Shuffle disabled: restored {} tracks from original_order, current track at position {}", original_ids.len(), new_current_index);
+                Ok((1, new_current_index))
+            } else {
+                // No original_order stored, just reset seed
+                tx.execute(
+                    "UPDATE queues SET shuffle_seed = 1 WHERE id = ?1",
+                    rusqlite::params![queue_id]
+                )?;
+                
+                let current_index: i32 = tx.query_row(
+                    "SELECT current_track_index FROM queues WHERE id = ?1",
+                    [queue_id],
+                    |row| row.get(0)
+                )?;
+                
+                tx.commit()?;
+                Ok((1, current_index))
+            }
+        }
     }
 
     /// Set shuffle seed for a queue directly
@@ -1830,7 +1926,141 @@ impl DbOperations {
         Ok(())
     }
 
+    /// Move a track from one position to another in a playlist
+    pub fn reorder_playlist_track(
+        db: &DatabaseConnection,
+        playlist_id: i64,
+        from_position: i32,
+        to_position: i32,
+    ) -> Result<(), anyhow::Error> {
+        if from_position == to_position {
+            return Ok(());
+        }
+
+        let conn = db.get_connection();
+        let mut conn = conn.lock().unwrap();
+
+        let tx = conn.transaction()?;
+
+        // Get track_id at from_position
+        let track_id: i64 = tx.query_row(
+            "SELECT track_id FROM playlist_tracks WHERE playlist_id = ?1 AND position = ?2",
+            params![playlist_id, from_position],
+            |row| row.get(0),
+        )?;
+
+        if from_position < to_position {
+            // Moving down: shift tracks between from+1 and to up by 1
+            tx.execute(
+                "UPDATE playlist_tracks SET position = position - 1 
+                 WHERE playlist_id = ?1 AND position > ?2 AND position <= ?3",
+                params![playlist_id, from_position, to_position],
+            )?;
+        } else {
+            // Moving up: shift tracks between to and from-1 down by 1
+            tx.execute(
+                "UPDATE playlist_tracks SET position = position + 1 
+                 WHERE playlist_id = ?1 AND position >= ?2 AND position < ?3",
+                params![playlist_id, to_position, from_position],
+            )?;
+        }
+
+        // Move the track to its new position
+        tx.execute(
+            "UPDATE playlist_tracks SET position = ?1 WHERE playlist_id = ?2 AND track_id = ?3",
+            params![to_position, playlist_id, track_id],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Move a track from one position to another in a queue
+    /// If the queue is shuffled, updates the original_order to reflect the new order
+    /// Returns the new current_track_index after adjustment
+    pub fn reorder_queue_track(
+        db: &DatabaseConnection,
+        queue_id: i64,
+        from_position: i32,
+        to_position: i32,
+    ) -> Result<i32, anyhow::Error> {
+        if from_position == to_position {
+            let current_index = Self::get_queue_current_index(db, queue_id)?;
+            return Ok(current_index);
+        }
+
+        let conn = db.get_connection();
+        let mut conn = conn.lock().unwrap();
+
+        let tx = conn.transaction()?;
+
+        // Get current track index
+        let current_index: i32 = tx.query_row(
+            "SELECT current_track_index FROM queues WHERE id = ?1",
+            params![queue_id],
+            |row| row.get(0),
+        )?;
+
+        // Get track_id at from_position
+        let track_id: i64 = tx.query_row(
+            "SELECT track_id FROM queue_tracks WHERE queue_id = ?1 AND position = ?2",
+            params![queue_id, from_position],
+            |row| row.get(0),
+        )?;
+
+        if from_position < to_position {
+            // Moving down: shift tracks between from+1 and to up by 1
+            tx.execute(
+                "UPDATE queue_tracks SET position = position - 1 
+                 WHERE queue_id = ?1 AND position > ?2 AND position <= ?3",
+                params![queue_id, from_position, to_position],
+            )?;
+        } else {
+            // Moving up: shift tracks between to and from-1 down by 1
+            tx.execute(
+                "UPDATE queue_tracks SET position = position + 1 
+                 WHERE queue_id = ?1 AND position >= ?2 AND position < ?3",
+                params![queue_id, to_position, from_position],
+            )?;
+        }
+
+        // Move the track to its new position
+        tx.execute(
+            "UPDATE queue_tracks SET position = ?1 WHERE queue_id = ?2 AND track_id = ?3 AND position = ?4",
+            params![to_position, queue_id, track_id, from_position],
+        )?;
+
+        // Note: We do NOT update original_order when reordering a shuffled queue.
+        // The original_order preserves the pre-shuffle state for restoration when unshuffle is pressed.
+        // User's drag-and-drop only affects the current (shuffled) order.
+
+        // Calculate new current_track_index
+        let new_index = if from_position == current_index {
+            // The currently playing track was moved
+            to_position
+        } else if from_position < current_index && to_position >= current_index {
+            // Track moved from before current to after/at current: current shifts up
+            current_index - 1
+        } else if from_position > current_index && to_position <= current_index {
+            // Track moved from after current to before/at current: current shifts down
+            current_index + 1
+        } else {
+            // No effect on current index
+            current_index
+        };
+
+        // Update current_track_index
+        tx.execute(
+            "UPDATE queues SET current_track_index = ?1 WHERE id = ?2",
+            params![new_index, queue_id],
+        )?;
+
+        tx.commit()?;
+        Ok(new_index)
+    }
+
     /// Append tracks to the end of a queue
+    /// If the queue is shuffled, also appends to the end of original_order
     pub fn append_tracks_to_queue(
         db: &DatabaseConnection,
         queue_id: i64,
@@ -1839,14 +2069,14 @@ impl DbOperations {
         let conn = db.get_connection();
         let mut conn = conn.lock().unwrap();
 
-        // Get current max position
-        let max_position: i32 = conn
+        // Get current max position and original_order
+        let (max_position, original_order_json): (i32, Option<String>) = conn
             .query_row(
-                "SELECT COALESCE(MAX(position), -1) FROM queue_tracks WHERE queue_id = ?1",
+                "SELECT COALESCE((SELECT MAX(position) FROM queue_tracks WHERE queue_id = ?1), -1), 
+                        (SELECT original_order FROM queues WHERE id = ?1)",
                 [queue_id],
-                |row| row.get(0),
-            )
-            .unwrap_or(-1);
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?;
 
         let tx = conn.transaction()?;
 
@@ -1854,6 +2084,17 @@ impl DbOperations {
             tx.execute(
                 "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
                 params![queue_id, track_id, max_position + 1 + index as i32],
+            )?;
+        }
+
+        // If shuffled, also append to original_order
+        if let Some(original_order_str) = original_order_json {
+            let mut original_ids: Vec<i64> = serde_json::from_str(&original_order_str)?;
+            original_ids.extend(track_ids.iter().copied());
+            let updated_original_order = serde_json::to_string(&original_ids)?;
+            tx.execute(
+                "UPDATE queues SET original_order = ?1 WHERE id = ?2",
+                params![updated_original_order, queue_id],
             )?;
         }
 
@@ -1893,6 +2134,7 @@ impl DbOperations {
     }
 
     /// Remove a track at a specific position from a queue
+    /// If the queue is shuffled, also removes the first occurrence from original_order
     /// Returns the new current_track_index after adjustment (-1 if queue becomes empty)
     pub fn remove_track_at_position(
         db: &DatabaseConnection,
@@ -1904,17 +2146,24 @@ impl DbOperations {
         
         let tx = conn.transaction()?;
 
-        // Get current track index before removal
-        let current_index: i32 = tx.query_row(
-            "SELECT current_track_index FROM queues WHERE id = ?1",
+        // Get current track index and original_order before removal
+        let (current_index, original_order_json): (i32, Option<String>) = tx.query_row(
+            "SELECT current_track_index, original_order FROM queues WHERE id = ?1",
             params![queue_id],
-            |row| row.get(0)
+            |row| Ok((row.get(0)?, row.get(1)?))
         )?;
 
         // Get total track count before removal
         let track_count: i32 = tx.query_row(
             "SELECT COUNT(*) FROM queue_tracks WHERE queue_id = ?1",
             params![queue_id],
+            |row| row.get(0)
+        )?;
+
+        // Get the track_id being removed (needed to update original_order)
+        let removed_track_id: i64 = tx.query_row(
+            "SELECT track_id FROM queue_tracks WHERE queue_id = ?1 AND position = ?2",
+            params![queue_id, position],
             |row| row.get(0)
         )?;
 
@@ -1929,6 +2178,19 @@ impl DbOperations {
             "UPDATE queue_tracks SET position = position - 1 WHERE queue_id = ?1 AND position > ?2",
             params![queue_id, position],
         )?;
+
+        // If shuffled, remove the first occurrence from original_order
+        if let Some(original_order_str) = original_order_json {
+            let mut original_ids: Vec<i64> = serde_json::from_str(&original_order_str)?;
+            if let Some(pos) = original_ids.iter().position(|&id| id == removed_track_id) {
+                original_ids.remove(pos);
+                let updated_original_order = serde_json::to_string(&original_ids)?;
+                tx.execute(
+                    "UPDATE queues SET original_order = ?1 WHERE id = ?2",
+                    params![updated_original_order, queue_id],
+                )?;
+            }
+        }
 
         // Calculate new current index
         let new_index = if track_count <= 1 {
