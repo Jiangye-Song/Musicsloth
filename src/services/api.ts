@@ -316,6 +316,10 @@ export const playlistApi = {
   getPlaylistTracks: async (playlistId: number): Promise<Track[]> => {
     return await invoke("get_playlist_tracks", { playlistId });
   },
+
+  removeTrackFromPlaylist: async (playlistId: number, trackId: number): Promise<void> => {
+    return await invoke("remove_track_from_playlist", { playlistId, trackId });
+  },
 };
 
 export const fileApi = {

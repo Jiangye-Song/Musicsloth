@@ -24,6 +24,7 @@ interface TrackContextMenuProps {
   hasActiveQueue?: boolean;
   // Whether multi-select mode is currently active
   isMultiSelectMode?: boolean;
+  onShowSongInfo?: () => void;
   onStartMultiSelect?: () => void;
   onPlayNext?: () => void;
   onAddToCurrentQueue?: () => void;
@@ -40,6 +41,7 @@ export default function TrackContextMenu({
   inPlaylist = null,
   hasActiveQueue = false,
   isMultiSelectMode = false,
+  onShowSongInfo,
   onStartMultiSelect,
   onPlayNext,
   onAddToCurrentQueue,
@@ -56,6 +58,12 @@ export default function TrackContextMenu({
   const showRemoveFromPlaylist = inPlaylist !== null && !inPlaylist.isSystemPlaylist;
 
   const handleMenuItemClick = (action: string) => {
+    if (action === "info" && onShowSongInfo) {
+      onShowSongInfo();
+      // Don't call onClose here - dialog will open
+      return;
+    }
+
     if (action === "multiselect" && onStartMultiSelect) {
       onStartMultiSelect();
       onClose();

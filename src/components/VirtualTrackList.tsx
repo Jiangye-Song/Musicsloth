@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
-import { libraryApi, Track, playerApi, queueApi } from "../services/api";
+import { libraryApi, Track, playerApi, queueApi, playlistApi } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
 import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener, Checkbox, Button, IconButton } from "@mui/material";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
@@ -8,6 +8,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import TrackContextMenu from "./TrackContextMenu";
 import AddToPlaylistDialog from "./AddToPlaylistDialog";
 import AddToQueueDialog from "./AddToQueueDialog";
+import SongInfoDialog from "./SongInfoDialog";
 
 const ITEM_HEIGHT = 80;
 const OVERSCAN = 10; // Number of items to render beyond visible area
@@ -28,11 +29,15 @@ interface VirtualTrackListProps {
   showPlayingIndicator?: boolean; // Show visual indicator for currently playing track
   onQueueActivated?: () => void; // Callback when queue is activated
   onQueueTracksChanged?: (queueId: number) => void; // Callback when tracks are added/removed from a queue
+  onPlaylistTracksChanged?: (playlistId: number) => void; // Callback when tracks are added/removed from a playlist
   showSearch?: boolean; // Whether to show the search bar
   initialTrackId?: number; // Track ID to scroll to and flash on mount
+  onNavigateToArtist?: (artistName: string, trackId: number) => void;
+  onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+  onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
-const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, onQueueTracksChanged, showSearch = false, initialTrackId }, ref) => {
+const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, onQueueTracksChanged, onPlaylistTracksChanged, showSearch = false, initialTrackId, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }, ref) => {
   // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex, isShuffled, loadShuffleStateFromQueue, setShuffleStateForNewQueue } = usePlayer();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
@@ -47,9 +52,10 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
   const [flashingIndex, setFlashingIndex] = useState<number | null>(null);
   const [dropdownAlbumArtCache, setDropdownAlbumArtCache] = useState<Map<string, string>>(new Map());
   const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
-  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState<{ id: number; title: string; position: number } | null>(null);
+  const [selectedTrackForMenu, setSelectedTrackForMenu] = useState<{ id: number; title: string; position: number; track: Track } | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [showQueueDialog, setShowQueueDialog] = useState(false);
+  const [showSongInfoDialog, setShowSongInfoDialog] = useState(false);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedPositions, setSelectedPositions] = useState<Set<number>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
@@ -776,7 +782,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                   onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setSelectedTrackForMenu({ id: track.id, title: track.title, position: actualIndex });
+                    setSelectedTrackForMenu({ id: track.id, title: track.title, position: actualIndex, track: track });
                     setContextMenu({
                       top: e.clientY,
                       left: e.clientX,
@@ -902,7 +908,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         onClose={() => {
           setContextMenu(null);
           // Only clear selectedTrackForMenu if no dialog is being opened
-          if (!showPlaylistDialog && !showQueueDialog) {
+          if (!showPlaylistDialog && !showQueueDialog && !showSongInfoDialog) {
             setSelectedTrackForMenu(null);
           }
         }}
@@ -916,6 +922,10 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         } : null}
         hasActiveQueue={currentQueueId !== null}
         isMultiSelectMode={isMultiSelectMode}
+        onShowSongInfo={() => {
+          setShowSongInfoDialog(true);
+          setContextMenu(null);
+        }}
         onStartMultiSelect={() => {
           if (selectedTrackForMenu) {
             // Start multi-select with the right-clicked track already selected
@@ -969,6 +979,16 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             console.error("Failed to remove track from queue:", err);
           }
         }}
+        onRemoveFromPlaylist={async () => {
+          if (!selectedTrackForMenu || playlistId === undefined) return;
+          try {
+            await playlistApi.removeTrackFromPlaylist(Number(playlistId), selectedTrackForMenu.id);
+            // Notify that playlist tracks changed
+            onPlaylistTracksChanged?.(Number(playlistId));
+          } catch (err) {
+            console.error("Failed to remove track from playlist:", err);
+          }
+        }}
       />
 
       {/* Add to Playlist Dialog */}
@@ -997,6 +1017,19 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         onTrackAdded={(addedQueueId) => {
           onQueueTracksChanged?.(addedQueueId);
         }}
+      />
+
+      {/* Song Info Dialog */}
+      <SongInfoDialog
+        open={showSongInfoDialog}
+        onClose={() => {
+          setShowSongInfoDialog(false);
+          setSelectedTrackForMenu(null);
+        }}
+        track={selectedTrackForMenu?.track || null}
+        onNavigateToArtist={onNavigateToArtist}
+        onNavigateToAlbum={onNavigateToAlbum}
+        onNavigateToGenre={onNavigateToGenre}
       />
     </div>
   );

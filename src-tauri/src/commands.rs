@@ -231,56 +231,103 @@ pub fn get_current_track(state: State<'_, AppState>) -> Result<Option<Track>, St
 pub async fn get_album_art(file_path: String) -> Result<Option<Vec<u8>>, String> {
     use lofty::probe::Probe;
     use lofty::picture::PictureType;
+    use std::path::Path;
     
     // Run file I/O in a blocking task to avoid blocking the async runtime
     tokio::task::spawn_blocking(move || {
-        let tagged_file = Probe::open(&file_path)
-            .map_err(|e| format!("Failed to open file: {}", e))?
-            .read()
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-    
-    // Priority order for picture types (matching foobar2000 behavior)
-    let picture_priority = [
-        PictureType::CoverFront,      // Front Cover (most common)
-        PictureType::Media,            // Media (e.g., label side of CD)
-        PictureType::CoverBack,        // Back Cover
-        PictureType::Leaflet,          // Leaflet page
-        PictureType::Other,            // Other/Undefined
-        PictureType::Icon,             // Icon
-        PictureType::OtherIcon,        // Other Icon
-        PictureType::Artist,           // Artist/Performer
-        PictureType::Band,             // Band/Orchestra
-        PictureType::Composer,         // Composer
-        PictureType::Lyricist,         // Lyricist/Text writer
-        PictureType::RecordingLocation, // Recording Location
-        PictureType::DuringRecording,  // During Recording
-        PictureType::DuringPerformance, // During Performance
-        PictureType::ScreenCapture,    // Screen Capture
-        PictureType::BrightFish,       // Bright Colored Fish
-        PictureType::Illustration,     // Illustration
-        PictureType::BandLogo,         // Band/Artist Logotype
-        PictureType::PublisherLogo,    // Publisher/Studio Logotype
-    ];
-    
-        // Try to get the primary tag first
-        if let Some(tag) = tagged_file.primary_tag() {
-            // Try each picture type in priority order
-            for pic_type in &picture_priority {
-                for picture in tag.pictures() {
-                    if picture.pic_type() == *pic_type {
-                        return Ok(Some(picture.data().to_vec()));
+        let path = Path::new(&file_path);
+        
+        // Try lofty first
+        let lofty_result = Probe::open(&file_path)
+            .and_then(|p| p.read());
+        
+        if let Ok(tagged_file) = lofty_result {
+            // Priority order for picture types (matching foobar2000 behavior)
+            let picture_priority = [
+                PictureType::CoverFront,      // Front Cover (most common)
+                PictureType::Media,            // Media (e.g., label side of CD)
+                PictureType::CoverBack,        // Back Cover
+                PictureType::Leaflet,          // Leaflet page
+                PictureType::Other,            // Other/Undefined
+                PictureType::Icon,             // Icon
+                PictureType::OtherIcon,        // Other Icon
+                PictureType::Artist,           // Artist/Performer
+                PictureType::Band,             // Band/Orchestra
+                PictureType::Composer,         // Composer
+                PictureType::Lyricist,         // Lyricist/Text writer
+                PictureType::RecordingLocation, // Recording Location
+                PictureType::DuringRecording,  // During Recording
+                PictureType::DuringPerformance, // During Performance
+                PictureType::ScreenCapture,    // Screen Capture
+                PictureType::BrightFish,       // Bright Colored Fish
+                PictureType::Illustration,     // Illustration
+                PictureType::BandLogo,         // Band/Artist Logotype
+                PictureType::PublisherLogo,    // Publisher/Studio Logotype
+            ];
+            
+            // Try to get the primary tag first
+            if let Some(tag) = tagged_file.primary_tag() {
+                // Try each picture type in priority order
+                for pic_type in &picture_priority {
+                    for picture in tag.pictures() {
+                        if picture.pic_type() == *pic_type {
+                            return Ok(Some(picture.data().to_vec()));
+                        }
                     }
                 }
             }
+            
+            // Try all tags if primary tag didn't have cover art
+            for tag in tagged_file.tags() {
+                // Try each picture type in priority order
+                for pic_type in &picture_priority {
+                    for picture in tag.pictures() {
+                        if picture.pic_type() == *pic_type {
+                            return Ok(Some(picture.data().to_vec()));
+                        }
+                    }
+                }
+            }
+            
+            return Ok(None);
         }
         
-        // Try all tags if primary tag didn't have cover art
-        for tag in tagged_file.tags() {
-            // Try each picture type in priority order
-            for pic_type in &picture_priority {
-                for picture in tag.pictures() {
-                    if picture.pic_type() == *pic_type {
-                        return Ok(Some(picture.data().to_vec()));
+        // Fallback: try id3 crate for MP3 files if lofty failed
+        let extension = path.extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase());
+        
+        if extension.as_deref() == Some("mp3") {
+            if let Ok(tag) = id3::Tag::read_from_path(&file_path) {
+                // id3 crate picture type priority (similar to lofty)
+                use id3::frame::PictureType as Id3PictureType;
+                let id3_priority = [
+                    Id3PictureType::CoverFront,
+                    Id3PictureType::Media,
+                    Id3PictureType::CoverBack,
+                    Id3PictureType::Leaflet,
+                    Id3PictureType::Other,
+                    Id3PictureType::Icon,
+                    Id3PictureType::OtherIcon,
+                    Id3PictureType::Artist,
+                    Id3PictureType::Band,
+                    Id3PictureType::Composer,
+                    Id3PictureType::Lyricist,
+                    Id3PictureType::RecordingLocation,
+                    Id3PictureType::DuringRecording,
+                    Id3PictureType::DuringPerformance,
+                    Id3PictureType::ScreenCapture,
+                    Id3PictureType::BrightFish,
+                    Id3PictureType::Illustration,
+                    Id3PictureType::BandLogo,
+                    Id3PictureType::PublisherLogo,
+                ];
+                
+                for pic_type in &id3_priority {
+                    for picture in tag.pictures() {
+                        if picture.picture_type == *pic_type {
+                            return Ok(Some(picture.data.clone()));
+                        }
                     }
                 }
             }
@@ -584,6 +631,12 @@ pub fn add_track_to_playlist(state: State<'_, AppState>, playlist_id: i64, track
 pub fn get_playlist_tracks(state: State<'_, AppState>, playlist_id: i64) -> Result<Vec<Track>, String> {
     DbOperations::get_playlist_tracks(&state.db, playlist_id)
         .map_err(|e| format!("Failed to get playlist tracks: {}", e))
+}
+
+#[tauri::command]
+pub fn remove_track_from_playlist(state: State<'_, AppState>, playlist_id: i64, track_id: i64) -> Result<(), String> {
+    DbOperations::remove_track_from_playlist(&state.db, playlist_id, track_id)
+        .map_err(|e| format!("Failed to remove track from playlist: {}", e))
 }
 
 #[tauri::command]

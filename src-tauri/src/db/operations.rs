@@ -527,6 +527,9 @@ impl DbOperations {
         conn.execute("DELETE FROM artists", [])?;
         conn.execute("DELETE FROM genres", [])?;
         
+        // Reset last_scanned on all scan paths so files will be re-indexed
+        conn.execute("UPDATE scan_paths SET last_scanned = NULL", [])?;
+        
         Ok(())
     }
 
@@ -1757,6 +1760,47 @@ impl DbOperations {
         .collect::<Result<Vec<_>, _>>()?;
         
         Ok(tracks)
+    }
+
+    /// Remove a track from a playlist by track ID
+    pub fn remove_track_from_playlist(
+        db: &DatabaseConnection,
+        playlist_id: i64,
+        track_id: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let mut conn = conn.lock().unwrap();
+        
+        // Get the position of the track to be removed
+        let position: Option<i32> = conn
+            .query_row(
+                "SELECT position FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+                params![playlist_id, track_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        
+        let position = match position {
+            Some(p) => p,
+            None => return Err(anyhow::anyhow!("Track not found in playlist")),
+        };
+        
+        let tx = conn.transaction()?;
+        
+        // Remove the track
+        tx.execute(
+            "DELETE FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2",
+            params![playlist_id, track_id],
+        )?;
+        
+        // Shift positions of tracks after the removed one
+        tx.execute(
+            "UPDATE playlist_tracks SET position = position - 1 WHERE playlist_id = ?1 AND position > ?2",
+            params![playlist_id, position],
+        )?;
+        
+        tx.commit()?;
+        Ok(())
     }
 
     /// Append tracks to the end of a queue

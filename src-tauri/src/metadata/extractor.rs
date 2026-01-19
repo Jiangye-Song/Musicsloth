@@ -1,6 +1,7 @@
-// Metadata extractor using lofty
+// Metadata extractor using lofty with id3 fallback for problematic MP3 files
 use lofty::probe::Probe;
 use lofty::prelude::{TaggedFileExt, ItemKey, Accessor, AudioFile};
+use id3::TagLike;
 use std::path::Path;
 use anyhow::Result;
 
@@ -10,28 +11,18 @@ pub struct MetadataExtractor;
 
 impl MetadataExtractor {
     pub fn extract_from_file(file_path: &Path) -> Result<Track> {
-        // Try to read the file with lofty
+        // Try to read the file with lofty first
         let tagged_file = match Probe::open(file_path)?.guess_file_type()?.read() {
             Ok(f) => f,
             Err(e) => {
                 eprintln!("Failed to read file with lofty: {:?}, error: {}", file_path, e);
-                // Fallback: return minimal track info if file can't be read
-                return Self::create_minimal_track(file_path);
+                // Fallback: try id3 crate for MP3 files, otherwise return minimal track info
+                return Self::extract_with_fallback(file_path);
             }
         };
 
         let tag = tagged_file.primary_tag().or(tagged_file.first_tag());
         let properties = tagged_file.properties();
-
-        // // Debug logging for problematic files
-        // if let Some(t) = tag {
-        //     eprintln!("DEBUG - File: {:?}", file_path.file_name());
-        //     eprintln!("  Tag type: {:?}", t.tag_type());
-        //     eprintln!("  Title: {:?}", t.title());
-        //     eprintln!("  Artist: {:?}", t.artist());
-        //     eprintln!("  Album: {:?}", t.album());
-        //     eprintln!("  Genre: {:?}", t.genre());
-        // }
 
         let title = tag
             .and_then(|t| t.title().map(|s| s.to_string()))
@@ -69,6 +60,7 @@ impl MetadataExtractor {
         });
         
         let track_number = tag.and_then(|t| t.track());
+        let disc_number = tag.and_then(|t| t.disk());
         let genre = tag.and_then(|t| t.genre().map(|s| s.to_string()));
 
         let duration_ms = properties.duration().as_millis() as i64;
@@ -95,7 +87,7 @@ impl MetadataExtractor {
             album_artist,
             year,
             track_number: track_number.map(|n| n as i32),
-            disc_number: None, // TODO: Extract disc number
+            disc_number: disc_number.map(|n| n as i32),
             duration_ms: Some(duration_ms),
             genre,
             file_size: Some(file_size),
@@ -110,7 +102,87 @@ impl MetadataExtractor {
         })
     }
     
-    /// Create a minimal track entry when metadata extraction fails
+    /// Fallback extraction method - uses id3 crate for MP3 files, minimal info for others
+    fn extract_with_fallback(file_path: &Path) -> Result<Track> {
+        let extension = file_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_lowercase());
+        
+        // Try id3 crate for MP3 files
+        if extension.as_deref() == Some("mp3") {
+            if let Ok(track) = Self::extract_with_id3(file_path) {
+                eprintln!("Successfully extracted metadata using id3 fallback for: {:?}", file_path);
+                return Ok(track);
+            }
+        }
+        
+        // Final fallback: minimal track info
+        Self::create_minimal_track(file_path)
+    }
+    
+    /// Extract metadata using the id3 crate (more lenient with malformed tags)
+    fn extract_with_id3(file_path: &Path) -> Result<Track> {
+        let tag = id3::Tag::read_from_path(file_path)?;
+        
+        let title = tag.title()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                file_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unknown")
+                    .to_string()
+            });
+        
+        let artist = tag.artist().map(|s| s.to_string());
+        let album = tag.album().map(|s| s.to_string());
+        let album_artist = tag.album_artist().map(|s| s.to_string());
+        let year = tag.year().map(|y| y as u32);
+        let track_number = tag.track().map(|t| t as i32);
+        let disc_number = tag.disc().map(|d| d as i32);
+        let genre = tag.genre_parsed().map(|g| g.to_string());
+        
+        // id3 crate doesn't provide audio properties, so we'll leave duration/bitrate as None
+        // The duration could be obtained from the TLEN frame if present
+        let duration_ms = tag.duration().map(|d| d as i64 * 1000);
+        
+        let file_size = std::fs::metadata(file_path)?.len() as i64;
+        let file_format = file_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs() as i64;
+        
+        Ok(Track {
+            id: 0,
+            file_path: file_path.to_string_lossy().to_string(),
+            title,
+            artist,
+            album,
+            album_artist,
+            year,
+            track_number,
+            disc_number,
+            duration_ms,
+            genre,
+            file_size: Some(file_size),
+            file_format: Some(file_format),
+            bitrate: None, // id3 crate doesn't provide this
+            sample_rate: None, // id3 crate doesn't provide this
+            date_added: now,
+            date_modified: now,
+            play_count: 0,
+            last_played: None,
+            file_hash: None,
+        })
+    }
+    
+    /// Create a minimal track entry when all metadata extraction fails
     fn create_minimal_track(file_path: &Path) -> Result<Track> {
         let title = file_path
             .file_stem()

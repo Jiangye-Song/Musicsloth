@@ -25,7 +25,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Metadata parsing
-lofty = "0.21"
+lofty = "0.22"
+id3 = "1.16"  # Fallback for MP3 files with malformed tags
 regex = "1"
 
 # Database

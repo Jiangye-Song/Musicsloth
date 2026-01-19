@@ -253,6 +253,20 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
               playlistId={selectedPlaylist?.id || selectedUserPlaylist?.id}
               isSystemPlaylist={selectedPlaylist !== null}
               showSearch={true}
+              onPlaylistTracksChanged={async (playlistId) => {
+                // Refresh tracks when a track is removed from the playlist
+                try {
+                  if (selectedUserPlaylist) {
+                    const loadedTracks = await playlistApi.getPlaylistTracks(playlistId);
+                    setTracks(loadedTracks);
+                  } else if (selectedPlaylist) {
+                    const loadedTracks = await selectedPlaylist.loadTracks();
+                    setTracks(loadedTracks);
+                  }
+                } catch (error) {
+                  console.error("Failed to refresh playlist tracks:", error);
+                }
+              }}
             />
           </div>
         ) : (
@@ -326,6 +340,13 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
             >
               My Playlists
             </h3>
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={handleOpenCreateDialog}
+            >
+              New Playlist
+            </Button>
           </div>
           {filteredUserPlaylists.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
@@ -354,13 +375,6 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
                   <span style={{ color: "#fff", fontSize: "14px" }}>{playlist.name}</span>
                 </div>
               ))}
-              <Button
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={handleOpenCreateDialog}
-              >
-                New Playlist
-              </Button>
             </div>
           ) : (
             <div

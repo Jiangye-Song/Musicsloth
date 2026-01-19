@@ -109,6 +109,7 @@ pub fn run() {
             commands::rename_playlist,
             commands::add_track_to_playlist,
             commands::get_playlist_tracks,
+            commands::remove_track_from_playlist,
             commands::append_tracks_to_queue,
             commands::insert_tracks_after_position,
             commands::remove_track_at_position,
