@@ -10,6 +10,22 @@ use crate::db::models::Track;
 pub struct MetadataExtractor;
 
 impl MetadataExtractor {
+    /// Get the file's modification time as a Unix timestamp.
+    /// Falls back to current time if the modification time cannot be read.
+    fn get_file_modified_time(file_path: &Path) -> i64 {
+        std::fs::metadata(file_path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or_else(|| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0)
+            })
+    }
+    
     pub fn extract_from_file(file_path: &Path) -> Result<Track> {
         // Try to read the file with lofty first
         let tagged_file = match Probe::open(file_path)?.guess_file_type()?.read() {
@@ -67,13 +83,16 @@ impl MetadataExtractor {
         let bitrate = properties.audio_bitrate().map(|b| b as i32);
         let sample_rate = properties.sample_rate().map(|s| s as i32);
 
-        let file_size = std::fs::metadata(file_path)?.len() as i64;
+        let file_metadata = std::fs::metadata(file_path)?;
+        let file_size = file_metadata.len() as i64;
         let file_format = file_path
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
 
+        // Use file's modification time for date_added (for "Recently Added" sorting)
+        let file_modified_time = Self::get_file_modified_time(file_path);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
@@ -94,7 +113,7 @@ impl MetadataExtractor {
             file_format: Some(file_format),
             bitrate,
             sample_rate,
-            date_added: now,
+            date_added: file_modified_time,
             date_modified: now,
             play_count: 0,
             last_played: None,
@@ -154,6 +173,8 @@ impl MetadataExtractor {
             .unwrap_or("unknown")
             .to_string();
         
+        // Use file's modification time for date_added (for "Recently Added" sorting)
+        let file_modified_time = Self::get_file_modified_time(file_path);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
@@ -174,7 +195,7 @@ impl MetadataExtractor {
             file_format: Some(file_format),
             bitrate: None, // id3 crate doesn't provide this
             sample_rate: None, // id3 crate doesn't provide this
-            date_added: now,
+            date_added: file_modified_time,
             date_modified: now,
             play_count: 0,
             last_played: None,
@@ -197,6 +218,8 @@ impl MetadataExtractor {
             .unwrap_or("unknown")
             .to_string();
         
+        // Use file's modification time for date_added (for "Recently Added" sorting)
+        let file_modified_time = Self::get_file_modified_time(file_path);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as i64;
@@ -217,7 +240,7 @@ impl MetadataExtractor {
             file_format: Some(file_format),
             bitrate: None,
             sample_rate: None,
-            date_added: now,
+            date_added: file_modified_time,
             date_modified: now,
             play_count: 0,
             last_played: None,
