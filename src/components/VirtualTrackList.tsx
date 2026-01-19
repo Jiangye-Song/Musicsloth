@@ -6,6 +6,7 @@ import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import CheckIcon from "@mui/icons-material/Check";
 import TrackContextMenu from "./TrackContextMenu";
 import AddToPlaylistDialog from "./AddToPlaylistDialog";
 import AddToQueueDialog from "./AddToQueueDialog";
@@ -695,6 +696,28 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         </Box>
       )}
 
+      {/* Reorder Mode Action Bar */}
+      {isReorderMode && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            p: 1,
+            bgcolor: "primary.dark",
+            borderBottom: 1,
+            borderColor: "divider",
+          }}
+        >
+          <Typography sx={{ color: "white", fontWeight: 500, flex: 1 }}>
+            Drag tracks to reorder
+          </Typography>
+          <IconButton size="small" onClick={() => onReorderModeChange?.(false)} sx={{ color: "white" }}>
+            <CheckIcon />
+          </IconButton>
+        </Box>
+      )}
+
       {/* Search Bar with Dropdown */}
       {showSearch && (
         <ClickAwayListener onClickAway={() => setShowDropdown(false)}>
@@ -1143,6 +1166,10 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
           } catch (err) {
             console.error("Failed to remove track from playlist:", err);
           }
+        }}
+        canReorder={(contextType === "queue" && queueId !== undefined) || (contextType === "playlist" && playlistId !== undefined && !isSystemPlaylist)}
+        onEnterReorderMode={() => {
+          onReorderModeChange?.(true);
         }}
       />
 

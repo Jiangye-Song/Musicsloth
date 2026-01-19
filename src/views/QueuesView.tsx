@@ -7,7 +7,6 @@ import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import ShuffleIcon from "@mui/icons-material/Shuffle";
-import SwapVertIcon from "@mui/icons-material/SwapVert";
 import { usePlayer } from "../contexts/PlayerContext";
 
 interface QueuesViewProps {
@@ -498,18 +497,6 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                   title="Locate active track"
                 >
                   <MyLocationIcon sx={{ fontSize: "18px" }} />
-                </IconButton>
-                <IconButton
-                  onClick={() => setIsReorderMode(!isReorderMode)}
-                  disabled={queueTracks.length === 0}
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    color: isReorderMode ? "primary.main" : "text.secondary",
-                  }}
-                  title={isReorderMode ? "Exit reorder mode" : "Reorder tracks"}
-                >
-                  <SwapVertIcon sx={{ fontSize: "18px" }} />
                 </IconButton>
                 <IconButton
                   onClick={handleToggleShuffle}

@@ -6,6 +6,7 @@ import AddToQueueIcon from "@mui/icons-material/AddToQueue";
 import QueueMusicIcon from "@mui/icons-material/QueueMusic";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
+import SwapVertIcon from "@mui/icons-material/SwapVert";
 
 interface TrackContextMenuProps {
   anchorPosition: { top: number; left: number } | null;
@@ -32,6 +33,9 @@ interface TrackContextMenuProps {
   onAddToPlaylist?: () => void;
   onRemoveFromQueue?: () => void;
   onRemoveFromPlaylist?: () => void;
+  // Reorder mode - only shown in queue/playlist context where reordering is allowed
+  canReorder?: boolean;
+  onEnterReorderMode?: () => void;
 }
 
 export default function TrackContextMenu({
@@ -49,6 +53,8 @@ export default function TrackContextMenu({
   onAddToPlaylist,
   onRemoveFromQueue,
   onRemoveFromPlaylist,
+  canReorder = false,
+  onEnterReorderMode,
 }: TrackContextMenuProps) {
   const open = Boolean(anchorPosition);
 
@@ -106,6 +112,12 @@ export default function TrackContextMenu({
       return;
     }
 
+    if (action === "reorder" && onEnterReorderMode) {
+      onEnterReorderMode();
+      onClose();
+      return;
+    }
+
     console.log(`Context menu action: ${action}`);
     // TODO: Implement other actions
     onClose();
@@ -137,6 +149,8 @@ export default function TrackContextMenu({
         </ListItemIcon>
         <ListItemText>Song Info</ListItemText>
       </MenuItem>
+
+      
 
       {!isMultiSelectMode && (
         <MenuItem onClick={() => handleMenuItemClick("multiselect")}>
@@ -200,6 +214,7 @@ export default function TrackContextMenu({
           )}
         </>
       )}
+
     </Menu>
   );
 }
