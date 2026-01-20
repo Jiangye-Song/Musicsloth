@@ -33,8 +33,7 @@ interface TrackContextMenuProps {
   onAddToPlaylist?: () => void;
   onRemoveFromQueue?: () => void;
   onRemoveFromPlaylist?: () => void;
-  // Reorder mode - only shown in queue/playlist context where reordering is allowed
-  canReorder?: boolean;
+  // Reorder mode - shown when onEnterReorderMode is provided
   onEnterReorderMode?: () => void;
 }
 
@@ -53,7 +52,6 @@ export default function TrackContextMenu({
   onAddToPlaylist,
   onRemoveFromQueue,
   onRemoveFromPlaylist,
-  canReorder = false,
   onEnterReorderMode,
 }: TrackContextMenuProps) {
   const open = Boolean(anchorPosition);
@@ -215,6 +213,17 @@ export default function TrackContextMenu({
         </>
       )}
 
+      {onEnterReorderMode && (
+        <>
+          <Divider />
+          <MenuItem onClick={() => handleMenuItemClick("reorder")}>
+            <ListItemIcon>
+              <SwapVertIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Reorder Tracks</ListItemText>
+          </MenuItem>
+        </>
+      )}
     </Menu>
   );
 }

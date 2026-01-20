@@ -138,46 +138,6 @@ impl DbOperations {
         Ok(())
     }
     
-    /// Insert a track (using the Track model)
-    pub fn insert_track(
-        db: &DatabaseConnection,
-        track: &Track,
-    ) -> Result<i64, anyhow::Error> {
-        let conn = db.get_connection();
-        let conn = conn.lock().unwrap();
-        
-        conn.execute(
-            "INSERT OR IGNORE INTO tracks (
-                file_path, title, artist, album, album_artist, year,
-                track_number, disc_number, duration_ms, genre,
-                file_size, file_format, bitrate, sample_rate,
-                play_count, last_played, date_added, date_modified
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
-            params![
-                track.file_path,
-                track.title,
-                track.artist,
-                track.album,
-                track.album_artist,
-                track.year.map(|y| y as i32),
-                track.track_number,
-                track.disc_number,
-                track.duration_ms,
-                track.genre,
-                track.file_size,
-                track.file_format,
-                track.bitrate,
-                track.sample_rate,
-                track.play_count,
-                track.last_played,
-                track.date_added,
-                track.date_modified,
-            ],
-        )?;
-        
-        Ok(conn.last_insert_rowid())
-    }
-    
     /// Get all tracks
     pub fn get_all_tracks(
         db: &DatabaseConnection,
@@ -580,30 +540,6 @@ impl DbOperations {
                     params![queue_id, track_id, global_index as i32],
                 )?;
             }
-        }
-        
-        tx.commit()?;
-        Ok(())
-    }
-
-    /// Add tracks to queue at specific starting position (for chunked loading)
-    pub fn add_tracks_to_queue_at_position(
-        db: &DatabaseConnection,
-        queue_id: i64,
-        track_ids: &[i64],
-        start_position: usize,
-    ) -> Result<(), anyhow::Error> {
-        let conn = db.get_connection();
-        let mut conn = conn.lock().unwrap();
-        
-        // Use a transaction for batch inserts
-        let tx = conn.transaction()?;
-        
-        for (index, track_id) in track_ids.iter().enumerate() {
-            tx.execute(
-                "INSERT INTO queue_tracks (queue_id, track_id, position) VALUES (?1, ?2, ?3)",
-                params![queue_id, track_id, (start_position + index) as i32],
-            )?;
         }
         
         tx.commit()?;
@@ -1337,31 +1273,6 @@ impl DbOperations {
         )?;
         
         Ok(anchor.unwrap_or(0))
-    }
-
-    /// Calculate shuffled index using seed-based algorithm
-    /// Given current index, seed, and queue length, calculate next/previous index
-    pub fn calculate_shuffled_index(
-        current_index: i32,
-        seed: i64,
-        queue_length: i32,
-        direction: i32, // 1 for next, -1 for previous
-    ) -> i32 {
-        if queue_length <= 1 {
-            return 0;
-        }
-        
-        // Use seed modulo queue_length as the step size
-        let step = (seed.abs() % queue_length as i64) as i32;
-        let step = if step == 0 { 1 } else { step }; // Ensure step is at least 1
-        
-        let next_index = if direction > 0 {
-            (current_index + step) % queue_length
-        } else {
-            (current_index - step + queue_length) % queue_length
-        };
-        
-        next_index
     }
 
     /// Find what position an original track index ends up at after shuffling

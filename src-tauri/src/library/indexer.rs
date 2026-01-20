@@ -89,15 +89,6 @@ impl LibraryIndexer {
         })
     }
     
-    /// Index a list of audio files into the database (without progress)
-    pub fn index_files<P: AsRef<Path>>(
-        paths: &[P],
-        db: &DatabaseConnection,
-        last_scanned: Option<i64>,
-    ) -> Result<IndexingResult, anyhow::Error> {
-        Self::index_files_with_progress(paths, db, last_scanned, |_| {})
-    }
-    
     /// Calculate file hash using BLAKE3 (fast and secure)
     fn calculate_file_hash(path: &Path) -> Result<String, anyhow::Error> {
         let mut file = File::open(path)?;

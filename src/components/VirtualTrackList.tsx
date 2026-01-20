@@ -1167,10 +1167,11 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
             console.error("Failed to remove track from playlist:", err);
           }
         }}
-        canReorder={(contextType === "queue" && queueId !== undefined) || (contextType === "playlist" && playlistId !== undefined && !isSystemPlaylist)}
-        onEnterReorderMode={() => {
-          onReorderModeChange?.(true);
-        }}
+        onEnterReorderMode={
+          (contextType === "queue" && queueId !== undefined) || (contextType === "playlist" && playlistId !== undefined && !isSystemPlaylist)
+            ? () => onReorderModeChange?.(true)
+            : undefined
+        }
       />
 
       {/* Add to Playlist Dialog */}

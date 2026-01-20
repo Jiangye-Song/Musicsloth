@@ -37,40 +37,4 @@ impl DirectoryScanner {
         
         Ok(audio_files)
     }
-    
-    /// Scan multiple directories and return all audio file paths
-    pub fn scan_multiple<P: AsRef<Path>>(directories: &[P]) -> Result<Vec<PathBuf>, anyhow::Error> {
-        let mut all_audio_files = Vec::new();
-        
-        for directory in directories {
-            let files = Self::scan(directory)?;
-            all_audio_files.extend(files);
-        }
-        
-        Ok(all_audio_files)
-    }
-    
-    /// Check if a file path has a supported audio extension
-    pub fn is_supported_audio_file<P: AsRef<Path>>(path: P) -> bool {
-        if let Some(extension) = path.as_ref().extension() {
-            let ext_str = extension.to_string_lossy().to_lowercase();
-            SUPPORTED_EXTENSIONS.contains(&ext_str.as_str())
-        } else {
-            false
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_supported_audio_file() {
-        assert!(DirectoryScanner::is_supported_audio_file("test.mp3"));
-        assert!(DirectoryScanner::is_supported_audio_file("test.flac"));
-        assert!(DirectoryScanner::is_supported_audio_file("test.FLAC"));
-        assert!(!DirectoryScanner::is_supported_audio_file("test.txt"));
-        assert!(!DirectoryScanner::is_supported_audio_file("test"));
-    }
 }

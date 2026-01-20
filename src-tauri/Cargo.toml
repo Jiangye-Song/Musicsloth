@@ -45,7 +45,7 @@ walkdir = "2"
 # Time utilities
 chrono = "0.4"
 
-# Hashing for queue deduplication and file change detection
+# Hashing for file change detection
 sha2 = "0.10"
 blake3 = "1.5"
 

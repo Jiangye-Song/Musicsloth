@@ -104,25 +104,10 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
             is_active BOOLEAN DEFAULT 0,
             current_track_index INTEGER DEFAULT 0,
             date_created INTEGER NOT NULL,
-            date_modified INTEGER NOT NULL,
-            track_hash TEXT
+            date_modified INTEGER NOT NULL
         )",
         [],
     )?;
-    
-    // Migration: Add track_hash column to existing queues table if it doesn't exist
-    // Check if column exists first
-    let column_exists: Result<i64, _> = conn.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('queues') WHERE name='track_hash'",
-        [],
-        |row| row.get(0)
-    );
-    
-    if let Ok(count) = column_exists {
-        if count == 0 {
-            conn.execute("ALTER TABLE queues ADD COLUMN track_hash TEXT", [])?;
-        }
-    }
 
     // Migration: Add shuffle_seed column to existing queues table if it doesn't exist
     let shuffle_seed_exists: Result<i64, _> = conn.query_row(
