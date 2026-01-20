@@ -26,6 +26,9 @@ interface PlaylistItemProps {
 interface PlaylistsViewProps {
   searchQuery?: string;
   onClearSearch?: () => void;
+  onNavigateToArtist?: (artistName: string, trackId: number) => void;
+  onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+  onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
 function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
@@ -54,7 +57,7 @@ function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
   );
 }
 
-export default function PlaylistsView({ searchQuery = "", onClearSearch }: PlaylistsViewProps) {
+export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: PlaylistsViewProps) {
   const [systemPlaylists] = useState<SystemPlaylist[]>([
     {
       id: "all-songs",
@@ -279,6 +282,9 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch }: Playl
               showSearch={true}
               isReorderMode={isReorderMode}
               onReorderModeChange={setIsReorderMode}
+              onNavigateToArtist={onNavigateToArtist}
+              onNavigateToAlbum={onNavigateToAlbum}
+              onNavigateToGenre={onNavigateToGenre}
               onPlaylistTracksChanged={async (playlistId) => {
                 // Refresh tracks when a track is removed from the playlist
                 try {

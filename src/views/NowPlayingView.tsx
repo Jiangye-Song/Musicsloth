@@ -7,6 +7,8 @@ import {
   Tab,
   Slider,
   useMediaQuery,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import {
   Close,
@@ -27,6 +29,7 @@ import {
 import { playerApi, libraryApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import { usePlayer } from "../contexts/PlayerContext";
+import { invoke } from "@tauri-apps/api/core";
 
 interface LyricLine {
   time: number; // milliseconds
@@ -59,6 +62,20 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const lastUserScrollTimeRef = useRef<number>(0);
   const isAutoScrollingRef = useRef(false);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    text: string;
+  } | null>(null);
+  
+  const [imageContextMenu, setImageContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
+  
+  const [albumArtBytes, setAlbumArtBytes] = useState<number[] | null>(null);
 
   // Parse LRC format lyrics
   const parseLrcLyrics = (lrcText: string): LyricLine[] => {
@@ -149,6 +166,24 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     };
 
     loadLyrics();
+  }, [currentTrack?.file_path]);
+
+  // Load album art bytes for copy functionality
+  useEffect(() => {
+    const loadAlbumArtBytes = async () => {
+      if (!currentTrack) {
+        setAlbumArtBytes(null);
+        return;
+      }
+      try {
+        const artBytes = await libraryApi.getAlbumArt(currentTrack.file_path);
+        setAlbumArtBytes(artBytes);
+      } catch (error) {
+        console.error("Failed to load album art bytes:", error);
+        setAlbumArtBytes(null);
+      }
+    };
+    loadAlbumArtBytes();
   }, [currentTrack?.file_path]);
 
   // Automatically switch tabs based on lyrics availability when track changes
@@ -326,11 +361,70 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
     }
   };
 
-  const copyToClipboard = (text: string | null | undefined, e: React.MouseEvent) => {
+  const handleContextMenu = (text: string | null | undefined, e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (text && text !== "—") {
-      navigator.clipboard.writeText(text);
+      setContextMenu({
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        text,
+      });
     }
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleCopyText = () => {
+    if (contextMenu?.text) {
+      navigator.clipboard.writeText(contextMenu.text);
+    }
+    handleCloseContextMenu();
+  };
+
+  const handleImageContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (albumArt) {
+      setImageContextMenu({
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+      });
+    }
+  };
+
+  const handleCloseImageContextMenu = () => {
+    setImageContextMenu(null);
+  };
+
+  const handleCopyImage = async () => {
+    if (albumArtBytes) {
+      try {
+        const blob = new Blob([new Uint8Array(albumArtBytes)], { type: "image/png" });
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+      } catch (error) {
+        console.error("Failed to copy image:", error);
+      }
+    }
+    handleCloseImageContextMenu();
+  };
+
+  const handleSaveImage = async () => {
+    if (currentTrack) {
+      try {
+        await invoke("save_album_art", {
+          filePath: currentTrack.file_path,
+          defaultName: currentTrack.title || "album_art",
+        });
+      } catch (error) {
+        console.error("Failed to save image:", error);
+      }
+    }
+    handleCloseImageContextMenu();
   };
 
   const renderAlbumArt = () => {
@@ -339,6 +433,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
     return (
       <Box
+        onContextMenu={handleImageContextMenu}
         sx={{
           width: 200,
           margin: isNarrow ? "0 auto" : 0,
@@ -350,6 +445,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           border: 1,
           borderColor: "divider",
           overflow: "hidden",
+          cursor: albumArt ? "context-menu" : "default",
         }}
       >
         {albumArt ? (
@@ -678,14 +774,14 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         >
           <Typography color="text.secondary">Title:</Typography>
           <Typography
-            onContextMenu={(e) => copyToClipboard(currentTrack.title, e)}
+            onContextMenu={(e) => handleContextMenu(currentTrack.title, e)}
             sx={{ userSelect: "text" }}
           >
             {currentTrack.title}
           </Typography>
 
           <Typography color="text.secondary">Artist:</Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => copyToClipboard(currentTrack.artist, e)}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => handleContextMenu(currentTrack.artist, e)}>
             {splitMultiValue(currentTrack.artist).length > 0 ? (
               splitMultiValue(currentTrack.artist).map((artist, index, arr) => (
                 <Typography
@@ -706,17 +802,30 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           </Box>
 
           <Typography color="text.secondary">Album Artist:</Typography>
-          <Typography
-            onContextMenu={(e) => copyToClipboard(currentTrack.album_artist, e)}
-            sx={{ userSelect: "text" }}
-          >
-            {currentTrack.album_artist || "—"}
-          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => handleContextMenu(currentTrack.album_artist, e)}>
+            {splitMultiValue(currentTrack.album_artist).length > 0 ? (
+              splitMultiValue(currentTrack.album_artist).map((artist, index, arr) => (
+                <Typography
+                  key={index}
+                  onClick={() => onNavigateToArtist?.(artist, currentTrack.id)}
+                  sx={{
+                    cursor: onNavigateToArtist ? "pointer" : "default",
+                    "&:hover": onNavigateToArtist ? { textDecoration: "underline" } : {},
+                    userSelect: "text"
+                  }}
+                >
+                  {artist}{index < arr.length - 1 ? ", " : ""}
+                </Typography>
+              ))
+            ) : (
+              <Typography sx={{ userSelect: "text" }}>—</Typography>
+            )}
+          </Box>
 
           <Typography color="text.secondary">Album:</Typography>
           <Typography
             onClick={() => currentTrack.album && onNavigateToAlbum?.(currentTrack.album, currentTrack.id)}
-            onContextMenu={(e) => copyToClipboard(currentTrack.album, e)}
+            onContextMenu={(e) => handleContextMenu(currentTrack.album, e)}
             sx={{
               cursor: currentTrack.album && currentTrack.album !== "—" && onNavigateToAlbum ? "pointer" : "default",
               "&:hover": currentTrack.album && currentTrack.album !== "—" && onNavigateToAlbum ? { textDecoration: "underline" } : {},
@@ -728,14 +837,14 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
           <Typography color="text.secondary">Year:</Typography>
           <Typography
-            onContextMenu={(e) => copyToClipboard(currentTrack.year?.toString(), e)}
+            onContextMenu={(e) => handleContextMenu(currentTrack.year?.toString(), e)}
             sx={{ userSelect: "text" }}
           >
             {currentTrack.year || "—"}
           </Typography>
 
           <Typography color="text.secondary">Genre:</Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => copyToClipboard(currentTrack.genre, e)}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} onContextMenu={(e) => handleContextMenu(currentTrack.genre, e)}>
             {splitMultiValue(currentTrack.genre).length > 0 ? (
               splitMultiValue(currentTrack.genre).map((genre, index, arr) => (
                 <Typography
@@ -860,6 +969,35 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
           </Box>
         </Box>
       )}
+
+      {/* Text Context Menu */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleCopyText}>Copy</MenuItem>
+      </Menu>
+
+      {/* Image Context Menu */}
+      <Menu
+        open={imageContextMenu !== null}
+        onClose={handleCloseImageContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          imageContextMenu !== null
+            ? { top: imageContextMenu.mouseY, left: imageContextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleCopyImage}>Copy Image</MenuItem>
+        <MenuItem onClick={handleSaveImage}>Save Image...</MenuItem>
+      </Menu>
     </Box>
   );
 }

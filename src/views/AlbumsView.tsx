@@ -199,9 +199,12 @@ interface AlbumsViewProps {
     initialAlbumName?: string;
     initialTrackId?: number;
     onClearSearch?: () => void;
+    onNavigateToArtist?: (artistName: string, trackId: number) => void;
+    onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+    onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
-export default function AlbumsView({ searchQuery = "", initialAlbumName, initialTrackId, onClearSearch }: AlbumsViewProps) {
+export default function AlbumsView({ searchQuery = "", initialAlbumName, initialTrackId, onClearSearch, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: AlbumsViewProps) {
     const [albums, setAlbums] = useState<Album[]>([]);
     const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
     const [loading, setLoading] = useState(true);
@@ -289,7 +292,7 @@ export default function AlbumsView({ searchQuery = "", initialAlbumName, initial
                     </h2>
                 </div>
                 <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-                    <VirtualTrackList tracks={albumTracks} contextType="album" contextName={selectedAlbum?.name} showSearch={true} initialTrackId={trackIdToFlash} />
+                    <VirtualTrackList tracks={albumTracks} contextType="album" contextName={selectedAlbum?.name} showSearch={true} initialTrackId={trackIdToFlash} onNavigateToArtist={onNavigateToArtist} onNavigateToAlbum={onNavigateToAlbum} onNavigateToGenre={onNavigateToGenre} />
                 </div>
             </div>
         );

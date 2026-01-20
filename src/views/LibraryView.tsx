@@ -5,9 +5,12 @@ import VirtualTrackList from "../components/VirtualTrackList";
 
 interface LibraryViewProps {
     searchQuery?: string;
+    onNavigateToArtist?: (artistName: string, trackId: number) => void;
+    onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+    onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
-export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
+export default function LibraryView({ searchQuery = "", onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: LibraryViewProps) {
     console.log(`[LibraryView] Render - searchQuery: "${searchQuery}"`);
     const [tracks, setTracks] = useState<Track[]>([]);
     const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
@@ -108,7 +111,14 @@ export default function LibraryView({ searchQuery = "" }: LibraryViewProps) {
                                 </p>
                             </div>
                         ) : (
-                            <VirtualTrackList tracks={filteredTracks} contextType="library" showSearch={false} />
+                            <VirtualTrackList
+                                tracks={filteredTracks}
+                                contextType="library"
+                                showSearch={false}
+                                onNavigateToArtist={onNavigateToArtist}
+                                onNavigateToAlbum={onNavigateToAlbum}
+                                onNavigateToGenre={onNavigateToGenre}
+                            />
                         )}
                     </div>
                 )}

@@ -116,6 +116,7 @@ pub fn run() {
             commands::append_tracks_to_queue,
             commands::insert_tracks_after_position,
             commands::remove_track_at_position,
+            commands::save_album_art,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

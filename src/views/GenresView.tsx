@@ -9,9 +9,12 @@ interface GenresViewProps {
   initialGenreName?: string;
   initialTrackId?: number;
   onClearSearch?: () => void;
+  onNavigateToArtist?: (artistName: string, trackId: number) => void;
+  onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+  onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
-export default function GenresView({ searchQuery = "", initialGenreName, initialTrackId, onClearSearch }: GenresViewProps) {
+export default function GenresView({ searchQuery = "", initialGenreName, initialTrackId, onClearSearch, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: GenresViewProps) {
   const [genres, setGenres] = useState<Genre[]>([]);
   const [filteredGenres, setFilteredGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +98,7 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
           </h2>
         </div>
         <div style={{ flex: 1, overflow: "hidden", padding: "20px" }}>
-          <VirtualTrackList tracks={genreTracks} contextType="genre" contextName={selectedGenre?.name} showSearch={true} initialTrackId={trackIdToFlash} />
+          <VirtualTrackList tracks={genreTracks} contextType="genre" contextName={selectedGenre?.name} showSearch={true} initialTrackId={trackIdToFlash} onNavigateToArtist={onNavigateToArtist} onNavigateToAlbum={onNavigateToAlbum} onNavigateToGenre={onNavigateToGenre} />
         </div>
       </div>
     );

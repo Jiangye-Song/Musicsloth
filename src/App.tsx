@@ -63,33 +63,56 @@ function App() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const queuesViewRef = useRef<QueuesViewRef>(null);
 
-  // const handleFileSelect = async () => {
-  //   const filePath = prompt("Enter the full path to an audio file:");
-  //   if (filePath) {
-  //     try {
-  //       await playerApi.playFile(filePath);
-  //     } catch (error) {
-  //       alert(`Failed to play file: ${error}`);
-  //     }
-  //   }
-  // };
+  // Navigation callbacks - shared by all views with track lists
+  const handleNavigateToArtist = (artistName: string, trackId: number) => {
+    setShowNowPlaying(false);
+    setSelectedArtistName(artistName);
+    setSelectedAlbumName(undefined);
+    setSelectedGenreName(undefined);
+    setSelectedTrackId(trackId);
+    setGlobalSearchQuery("");
+    setNavigationKey(k => k + 1);
+    setActiveTab("artists");
+  };
+
+  const handleNavigateToAlbum = (albumName: string, trackId: number) => {
+    setShowNowPlaying(false);
+    setSelectedAlbumName(albumName);
+    setSelectedArtistName(undefined);
+    setSelectedGenreName(undefined);
+    setSelectedTrackId(trackId);
+    setGlobalSearchQuery("");
+    setNavigationKey(k => k + 1);
+    setActiveTab("albums");
+  };
+
+  const handleNavigateToGenre = (genreName: string, trackId: number) => {
+    setShowNowPlaying(false);
+    setSelectedGenreName(genreName);
+    setSelectedArtistName(undefined);
+    setSelectedAlbumName(undefined);
+    setSelectedTrackId(trackId);
+    setGlobalSearchQuery("");
+    setNavigationKey(k => k + 1);
+    setActiveTab("genres");
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
       case "library":
-        return <LibraryView searchQuery={globalSearchQuery} />;
+        return <LibraryView searchQuery={globalSearchQuery} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       case "queues":
-        return <QueuesView ref={queuesViewRef} searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <QueuesView ref={queuesViewRef} searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       case "playlists":
-        return <PlaylistsView searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <PlaylistsView searchQuery={globalSearchQuery} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       case "artists":
-        return <ArtistsView key={`artists-${navigationKey}`} searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <ArtistsView key={`artists-${navigationKey}`} searchQuery={globalSearchQuery} initialArtistName={selectedArtistName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       case "albums":
-        return <AlbumsView key={`albums-${navigationKey}`} searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <AlbumsView key={`albums-${navigationKey}`} searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       case "genres":
-        return <GenresView key={`genres-${navigationKey}`} searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} />;
+        return <GenresView key={`genres-${navigationKey}`} searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       default:
-        return <LibraryView searchQuery={globalSearchQuery} />;
+        return <LibraryView searchQuery={globalSearchQuery} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
     }
   };
 
@@ -256,36 +279,9 @@ function App() {
               setActiveTab("queues");
               setTimeout(() => queuesViewRef.current?.scrollToActiveTrack(), 100);
             }}
-            onNavigateToArtist={(artistName, trackId) => {
-              setShowNowPlaying(false);
-              setSelectedArtistName(artistName);
-              setSelectedAlbumName(undefined);
-              setSelectedGenreName(undefined);
-              setSelectedTrackId(trackId);
-              setGlobalSearchQuery("");
-              setNavigationKey(k => k + 1);
-              setActiveTab("artists");
-            }}
-            onNavigateToAlbum={(albumName, trackId) => {
-              setShowNowPlaying(false);
-              setSelectedAlbumName(albumName);
-              setSelectedArtistName(undefined);
-              setSelectedGenreName(undefined);
-              setSelectedTrackId(trackId);
-              setGlobalSearchQuery("");
-              setNavigationKey(k => k + 1);
-              setActiveTab("albums");
-            }}
-            onNavigateToGenre={(genreName, trackId) => {
-              setShowNowPlaying(false);
-              setSelectedGenreName(genreName);
-              setSelectedArtistName(undefined);
-              setSelectedAlbumName(undefined);
-              setSelectedTrackId(trackId);
-              setGlobalSearchQuery("");
-              setNavigationKey(k => k + 1);
-              setActiveTab("genres");
-            }}
+            onNavigateToArtist={handleNavigateToArtist}
+            onNavigateToAlbum={handleNavigateToAlbum}
+            onNavigateToGenre={handleNavigateToGenre}
           />
         </Dialog>
       </Box>

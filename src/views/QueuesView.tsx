@@ -12,13 +12,16 @@ import { usePlayer } from "../contexts/PlayerContext";
 interface QueuesViewProps {
   searchQuery?: string;
   onClearSearch?: () => void;
+  onNavigateToArtist?: (artistName: string, trackId: number) => void;
+  onNavigateToAlbum?: (albumName: string, trackId: number) => void;
+  onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
 export interface QueuesViewRef {
   scrollToActiveTrack: () => void;
 }
 
-const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch }, ref) => {
+const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "", onClearSearch, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }, ref) => {
   const { currentQueueId, shuffleSeed, clearPlayer, loadShuffleStateFromQueue, updateQueuePosition, toggleShuffle } = usePlayer();
   const [queues, setQueues] = useState<Queue[]>([]);
   const [filteredQueues, setFilteredQueues] = useState<Queue[]>([]);
@@ -548,6 +551,9 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
                     showSearch={true}
                     isReorderMode={isReorderMode}
                     onReorderModeChange={setIsReorderMode}
+                    onNavigateToArtist={onNavigateToArtist}
+                    onNavigateToAlbum={onNavigateToAlbum}
+                    onNavigateToGenre={onNavigateToGenre}
                   />
                 </div>
               </>

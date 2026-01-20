@@ -674,3 +674,69 @@ pub fn remove_track_at_position(state: State<'_, AppState>, queue_id: i64, posit
     DbOperations::remove_track_at_position(&state.db, queue_id, position)
         .map_err(|e| format!("Failed to remove track at position: {}", e))
 }
+
+#[tauri::command]
+pub async fn save_album_art(app: AppHandle, file_path: String, default_name: String) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    use lofty::probe::Probe;
+    use lofty::picture::PictureType;
+    use std::fs;
+    
+    // First, get the album art data
+    let art_data = tokio::task::spawn_blocking(move || {
+        let lofty_result = Probe::open(&file_path)
+            .and_then(|p| p.read());
+        
+        if let Ok(tagged_file) = lofty_result {
+            let picture_priority = [
+                PictureType::CoverFront,
+                PictureType::Media,
+                PictureType::CoverBack,
+                PictureType::Leaflet,
+                PictureType::Other,
+            ];
+            
+            if let Some(tag) = tagged_file.primary_tag() {
+                for pic_type in &picture_priority {
+                    for picture in tag.pictures() {
+                        if picture.pic_type() == *pic_type {
+                            return Some(picture.data().to_vec());
+                        }
+                    }
+                }
+                // If no specific type matched, return first picture
+                if let Some(picture) = tag.pictures().first() {
+                    return Some(picture.data().to_vec());
+                }
+            }
+        }
+        None
+    }).await.map_err(|e| format!("Failed to get album art: {}", e))?;
+    
+    let Some(data) = art_data else {
+        return Err("No album art found".to_string());
+    };
+    
+    // Show save dialog using callback-based approach
+    let (tx, rx) = std::sync::mpsc::channel();
+    let data_clone = data.clone();
+    
+    app.dialog()
+        .file()
+        .set_file_name(&format!("{}.jpg", default_name))
+        .add_filter("JPEG Image", &["jpg", "jpeg"])
+        .add_filter("PNG Image", &["png"])
+        .save_file(move |file_path_opt| {
+            let result = if let Some(path) = file_path_opt {
+                match fs::write(path.as_path().unwrap(), &data_clone) {
+                    Ok(_) => Ok(true),
+                    Err(e) => Err(format!("Failed to write file: {}", e)),
+                }
+            } else {
+                Ok(false) // User cancelled
+            };
+            let _ = tx.send(result);
+        });
+    
+    rx.recv().map_err(|e| format!("Dialog error: {}", e))?
+}
