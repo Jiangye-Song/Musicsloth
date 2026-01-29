@@ -887,7 +887,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
               const isFlashing = flashingIndex === actualIndex;
               const isSelected = isMultiSelectMode && selectedPositions.has(actualIndex);
               const isThisDragged = draggedIndex === actualIndex;
-              const isDragOver = dragOverIndex === actualIndex && draggedIndex !== actualIndex;
+              // const isDragOver = dragOverIndex === actualIndex && draggedIndex !== actualIndex;
 
               // Calculate visual shift for items during drag
               // If dragging down (dragOverIndex > draggedIndex): items between need to shift UP
