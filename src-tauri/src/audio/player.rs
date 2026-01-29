@@ -1,10 +1,9 @@
 // Audio player using Symphonia for decoding and cpal for output
 
-#![allow(dead_code)] // Methods will be used in Phase 2
-
 use super::decoder::AudioDecoder;
 use super::output::AudioOutput;
 use parking_lot::{Mutex, RwLock};
+use rubato::{Resampler, SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
@@ -143,12 +142,49 @@ impl Player {
         // Initialize audio output
         let output = AudioOutput::new()?;
         
-        // Calculate samples per millisecond for position tracking
-        let sample_rate = decoder.sample_rate();
-        let channels = decoder.channels();
-        let samples_per_ms = (sample_rate as f64 * channels as f64) / 1000.0;
+        // Get rates and channels
+        let input_sample_rate = decoder.sample_rate();
+        let input_channels = decoder.channels();
+        let output_sample_rate = output.sample_rate();
+        let output_channels = output.channels() as usize;
+        
+        eprintln!(
+            "Audio: input {}Hz {}ch -> output {}Hz {}ch",
+            input_sample_rate, input_channels, output_sample_rate, output_channels
+        );
+        
+        // Create resampler if sample rates don't match
+        let needs_resample = input_sample_rate != output_sample_rate;
+        let mut resampler: Option<SincFixedIn<f32>> = if needs_resample {
+            let params = SincInterpolationParameters {
+                sinc_len: 256,
+                f_cutoff: 0.95,
+                interpolation: SincInterpolationType::Linear,
+                oversampling_factor: 256,
+                window: WindowFunction::BlackmanHarris2,
+            };
+            
+            let resample_ratio = output_sample_rate as f64 / input_sample_rate as f64;
+            
+            Some(SincFixedIn::new(
+                resample_ratio,
+                2.0, // max relative ratio (for seeking)
+                params,
+                1024, // chunk size
+                input_channels,
+            ).map_err(|e| format!("Failed to create resampler: {}", e))?)
+        } else {
+            None
+        };
+        
+        // Calculate samples per millisecond for position tracking (at input rate)
+        let samples_per_ms = (input_sample_rate as f64 * input_channels as f64) / 1000.0;
         
         let mut samples_decoded: i64 = 0;
+        
+        // Buffer for accumulating samples for the resampler (planar format)
+        let chunk_size = 1024;
+        let mut input_buffer: Vec<Vec<f32>> = vec![Vec::new(); input_channels];
         
         // Main decode/playback loop
         while !should_stop.load(Ordering::SeqCst) {
@@ -166,7 +202,13 @@ impl Player {
                         // Update position and sample count
                         position_ms.store(actual_pos as i64, Ordering::SeqCst);
                         samples_decoded = (actual_pos as f64 * samples_per_ms) as i64;
-                        // Clear output buffer to prevent old audio playing
+                        // Clear buffers
+                        for buf in &mut input_buffer {
+                            buf.clear();
+                        }
+                        if let Some(ref mut rs) = resampler {
+                            rs.reset();
+                        }
                         output.clear();
                     }
                     Err(e) => {
@@ -180,17 +222,93 @@ impl Player {
             
             // Decode next packet
             match decoder.decode_next() {
-                Ok(Some(samples)) => {
-                    // Write samples to output (blocking to prevent buffer overrun)
-                    output.write_blocking(&samples);
-                    
-                    // Update position
-                    samples_decoded += samples.len() as i64;
+                Ok(Some(interleaved_samples)) => {
+                    // Update position based on input samples
+                    samples_decoded += interleaved_samples.len() as i64;
                     let pos = (samples_decoded as f64 / samples_per_ms) as i64;
                     position_ms.store(pos, Ordering::SeqCst);
+                    
+                    // Convert interleaved to planar for resampling
+                    let frame_count = interleaved_samples.len() / input_channels;
+                    
+                    // Prepare output samples
+                    let output_samples = if needs_resample {
+                        // De-interleave and accumulate into planar buffers
+                        for frame in 0..frame_count {
+                            for ch in 0..input_channels {
+                                input_buffer[ch].push(interleaved_samples[frame * input_channels + ch]);
+                            }
+                        }
+                        
+                        // Process in chunks when we have enough samples
+                        let mut all_resampled: Vec<f32> = Vec::new();
+                        
+                        while input_buffer[0].len() >= chunk_size {
+                            // Extract exactly chunk_size frames
+                            let mut chunk: Vec<Vec<f32>> = vec![Vec::with_capacity(chunk_size); input_channels];
+                            for ch in 0..input_channels {
+                                chunk[ch] = input_buffer[ch].drain(..chunk_size).collect();
+                            }
+                            
+                            // Resample the chunk
+                            if let Some(ref mut rs) = resampler {
+                                match rs.process(&chunk, None) {
+                                    Ok(resampled) => {
+                                        let interleaved = Self::interleave_and_convert_channels(&resampled, output_channels);
+                                        all_resampled.extend(interleaved);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Resample error: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        all_resampled
+                    } else {
+                        // No resampling needed, but might need channel conversion
+                        Self::convert_channels(&interleaved_samples, input_channels, output_channels)
+                    };
+                    
+                    // Write samples to output (blocking to prevent buffer overrun)
+                    if !output_samples.is_empty() {
+                        output.write_blocking(&output_samples);
+                    }
                 }
                 Ok(None) => {
-                    // End of file - wait for buffer to drain a bit before exiting
+                    // End of file - flush remaining samples in resampler buffer
+                    if needs_resample && !input_buffer[0].is_empty() {
+                        // Pad remaining samples to chunk size
+                        let remaining = input_buffer[0].len();
+                        for ch in 0..input_channels {
+                            input_buffer[ch].resize(chunk_size, 0.0);
+                        }
+                        
+                        if let Some(ref mut rs) = resampler {
+                            if let Ok(resampled) = rs.process(&input_buffer, None) {
+                                // Only output the valid portion
+                                let valid_ratio = remaining as f64 / chunk_size as f64;
+                                let valid_frames = (resampled[0].len() as f64 * valid_ratio) as usize;
+                                
+                                let mut final_samples: Vec<f32> = Vec::with_capacity(valid_frames * output_channels);
+                                for frame in 0..valid_frames {
+                                    for out_ch in 0..output_channels {
+                                        if out_ch < resampled.len() {
+                                            final_samples.push(resampled[out_ch][frame]);
+                                        } else if !resampled.is_empty() {
+                                            final_samples.push(resampled[0][frame]);
+                                        }
+                                    }
+                                }
+                                
+                                if !final_samples.is_empty() {
+                                    output.write_blocking(&final_samples);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Wait for buffer to drain before exiting
                     thread::sleep(Duration::from_millis(100));
                     break;
                 }
@@ -203,6 +321,59 @@ impl Player {
         
         is_playing.store(false, Ordering::SeqCst);
         Ok(())
+    }
+    
+    /// Interleave planar audio and convert channels if needed
+    fn interleave_and_convert_channels(planar: &[Vec<f32>], output_channels: usize) -> Vec<f32> {
+        if planar.is_empty() || planar[0].is_empty() {
+            return vec![];
+        }
+        
+        let input_channels = planar.len();
+        let frame_count = planar[0].len();
+        let mut output = Vec::with_capacity(frame_count * output_channels);
+        
+        for frame in 0..frame_count {
+            for out_ch in 0..output_channels {
+                if out_ch < input_channels {
+                    output.push(planar[out_ch][frame]);
+                } else if input_channels == 1 {
+                    // Mono to stereo: duplicate
+                    output.push(planar[0][frame]);
+                } else {
+                    // More output channels than input: use first channel
+                    output.push(planar[0][frame]);
+                }
+            }
+        }
+        
+        output
+    }
+    
+    /// Convert interleaved audio between channel counts
+    fn convert_channels(samples: &[f32], input_channels: usize, output_channels: usize) -> Vec<f32> {
+        if input_channels == output_channels {
+            return samples.to_vec();
+        }
+        
+        let frame_count = samples.len() / input_channels;
+        let mut output = Vec::with_capacity(frame_count * output_channels);
+        
+        for frame in 0..frame_count {
+            for out_ch in 0..output_channels {
+                if out_ch < input_channels {
+                    output.push(samples[frame * input_channels + out_ch]);
+                } else if input_channels == 1 {
+                    // Mono to stereo: duplicate
+                    output.push(samples[frame * input_channels]);
+                } else {
+                    // More output channels than input: use first channel
+                    output.push(samples[frame * input_channels]);
+                }
+            }
+        }
+        
+        output
     }
     
     /// Pause playback

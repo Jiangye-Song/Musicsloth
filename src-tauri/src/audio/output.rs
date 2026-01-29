@@ -1,15 +1,14 @@
 // Audio output using cpal
 // Handles cross-platform audio output with a ring buffer
 
-#![allow(dead_code)] // Methods will be used in Phase 2
-
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Stream, StreamConfig};
 use parking_lot::Mutex;
 use ringbuf::{HeapRb, traits::{Consumer, Observer, Producer, Split}};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-const RING_BUFFER_SIZE: usize = 48000 * 2 * 4; // ~4 seconds of stereo audio at 48kHz
+const RING_BUFFER_SIZE: usize = 48000 * 2 / 4; // ~250ms of stereo audio at 48kHz
 
 type RingProducer = ringbuf::HeapProd<f32>;
 type RingConsumer = ringbuf::HeapCons<f32>;
@@ -20,6 +19,7 @@ pub struct AudioOutput {
     sample_rate: u32,
     channels: u16,
     volume: Arc<Mutex<f32>>,
+    clear_flag: Arc<AtomicBool>,
 }
 
 impl AudioOutput {
@@ -45,16 +45,19 @@ impl AudioOutput {
         let volume = Arc::new(Mutex::new(1.0f32));
         let volume_clone = volume.clone();
         
+        let clear_flag = Arc::new(AtomicBool::new(false));
+        let clear_flag_clone = clear_flag.clone();
+        
         // Build the output stream based on sample format
         let stream = match config.sample_format() {
             cpal::SampleFormat::F32 => {
-                Self::build_stream::<f32>(&device, &config.into(), consumer, volume_clone)?
+                Self::build_stream::<f32>(&device, &config.into(), consumer, volume_clone, clear_flag_clone)?
             }
             cpal::SampleFormat::I16 => {
-                Self::build_stream::<i16>(&device, &config.into(), consumer, volume_clone)?
+                Self::build_stream::<i16>(&device, &config.into(), consumer, volume_clone, clear_flag_clone)?
             }
             cpal::SampleFormat::U16 => {
-                Self::build_stream::<u16>(&device, &config.into(), consumer, volume_clone)?
+                Self::build_stream::<u16>(&device, &config.into(), consumer, volume_clone, clear_flag_clone)?
             }
             format => return Err(format!("Unsupported sample format: {:?}", format)),
         };
@@ -67,6 +70,7 @@ impl AudioOutput {
             sample_rate,
             channels,
             volume,
+            clear_flag,
         })
     }
     
@@ -75,12 +79,19 @@ impl AudioOutput {
         config: &StreamConfig,
         consumer: Arc<Mutex<RingConsumer>>,
         volume: Arc<Mutex<f32>>,
+        clear_flag: Arc<AtomicBool>,
     ) -> Result<Stream, String> {
         let stream = device.build_output_stream(
             config,
             move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
                 let mut consumer = consumer.lock();
                 let vol = *volume.lock();
+                
+                // If clear flag is set, drain the buffer and output silence
+                if clear_flag.swap(false, Ordering::SeqCst) {
+                    // Drain all samples from the buffer
+                    while consumer.try_pop().is_some() {}
+                }
                 
                 for sample in data.iter_mut() {
                     let value = consumer.try_pop().unwrap_or(0.0) * vol;
@@ -137,11 +148,8 @@ impl AudioOutput {
     
     /// Clear the buffer (useful when seeking)
     pub fn clear(&self) {
-        let producer = self.producer.lock();
-        // We can't directly clear, but we can fill with silence
-        // Actually, ringbuf doesn't have a clear method on producer
-        // The consumer will just read zeros when buffer is empty
-        drop(producer);
+        // Set flag so audio callback drains buffer on next call
+        self.clear_flag.store(true, Ordering::SeqCst);
     }
     
     /// Get the output sample rate

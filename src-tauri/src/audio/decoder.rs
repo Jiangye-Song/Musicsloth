@@ -1,8 +1,6 @@
 // Audio decoder using Symphonia
 // Decodes audio files to raw PCM samples
 
-#![allow(dead_code)] // Methods will be used in Phase 2
-
 use symphonia::core::audio::{AudioBufferRef, AudioPlanes, Signal};
 use symphonia::core::codecs::{Decoder, DecoderOptions, CODEC_TYPE_NULL};
 use symphonia::core::errors::Error as SymphoniaError;

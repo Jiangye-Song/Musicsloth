@@ -740,3 +740,69 @@ pub async fn save_album_art(app: AppHandle, file_path: String, default_name: Str
     
     rx.recv().map_err(|e| format!("Dialog error: {}", e))?
 }
+
+// ===== Audio Player Commands =====
+
+use crate::audio::player::PlayerState;
+
+#[tauri::command]
+pub fn player_play(
+    file_path: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.play(PathBuf::from(file_path))
+}
+
+#[tauri::command]
+pub fn player_pause(state: State<'_, AppState>) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.pause();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_resume(state: State<'_, AppState>) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.resume();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_stop(state: State<'_, AppState>) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.stop();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_seek(
+    position_ms: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.seek(position_ms);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_set_volume(
+    volume: f32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.set_volume(volume);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_get_state(state: State<'_, AppState>) -> Result<PlayerState, String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(player.get_state())
+}
+
+#[tauri::command]
+pub fn player_has_track_ended(state: State<'_, AppState>) -> Result<bool, String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(player.has_track_ended())
+}

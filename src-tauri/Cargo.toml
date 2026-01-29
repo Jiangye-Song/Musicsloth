@@ -73,3 +73,6 @@ ringbuf = "0.4"
 # Better locks for audio thread
 parking_lot = "0.12"
 
+# Sample rate conversion
+rubato = "0.15"
+

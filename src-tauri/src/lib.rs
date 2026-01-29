@@ -116,6 +116,15 @@ pub fn run() {
             commands::insert_tracks_after_position,
             commands::remove_track_at_position,
             commands::save_album_art,
+            // Audio player commands
+            commands::player_play,
+            commands::player_pause,
+            commands::player_resume,
+            commands::player_stop,
+            commands::player_seek,
+            commands::player_set_volume,
+            commands::player_get_state,
+            commands::player_has_track_ended,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

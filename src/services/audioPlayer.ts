@@ -1,5 +1,6 @@
-// Frontend audio player using Web Audio API
-import { convertFileSrc } from '@tauri-apps/api/core';
+// Frontend audio player - uses Rust backend via Tauri IPC
+// Symphonia decoding + cpal output in backend
+import { invoke } from '@tauri-apps/api/core';
 
 interface PlayerState {
   isPlaying: boolean;
@@ -10,146 +11,83 @@ interface PlayerState {
   volume: number;
 }
 
+// Backend response format (snake_case)
+interface BackendPlayerState {
+  is_playing: boolean;
+  is_paused: boolean;
+  current_file: string | null;
+  position_ms: number;
+  duration_ms: number;
+  volume: number;
+}
+
 type StateChangeCallback = (state: PlayerState) => void;
 type TrackEndedCallback = () => void;
 
 class AudioPlayer {
-  private audio: HTMLAudioElement | null = null;
-  private currentFile: string | null = null;
   private stateCallbacks: Set<StateChangeCallback> = new Set();
   private trackEndedCallbacks: Set<TrackEndedCallback> = new Set();
-  private updateInterval: number | null = null;
+  private pollInterval: number | null = null;
+  private lastState: PlayerState | null = null;
+  private currentVolume: number = 1.0;
+  private wasPlaying: boolean = false;
 
   constructor() {
-    // Create audio element
-    this.audio = new Audio();
-    this.audio.volume = 1.0;
-    
-    // Set up event listeners
-    this.audio.addEventListener('play', () => this.notifyStateChange());
-    this.audio.addEventListener('pause', () => this.notifyStateChange());
-    this.audio.addEventListener('ended', () => {
-      this.notifyStateChange();
-      this.notifyTrackEnded();
-    });
-    this.audio.addEventListener('loadedmetadata', () => this.notifyStateChange());
-    this.audio.addEventListener('timeupdate', () => this.notifyStateChange());
-    this.audio.addEventListener('error', (e) => {
-      console.error('Audio error:', e);
-      this.notifyStateChange();
-    });
-    
-    // Update position every 100ms
-    this.updateInterval = window.setInterval(() => {
-      if (this.audio && !this.audio.paused) {
-        this.notifyStateChange();
-      }
-    }, 100);
+    // Poll backend for state updates
+    this.startPolling();
   }
 
-  async play(filePath: string): Promise<void> {
-    if (!this.audio) return;
-    
-    // Convert file path to URL that Tauri can serve
-    const fileUrl = convertFileSrc(filePath);
-    
-    // If it's a new file, load it
-    if (this.currentFile !== filePath) {
-      this.audio.src = fileUrl;
-      this.currentFile = filePath;
-    }
-    
+  private startPolling(): void {
+    this.pollInterval = window.setInterval(() => {
+      this.pollState();
+    }, 50); // 50ms for smooth progress bar
+  }
+
+  private async pollState(): Promise<void> {
     try {
-      await this.audio.play();
-    } catch (error) {
-      console.error('Failed to play audio:', error);
-      throw error;
-    }
-  }
+      const backendState = await invoke<BackendPlayerState>('player_get_state');
 
-  pause(): void {
-    if (!this.audio) return;
-    this.audio.pause();
-  }
-
-  resume(): void {
-    if (!this.audio) return;
-    this.audio.play();
-  }
-
-  stop(): void {
-    if (!this.audio) return;
-    this.audio.pause();
-    this.audio.currentTime = 0;
-    this.currentFile = null;
-    this.audio.src = '';
-  }
-
-  seek(positionMs: number): void {
-    if (!this.audio) return;
-    this.audio.currentTime = positionMs / 1000;
-  }
-
-  setVolume(volume: number): void {
-    if (!this.audio) return;
-    this.audio.volume = Math.max(0, Math.min(1, volume));
-    this.notifyStateChange();
-  }
-
-  getState(): PlayerState {
-    if (!this.audio) {
-      return {
-        isPlaying: false,
-        isPaused: false,
-        currentFile: null,
-        duration: 0,
-        position: 0,
-        volume: 1.0,
+      const state: PlayerState = {
+        isPlaying: backendState.is_playing && !backendState.is_paused,
+        isPaused: backendState.is_paused,
+        currentFile: backendState.current_file,
+        duration: backendState.duration_ms,
+        position: backendState.position_ms,
+        volume: backendState.volume,
       };
+
+      // Detect track ended: was playing, now not playing and not paused
+      if (this.wasPlaying && !state.isPlaying && !state.isPaused) {
+        // Check if backend signals track ended
+        const trackEnded = await invoke<boolean>('player_has_track_ended');
+        if (trackEnded) {
+          this.notifyTrackEnded();
+        }
+      }
+      
+      this.wasPlaying = state.isPlaying;
+      this.lastState = state;
+      this.notifyStateChange(state);
+      
+      // Update Media Session position state for Windows SMTC seekbar sync
+      this.updateMediaSessionPosition(state);
+    } catch (error) {
+      console.error('Failed to poll player state:', error);
     }
-
-    return {
-      isPlaying: !this.audio.paused && !this.audio.ended,
-      isPaused: this.audio.paused && this.audio.currentTime > 0,
-      currentFile: this.currentFile,
-      duration: (this.audio.duration || 0) * 1000, // Convert to ms
-      position: (this.audio.currentTime || 0) * 1000, // Convert to ms
-      volume: this.audio.volume,
-    };
   }
 
-  onStateChange(callback: StateChangeCallback): () => void {
-    this.stateCallbacks.add(callback);
-    // Return unsubscribe function
-    return () => {
-      this.stateCallbacks.delete(callback);
-    };
-  }
-
-  onTrackEnded(callback: TrackEndedCallback): () => void {
-    this.trackEndedCallbacks.add(callback);
-    // Return unsubscribe function
-    return () => {
-      this.trackEndedCallbacks.delete(callback);
-    };
-  }
-
-  private notifyStateChange(): void {
-    const state = this.getState();
-    this.stateCallbacks.forEach(callback => callback(state));
-    
-    // Update Media Session position state for Windows SMTC seekbar sync
-    if ("mediaSession" in navigator && this.audio) {
+  private updateMediaSessionPosition(state: PlayerState): void {
+    if ("mediaSession" in navigator) {
       try {
-        const duration = this.audio.duration;
-        const position = this.audio.currentTime;
+        const duration = state.duration / 1000; // Convert ms to seconds
+        const position = state.position / 1000;
         
         // Only update if we have valid duration
         if (duration && !isNaN(duration) && duration > 0) {
           navigator.mediaSession.setPositionState({
             duration: duration,
-            playbackRate: this.audio.playbackRate || 1,
-            position: Math.min(position, duration), // Ensure position doesn't exceed duration
+            playbackRate: 1,
+            position: Math.min(position, duration),
           });
         }
       } catch (e) {
@@ -158,18 +96,70 @@ class AudioPlayer {
     }
   }
 
+  async play(filePath: string): Promise<void> {
+    try {
+      await invoke('player_play', { filePath });
+    } catch (error) {
+      console.error('Failed to play audio:', error);
+      throw error;
+    }
+  }
+
+  pause(): void {
+    invoke('player_pause').catch(e => console.error('Failed to pause:', e));
+  }
+
+  resume(): void {
+    invoke('player_resume').catch(e => console.error('Failed to resume:', e));
+  }
+
+  stop(): void {
+    invoke('player_stop').catch(e => console.error('Failed to stop:', e));
+  }
+
+  seek(positionMs: number): void {
+    invoke('player_seek', { positionMs: Math.floor(positionMs) })
+      .catch(e => console.error('Failed to seek:', e));
+  }
+
+  setVolume(volume: number): void {
+    this.currentVolume = Math.max(0, Math.min(1, volume));
+    invoke('player_set_volume', { volume: this.currentVolume })
+      .catch(e => console.error('Failed to set volume:', e));
+  }
+
+  getState(): PlayerState {
+    return this.lastState || {
+      isPlaying: false,
+      isPaused: false,
+      currentFile: null,
+      duration: 0,
+      position: 0,
+      volume: this.currentVolume,
+    };
+  }
+
+  onStateChange(callback: StateChangeCallback): () => void {
+    this.stateCallbacks.add(callback);
+    return () => this.stateCallbacks.delete(callback);
+  }
+
+  onTrackEnded(callback: TrackEndedCallback): () => void {
+    this.trackEndedCallbacks.add(callback);
+    return () => this.trackEndedCallbacks.delete(callback);
+  }
+
+  private notifyStateChange(state: PlayerState): void {
+    this.stateCallbacks.forEach(callback => callback(state));
+  }
+
   private notifyTrackEnded(): void {
     this.trackEndedCallbacks.forEach(callback => callback());
   }
 
   destroy(): void {
-    if (this.updateInterval !== null) {
-      clearInterval(this.updateInterval);
-    }
-    if (this.audio) {
-      this.audio.pause();
-      this.audio.src = '';
-      this.audio = null;
+    if (this.pollInterval !== null) {
+      clearInterval(this.pollInterval);
     }
     this.stateCallbacks.clear();
     this.trackEndedCallbacks.clear();
