@@ -1,6 +1,6 @@
 // API service for Tauri commands
 import { invoke } from "@tauri-apps/api/core";
-import { audioPlayer } from "./audioPlayer";
+import { audioPlayer, AudioPlayer } from "./audioPlayer";
 
 export interface PlayerState {
   is_playing: boolean;
@@ -34,6 +34,28 @@ export const playerApi = {
 
   setVolume: async (volume: number): Promise<void> => {
     audioPlayer.setVolume(volume);
+  },
+
+  /**
+   * Set volume in decibels (-60 to 0)
+   * More natural volume control curve
+   */
+  setVolumeDb: async (db: number): Promise<void> => {
+    audioPlayer.setVolumeDb(db);
+  },
+
+  /**
+   * Convert slider position (0-100) to dB
+   */
+  sliderToDb: (slider: number): number => {
+    return AudioPlayer.sliderToDb(slider);
+  },
+
+  /**
+   * Convert dB to slider position (0-100)
+   */
+  dbToSlider: (db: number): number => {
+    return AudioPlayer.dbToSlider(db);
   },
 
   seekTo: async (positionMs: number): Promise<void> => {

@@ -7,12 +7,14 @@ mod library;
 mod metadata;
 mod playlist;
 mod queue;
+mod smtc;
 mod state;
 
 use audio::player::Player;
 use db::connection::DatabaseConnection;
+use smtc::{SmtcButton, SmtcManager};
 use state::AppState;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg(target_os = "windows")]
 fn set_app_user_model_id() {
@@ -57,8 +59,35 @@ pub fn run() {
             // Initialize audio player
             let player = Player::new();
 
+            // Initialize SMTC (Windows only)
+            let smtc = match SmtcManager::new() {
+                Ok(s) => {
+                    eprintln!("SMTC initialized successfully");
+                    Some(s)
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize SMTC: {}", e);
+                    None
+                }
+            };
+
+            // Set up SMTC button callback to emit events
+            if let Some(ref smtc) = smtc {
+                let app_handle = app.handle().clone();
+                let _ = smtc.set_button_callback(move |button| {
+                    let event_name = match button {
+                        SmtcButton::Play => "smtc-play",
+                        SmtcButton::Pause => "smtc-pause",
+                        SmtcButton::Stop => "smtc-stop",
+                        SmtcButton::Next => "smtc-next",
+                        SmtcButton::Previous => "smtc-previous",
+                    };
+                    let _ = app_handle.emit(event_name, ());
+                });
+            }
+
             // Create and manage app state
-            let app_state = AppState::new(player, db);
+            let app_state = AppState::new(player, db, smtc);
             app.manage(app_state);
 
             Ok(())
@@ -123,8 +152,14 @@ pub fn run() {
             commands::player_stop,
             commands::player_seek,
             commands::player_set_volume,
+            commands::player_set_volume_db,
             commands::player_get_state,
             commands::player_has_track_ended,
+            // SMTC commands
+            commands::smtc_update_metadata,
+            commands::smtc_set_playback_status,
+            commands::smtc_set_timeline,
+            commands::get_artwork_temp_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

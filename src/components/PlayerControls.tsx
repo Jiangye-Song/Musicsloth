@@ -121,7 +121,9 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
     const newVolume = value as number;
     setVolume(newVolume);
     try {
-      await playerApi.setVolume(newVolume / 100);
+      // Convert slider position to dB for more natural volume curve
+      const db = playerApi.sliderToDb(newVolume);
+      await playerApi.setVolumeDb(db);
     } catch (error) {
       console.error("Failed to set volume:", error);
     }

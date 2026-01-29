@@ -1,5 +1,5 @@
 // Tauri command handlers
-use tauri::{State, AppHandle, Emitter};
+use tauri::{State, AppHandle, Emitter, Manager};
 use std::path::PathBuf;
 
 use crate::state::AppState;
@@ -796,6 +796,16 @@ pub fn player_set_volume(
 }
 
 #[tauri::command]
+pub fn player_set_volume_db(
+    db: f32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.set_volume_db(db);
+    Ok(())
+}
+
+#[tauri::command]
 pub fn player_get_state(state: State<'_, AppState>) -> Result<PlayerState, String> {
     let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
     Ok(player.get_state())
@@ -805,4 +815,116 @@ pub fn player_get_state(state: State<'_, AppState>) -> Result<PlayerState, Strin
 pub fn player_has_track_ended(state: State<'_, AppState>) -> Result<bool, String> {
     let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
     Ok(player.has_track_ended())
+}
+
+// ============================================================================
+// SMTC (System Media Transport Controls) Commands
+// ============================================================================
+
+#[tauri::command]
+pub fn smtc_update_metadata(
+    title: String,
+    artist: Option<String>,
+    album: Option<String>,
+    artwork_path: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    eprintln!("[SMTC] update_metadata called - title: {}, artwork_path: {:?}", title, artwork_path);
+    let smtc_guard = state.smtc.lock().map_err(|e| format!("Lock error: {}", e))?;
+    if let Some(ref smtc) = *smtc_guard {
+        let artwork = artwork_path.as_ref().map(std::path::Path::new);
+        smtc.update_metadata(
+            &title,
+            artist.as_deref(),
+            album.as_deref(),
+            artwork,
+        )?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn smtc_set_playback_status(
+    is_playing: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let smtc_guard = state.smtc.lock().map_err(|e| format!("Lock error: {}", e))?;
+    if let Some(ref smtc) = *smtc_guard {
+        smtc.set_playback_status(is_playing)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn smtc_set_timeline(
+    position_ms: i64,
+    duration_ms: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let smtc_guard = state.smtc.lock().map_err(|e| format!("Lock error: {}", e))?;
+    if let Some(ref smtc) = *smtc_guard {
+        smtc.set_timeline(position_ms, duration_ms)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_artwork_temp_path(app: AppHandle, file_path: String) -> Result<Option<String>, String> {
+    use lofty::probe::Probe;
+    use lofty::picture::PictureType;
+    
+    // Get album art data
+    let art_data = tokio::task::spawn_blocking(move || {
+        let lofty_result = Probe::open(&file_path)
+            .and_then(|p| p.read());
+        
+        if let Ok(tagged_file) = lofty_result {
+            let picture_priority = [
+                PictureType::CoverFront,
+                PictureType::Media,
+                PictureType::CoverBack,
+                PictureType::Leaflet,
+                PictureType::Other,
+            ];
+            
+            if let Some(tag) = tagged_file.primary_tag() {
+                for pic_type in &picture_priority {
+                    for picture in tag.pictures() {
+                        if picture.pic_type() == *pic_type {
+                            return Some(picture.data().to_vec());
+                        }
+                    }
+                }
+            }
+            
+            // Check all tags if primary tag didn't have art
+            for tag in tagged_file.tags() {
+                if let Some(picture) = tag.pictures().first() {
+                    return Some(picture.data().to_vec());
+                }
+            }
+        }
+        None
+    }).await.map_err(|e| format!("Task join error: {}", e))?;
+    
+    if let Some(data) = art_data {
+        eprintln!("[SMTC] Found artwork data: {} bytes", data.len());
+        // Save to temp directory
+        let cache_dir = app.path().app_cache_dir()
+            .map_err(|e| format!("Failed to get cache dir: {}", e))?;
+        
+        std::fs::create_dir_all(&cache_dir)
+            .map_err(|e| format!("Failed to create cache dir: {}", e))?;
+        
+        let temp_path = cache_dir.join("smtc_artwork.jpg");
+        
+        std::fs::write(&temp_path, &data)
+            .map_err(|e| format!("Failed to write artwork: {}", e))?;
+        
+        eprintln!("[SMTC] Saved artwork to: {:?}", temp_path);
+        Ok(Some(temp_path.to_string_lossy().to_string()))
+    } else {
+        eprintln!("[SMTC] No artwork found in file");
+        Ok(None)
+    }
 }

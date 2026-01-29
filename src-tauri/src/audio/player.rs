@@ -18,7 +18,8 @@ pub struct PlayerState {
     pub current_file: Option<String>,
     pub position_ms: i64,
     pub duration_ms: i64,
-    pub volume: f32,
+    pub volume: f32,      // Linear gain (0.0 to 1.0)
+    pub volume_db: f32,   // Volume in dB (-60 to 0)
 }
 
 /// Audio player with Symphonia decoding and cpal output
@@ -32,8 +33,10 @@ pub struct Player {
     position_ms: Arc<AtomicI64>,
     duration_ms: Arc<AtomicI64>,
     
-    // Volume (0.0 to 1.0)
-    volume: Arc<RwLock<f32>>,
+    // Volume in dB (-60 to 0, where 0 is full volume)
+    volume_db: Arc<RwLock<f32>>,
+    // Linear gain computed from dB (0.0 to 1.0)
+    volume_linear: Arc<RwLock<f32>>,
     
     // Current file path
     current_file: Arc<RwLock<Option<PathBuf>>>,
@@ -57,7 +60,8 @@ impl Player {
             should_stop: Arc::new(AtomicBool::new(false)),
             position_ms: Arc::new(AtomicI64::new(0)),
             duration_ms: Arc::new(AtomicI64::new(0)),
-            volume: Arc::new(RwLock::new(1.0)),
+            volume_db: Arc::new(RwLock::new(0.0)),      // 0 dB = full volume
+            volume_linear: Arc::new(RwLock::new(1.0)),   // gain = 1.0
             current_file: Arc::new(RwLock::new(None)),
             seek_request: Arc::new(AtomicI64::new(-1)),
             playback_thread: Mutex::new(None),
@@ -89,7 +93,7 @@ impl Player {
         let should_stop = self.should_stop.clone();
         let position_ms = self.position_ms.clone();
         let duration_ms = self.duration_ms.clone();
-        let volume = self.volume.clone();
+        let volume = self.volume_linear.clone();
         let seek_request = self.seek_request.clone();
         let track_ended = self.track_ended.clone();
         
@@ -411,9 +415,36 @@ impl Player {
         self.seek_request.store(position_ms.max(0), Ordering::SeqCst);
     }
     
-    /// Set volume (0.0 to 1.0)
-    pub fn set_volume(&self, vol: f32) {
-        *self.volume.write() = vol.clamp(0.0, 1.0);
+    /// Set volume in dB (-60 to 0, or use special value -inf for mute)
+    /// Also accepts linear 0.0-1.0 for backward compatibility if use_db is false
+    pub fn set_volume_db(&self, db: f32) {
+        let db_clamped = db.clamp(-60.0, 0.0);
+        *self.volume_db.write() = db_clamped;
+        // Convert dB to linear gain: gain = 10^(dB/20)
+        let linear = if db_clamped <= -60.0 {
+            0.0 // Treat -60 dB as mute
+        } else {
+            10.0_f32.powf(db_clamped / 20.0)
+        };
+        *self.volume_linear.write() = linear;
+    }
+    
+    /// Set volume using linear gain (0.0 to 1.0) - converts to dB internally
+    pub fn set_volume(&self, linear: f32) {
+        let linear_clamped = linear.clamp(0.0, 1.0);
+        // Convert linear to dB: dB = 20 * log10(gain)
+        let db = if linear_clamped <= 0.001 {
+            -60.0 // Treat very small values as mute
+        } else {
+            20.0 * linear_clamped.log10()
+        };
+        *self.volume_db.write() = db.clamp(-60.0, 0.0);
+        *self.volume_linear.write() = linear_clamped;
+    }
+    
+    /// Get current volume in dB
+    pub fn volume_db(&self) -> f32 {
+        *self.volume_db.read()
     }
     
     /// Get current player state
@@ -424,7 +455,8 @@ impl Player {
             current_file: self.current_file.read().as_ref().map(|p| p.to_string_lossy().to_string()),
             position_ms: self.position_ms.load(Ordering::SeqCst),
             duration_ms: self.duration_ms.load(Ordering::SeqCst),
-            volume: *self.volume.read(),
+            volume: *self.volume_linear.read(),
+            volume_db: *self.volume_db.read(),
         }
     }
     

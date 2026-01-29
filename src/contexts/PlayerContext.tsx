@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { playerApi, libraryApi, queueApi, Track } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
+import { smtcService } from "../services/smtcService";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface PlayerContextType {
@@ -367,6 +368,78 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [playNext, isRepeating, currentTrack]);
 
+  // Initialize SMTC (Windows System Media Transport Controls)
+  useEffect(() => {
+    const initSmtc = async () => {
+      await smtcService.init();
+      
+      // Set up button callbacks
+      smtcService.setCallbacks({
+        onPlay: async () => {
+          try {
+            await playerApi.resume();
+          } catch (error) {
+            console.error('[SMTC] Failed to play:', error);
+          }
+        },
+        onPause: async () => {
+          try {
+            await playerApi.pause();
+          } catch (error) {
+            console.error('[SMTC] Failed to pause:', error);
+          }
+        },
+        onStop: async () => {
+          try {
+            await playerApi.stop();
+          } catch (error) {
+            console.error('[SMTC] Failed to stop:', error);
+          }
+        },
+        onNext: async () => {
+          try {
+            await playNext();
+          } catch (error) {
+            console.error('[SMTC] Failed to play next:', error);
+          }
+        },
+        onPrevious: async () => {
+          try {
+            await playPrevious();
+          } catch (error) {
+            console.error('[SMTC] Failed to play previous:', error);
+          }
+        },
+      });
+    };
+    
+    initSmtc();
+    
+    return () => {
+      smtcService.destroy();
+    };
+  }, [playNext, playPrevious]);
+
+  // Update SMTC when track or playback state changes
+  useEffect(() => {
+    const updateSmtc = async () => {
+      if (currentTrack) {
+        // Get artwork temp path for SMTC
+        const artworkPath = await smtcService.getArtworkTempPath(currentTrack.file_path);
+        console.log('[PlayerContext] SMTC artwork path:', artworkPath);
+        
+        await smtcService.updateMetadata({
+          title: currentTrack.title,
+          artist: currentTrack.artist || undefined,
+          album: currentTrack.album || undefined,
+          artworkPath: artworkPath || undefined,
+        });
+      }
+    };
+    
+    updateSmtc();
+  }, [currentTrack]);
+
   useEffect(() => {
     console.log('[PlayerContext] Setting up polling interval');
     // Poll for current track and album art
@@ -378,6 +451,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if ("mediaSession" in navigator) {
           navigator.mediaSession.playbackState = state.is_playing ? "playing" : "paused";
         }
+        
+        // Update SMTC playback status
+        smtcService.setPlaybackStatus(state.is_playing);
         
         if (state.current_file) {
           try {

@@ -8,7 +8,8 @@ interface PlayerState {
   currentFile: string | null;
   duration: number;
   position: number;
-  volume: number;
+  volume: number;     // Linear gain 0.0-1.0
+  volumeDb: number;   // Volume in dB (-60 to 0)
 }
 
 // Backend response format (snake_case)
@@ -19,6 +20,7 @@ interface BackendPlayerState {
   position_ms: number;
   duration_ms: number;
   volume: number;
+  volume_db: number;
 }
 
 type StateChangeCallback = (state: PlayerState) => void;
@@ -54,6 +56,7 @@ class AudioPlayer {
         duration: backendState.duration_ms,
         position: backendState.position_ms,
         volume: backendState.volume,
+        volumeDb: backendState.volume_db,
       };
 
       // Detect track ended: was playing, now not playing and not paused
@@ -128,6 +131,38 @@ class AudioPlayer {
       .catch(e => console.error('Failed to set volume:', e));
   }
 
+  /**
+   * Set volume in decibels (-60 to 0)
+   * -60 dB = essentially mute
+   * 0 dB = full volume
+   */
+  setVolumeDb(db: number): void {
+    const dbClamped = Math.max(-60, Math.min(0, db));
+    invoke('player_set_volume_db', { db: dbClamped })
+      .catch(e => console.error('Failed to set volume:', e));
+  }
+
+  /**
+   * Convert slider position (0-100) to dB using logarithmic curve
+   * This gives a more natural volume feel
+   */
+  static sliderToDb(slider: number): number {
+    if (slider <= 0) return -60;
+    if (slider >= 100) return 0;
+    // Logarithmic curve: slider 0-100 maps to -60dB to 0dB
+    // Using a curve that feels natural for audio
+    return (slider / 100) * 60 - 60;
+  }
+
+  /**
+   * Convert dB to slider position (0-100)
+   */
+  static dbToSlider(db: number): number {
+    if (db <= -60) return 0;
+    if (db >= 0) return 100;
+    return ((db + 60) / 60) * 100;
+  }
+
   getState(): PlayerState {
     return this.lastState || {
       isPlaying: false,
@@ -136,6 +171,7 @@ class AudioPlayer {
       duration: 0,
       position: 0,
       volume: this.currentVolume,
+      volumeDb: -60,
     };
   }
 
@@ -165,6 +201,9 @@ class AudioPlayer {
     this.trackEndedCallbacks.clear();
   }
 }
+
+// Export class for static method access
+export { AudioPlayer };
 
 // Singleton instance
 export const audioPlayer = new AudioPlayer();
