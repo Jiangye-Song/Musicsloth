@@ -55,8 +55,7 @@ pub fn run() {
                 .expect("Failed to initialize database");
 
             // Initialize audio player
-            let player = Player::new()
-                .expect("Failed to initialize audio player");
+            let player = Player::new();
 
             // Create and manage app state
             let app_state = AppState::new(player, db);

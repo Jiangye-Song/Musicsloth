@@ -52,3 +52,24 @@ blake3 = "1.5"
 # Random number generation for shuffle
 rand = "0.8"
 
+# Audio decoding (pure Rust)
+symphonia = { version = "0.5", features = [
+    "mp3",      # MP3 support
+    "aac",      # AAC support
+    "flac",     # FLAC support
+    "ogg",      # OGG container
+    "wav",      # WAV support
+    "pcm",      # PCM codec
+    "vorbis",   # Vorbis codec
+    "isomp4",   # MP4/M4A container
+] }
+
+# Cross-platform audio output
+cpal = "0.15"
+
+# Thread-safe ring buffer for audio samples
+ringbuf = "0.4"
+
+# Better locks for audio thread
+parking_lot = "0.12"
+
