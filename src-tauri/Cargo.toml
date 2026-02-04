@@ -76,6 +76,9 @@ parking_lot = "0.12"
 # Sample rate conversion
 rubato = "0.15"
 
+# Image decoding for app icon
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 # Windows SMTC (System Media Transport Controls)
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

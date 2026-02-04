@@ -737,6 +737,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
                 placeholder="Search in this list..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                autoComplete="off"
                 onFocus={() => {
                   if (searchResults.length > 0) {
                     setShowDropdown(true);

@@ -59,13 +59,12 @@ class AudioPlayer {
         volumeDb: backendState.volume_db,
       };
 
-      // Detect track ended: was playing, now not playing and not paused
-      if (this.wasPlaying && !state.isPlaying && !state.isPaused) {
-        // Check if backend signals track ended
-        const trackEnded = await invoke<boolean>('player_has_track_ended');
-        if (trackEnded) {
-          this.notifyTrackEnded();
-        }
+      // Always check if track ended - don't rely on state transitions
+      // This is more robust against race conditions
+      const trackEnded = await invoke<boolean>('player_has_track_ended');
+      if (trackEnded) {
+        console.log('[AudioPlayer] Track ended signal received');
+        this.notifyTrackEnded();
       }
       
       this.wasPlaying = state.isPlaying;

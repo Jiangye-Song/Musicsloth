@@ -28,6 +28,7 @@ export default function SearchBar({ placeholder, value, onChange, variant = "pri
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        autoComplete="off"
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">

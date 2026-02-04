@@ -67,6 +67,7 @@ export default function CreatePlaylistDialog({
           type="text"
           fullWidth
           variant="outlined"
+          autoComplete="off"
           value={name}
           onChange={(e) => setName(e.target.value)}
           error={!isNameEmpty && isNameTaken}
@@ -88,6 +89,7 @@ export default function CreatePlaylistDialog({
           type="text"
           fullWidth
           variant="outlined"
+          autoComplete="off"
           multiline
           rows={2}
           value={description}

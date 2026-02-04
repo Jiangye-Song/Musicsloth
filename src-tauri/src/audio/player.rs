@@ -113,9 +113,11 @@ impl Player {
                 eprintln!("Playback error: {}", e);
             }
             
-            // Mark as not playing when thread exits
-            is_playing.store(false, Ordering::SeqCst);
+            // Mark track as ended BEFORE marking as not playing
+            // This prevents race condition where frontend sees is_playing=false
+            // but track_ended hasn't been set yet
             track_ended.store(true, Ordering::SeqCst);
+            is_playing.store(false, Ordering::SeqCst);
         });
         
         *self.playback_thread.lock() = Some(handle);

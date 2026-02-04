@@ -95,6 +95,7 @@ export default function PlaylistNameDialog({
           type="text"
           fullWidth
           variant="outlined"
+          autoComplete="off"
           value={name}
           onChange={(e) => {
             setName(e.target.value);
@@ -121,6 +122,7 @@ export default function PlaylistNameDialog({
             type="text"
             fullWidth
             variant="outlined"
+            autoComplete="off"
             multiline
             rows={2}
             value={description}

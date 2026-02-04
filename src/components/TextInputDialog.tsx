@@ -109,6 +109,7 @@ export default function TextInputDialog({
           type="text"
           fullWidth
           variant="outlined"
+          autoComplete="off"
           value={value}
           onChange={(e) => {
             setValue(e.target.value);

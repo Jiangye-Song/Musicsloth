@@ -14,7 +14,7 @@ use audio::player::Player;
 use db::connection::DatabaseConnection;
 use smtc::{SmtcButton, SmtcManager};
 use state::AppState;
-use tauri::{Emitter, Manager};
+use tauri::{image::Image, Emitter, Manager};
 
 #[cfg(target_os = "windows")]
 fn set_app_user_model_id() {
@@ -89,6 +89,17 @@ pub fn run() {
             // Create and manage app state
             let app_state = AppState::new(player, db, smtc);
             app.manage(app_state);
+
+            // Set window icon
+            if let Some(window) = app.get_webview_window("main") {
+                let icon_bytes = include_bytes!("../icons/icon.png");
+                if let Ok(img) = image::load_from_memory(icon_bytes) {
+                    let rgba = img.to_rgba8();
+                    let (width, height) = rgba.dimensions();
+                    let icon = Image::new_owned(rgba.into_raw(), width, height);
+                    let _ = window.set_icon(icon);
+                }
+            }
 
             Ok(())
         })
