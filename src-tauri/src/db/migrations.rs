@@ -224,6 +224,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    // Migration: Add normalization_gain_db column to tracks table for ReplayGain/volume normalization
+    // Stores the gain adjustment in dB needed to normalize tracks to -14 LUFS target
+    let normalization_gain_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('tracks') WHERE name='normalization_gain_db'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = normalization_gain_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE tracks ADD COLUMN normalization_gain_db REAL", [])?;
+        }
+    }
+
     // Migration: Add last_scanned column to scan_paths table
     let last_scanned_exists: Result<i64, _> = conn.query_row(
         "SELECT COUNT(*) FROM pragma_table_info('scan_paths') WHERE name='last_scanned'",

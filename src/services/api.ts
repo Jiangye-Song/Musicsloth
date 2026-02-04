@@ -37,8 +37,8 @@ export const playerApi = {
   },
 
   /**
-   * Set volume in decibels (-60 to 0)
-   * More natural volume control curve
+   * Set volume in decibels (-60 to +6)
+   * -60 dB = mute, 0 dB = unity gain, +6 dB = max boost
    */
   setVolumeDb: async (db: number): Promise<void> => {
     audioPlayer.setVolumeDb(db);
@@ -46,6 +46,7 @@ export const playerApi = {
 
   /**
    * Convert slider position (0-100) to dB
+   * 0% = -60dB (mute), 80% = 0dB, 100% = +15dB
    */
   sliderToDb: (slider: number): number => {
     return AudioPlayer.sliderToDb(slider);
@@ -53,9 +54,17 @@ export const playerApi = {
 
   /**
    * Convert dB to slider position (0-100)
+   * -60dB = 0%, 0dB = 80%, +15dB = 100%
    */
   dbToSlider: (db: number): number => {
     return AudioPlayer.dbToSlider(db);
+  },
+
+  /**
+   * Get default slider position (80% = 0dB unity gain)
+   */
+  getDefaultSliderPosition: (): number => {
+    return AudioPlayer.getDefaultSliderPosition();
   },
 
   seekTo: async (positionMs: number): Promise<void> => {
@@ -94,6 +103,10 @@ export interface Track {
   last_played: number | null;
   date_added: number;
   date_modified: number;
+  /** ReplayGain normalization gain in dB (EBU R128). 
+   * Positive = track quieter than -14 LUFS target, needs boost.
+   * Negative = track louder than target, needs reduction. */
+  normalization_gain_db: number | null;
 }
 
 export interface Album {
@@ -361,5 +374,103 @@ export const fileApi = {
     // TODO: Use Tauri's file dialog
     // For now, this is a placeholder
     return null;
+  },
+};
+
+/** Backend player state interface */
+export interface BackendPlayerState {
+  is_playing: boolean;
+  is_paused: boolean;
+  current_file: string | null;
+  position_ms: number;
+  duration_ms: number;
+  volume: number;
+  volume_db: number;
+  normalization_enabled: boolean;
+  track_gain_db: number;
+}
+
+/** Loudness analysis progress */
+export interface LoudnessAnalysisProgress {
+  current: number;
+  total: number;
+  current_file: string;
+  analyzed: number;
+  failed: number;
+}
+
+/** Backend audio player API (using native Symphonia decoder) */
+export const backendPlayerApi = {
+  /** Play a file with optional normalization gain */
+  play: async (filePath: string, normalizationGainDb?: number): Promise<void> => {
+    return await invoke("player_play_with_normalization", { 
+      filePath, 
+      normalizationGainDb 
+    });
+  },
+
+  /** Pause playback */
+  pause: async (): Promise<void> => {
+    return await invoke("player_pause");
+  },
+
+  /** Resume playback */
+  resume: async (): Promise<void> => {
+    return await invoke("player_resume");
+  },
+
+  /** Stop playback */
+  stop: async (): Promise<void> => {
+    return await invoke("player_stop");
+  },
+
+  /** Seek to position in milliseconds */
+  seek: async (positionMs: number): Promise<void> => {
+    return await invoke("player_seek", { positionMs });
+  },
+
+  /** Set volume (0.0 to 2.0, where 1.0 = 0dB) */
+  setVolume: async (volume: number): Promise<void> => {
+    return await invoke("player_set_volume", { volume });
+  },
+
+  /** Set volume in dB (-60 to +15) */
+  setVolumeDb: async (db: number): Promise<void> => {
+    return await invoke("player_set_volume_db", { db });
+  },
+
+  /** Get current player state */
+  getState: async (): Promise<BackendPlayerState> => {
+    return await invoke("player_get_state");
+  },
+
+  /** Check if track has ended */
+  hasTrackEnded: async (): Promise<boolean> => {
+    return await invoke("player_has_track_ended");
+  },
+
+  /** Set track-specific normalization gain in dB */
+  setTrackGain: async (gainDb: number): Promise<void> => {
+    return await invoke("player_set_track_gain", { gainDb });
+  },
+
+  /** Enable or disable volume normalization */
+  setNormalizationEnabled: async (enabled: boolean): Promise<void> => {
+    return await invoke("player_set_normalization_enabled", { enabled });
+  },
+
+  /** Get whether normalization is enabled */
+  getNormalizationEnabled: async (): Promise<boolean> => {
+    return await invoke("player_get_normalization_enabled");
+  },
+};
+
+/** Loudness analysis API */
+export const loudnessApi = {
+  /** Analyze loudness for all tracks missing normalization data.
+   * Returns [analyzed_count, failed_count].
+   * Emits 'loudness-analysis-progress' events during analysis. */
+  analyzeLibrary: async (): Promise<[number, number]> => {
+    return await invoke("analyze_library_loudness");
   },
 };

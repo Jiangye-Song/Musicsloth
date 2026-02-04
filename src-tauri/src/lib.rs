@@ -166,6 +166,12 @@ pub fn run() {
             commands::player_set_volume_db,
             commands::player_get_state,
             commands::player_has_track_ended,
+            // Audio player normalization commands
+            commands::player_play_with_normalization,
+            commands::player_set_track_gain,
+            commands::player_set_normalization_enabled,
+            commands::player_get_normalization_enabled,
+            commands::analyze_library_loudness,
             // SMTC commands
             commands::smtc_update_metadata,
             commands::smtc_set_playback_status,

@@ -32,7 +32,6 @@ class AudioPlayer {
   private pollInterval: number | null = null;
   private lastState: PlayerState | null = null;
   private currentVolume: number = 1.0;
-  private wasPlaying: boolean = false;
 
   constructor() {
     // Poll backend for state updates
@@ -67,7 +66,6 @@ class AudioPlayer {
         this.notifyTrackEnded();
       }
       
-      this.wasPlaying = state.isPlaying;
       this.lastState = state;
       this.notifyStateChange(state);
       
@@ -131,35 +129,67 @@ class AudioPlayer {
   }
 
   /**
-   * Set volume in decibels (-60 to 0)
+   * Set volume in decibels (-60 to +15)
    * -60 dB = essentially mute
-   * 0 dB = full volume
+   * 0 dB = unity gain (no boost/cut)
+   * +15 dB = maximum boost (~5.6x)
    */
   setVolumeDb(db: number): void {
-    const dbClamped = Math.max(-60, Math.min(0, db));
+    const dbClamped = Math.max(-60, Math.min(15, db));
     invoke('player_set_volume_db', { db: dbClamped })
       .catch(e => console.error('Failed to set volume:', e));
   }
 
   /**
-   * Convert slider position (0-100) to dB using logarithmic curve
-   * This gives a more natural volume feel
+   * Convert slider position (0-100) to dB
+   * 0% = -∞ (mute, represented as -60dB)
+   * 80% = 0dB (unity gain)
+   * 100% = +15dB (max boost)
+   * Uses logarithmic curve below 80% for natural volume feel
    */
   static sliderToDb(slider: number): number {
-    if (slider <= 0) return -60;
-    if (slider >= 100) return 0;
-    // Logarithmic curve: slider 0-100 maps to -60dB to 0dB
-    // Using a curve that feels natural for audio
-    return (slider / 100) * 60 - 60;
+    if (slider <= 0) return -60; // Mute
+    if (slider >= 100) return 15; // Max boost
+    
+    if (slider < 80) {
+      // 0-80% maps to -60dB to 0dB with logarithmic curve
+      // Use quadratic for more control at low volumes
+      const normalized = slider / 80; // 0 to 1
+      return -60 * Math.pow(1 - normalized, 2);
+    } else {
+      // 80-100% maps linearly to 0dB to +15dB
+      const normalized = (slider - 80) / 20; // 0 to 1
+      return normalized * 15;
+    }
   }
 
   /**
    * Convert dB to slider position (0-100)
+   * -60dB = 0%, 0dB = 80%, +15dB = 100%
    */
   static dbToSlider(db: number): number {
     if (db <= -60) return 0;
-    if (db >= 0) return 100;
-    return ((db + 60) / 60) * 100;
+    if (db >= 15) return 100;
+    
+    if (db <= 0) {
+      // -60dB to 0dB maps to 0-80% with inverse of logarithmic curve
+      // db = -60 * (1 - normalized)^2
+      // (1 - normalized)^2 = -db / 60
+      // normalized = 1 - sqrt(-db / 60)
+      const normalized = 1 - Math.sqrt(-db / 60);
+      return normalized * 80;
+    } else {
+      // 0dB to +15dB maps to 80-100%
+      const normalized = db / 15; // 0 to 1
+      return 80 + normalized * 20;
+    }
+  }
+
+  /**
+   * Get the default slider position (80% = 0dB unity gain)
+   */
+  static getDefaultSliderPosition(): number {
+    return 80;
   }
 
   getState(): PlayerState {

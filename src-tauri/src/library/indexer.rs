@@ -5,6 +5,7 @@ use crate::db::connection::DatabaseConnection;
 use crate::db::operations::DbOperations;
 use crate::metadata::extractor::MetadataExtractor;
 use crate::metadata::parser::{parse_artists, parse_genres};
+use crate::metadata::loudness::analyze_loudness;
 use blake3;
 
 /// Result of an indexing operation
@@ -25,6 +26,16 @@ pub struct IndexingProgress {
     pub current: usize,
     pub total: usize,
     pub current_file: String,
+}
+
+/// Progress update for loudness analysis
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LoudnessAnalysisProgress {
+    pub current: usize,
+    pub total: usize,
+    pub current_file: String,
+    pub analyzed: usize,
+    pub failed: usize,
 }
 
 /// Library indexer for adding tracks to database
@@ -193,5 +204,75 @@ impl LibraryIndexer {
         }
         
         Ok(was_updated)
+    }
+    
+    /// Analyze loudness for all tracks that don't have normalization data yet
+    /// This is CPU-intensive and should be run as a separate phase after indexing
+    pub fn analyze_loudness_with_progress<F>(
+        db: &DatabaseConnection,
+        mut progress_callback: F,
+    ) -> Result<(usize, usize), anyhow::Error>
+    where
+        F: FnMut(LoudnessAnalysisProgress),
+    {
+        // Get all tracks that need loudness analysis
+        let tracks = DbOperations::get_tracks_needing_loudness_analysis(db)?;
+        let total = tracks.len();
+        
+        if total == 0 {
+            return Ok((0, 0));
+        }
+        
+        let mut analyzed = 0;
+        let mut failed = 0;
+        
+        for (index, track) in tracks.iter().enumerate() {
+            let file_name = std::path::Path::new(&track.file_path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            
+            // Send progress update
+            progress_callback(LoudnessAnalysisProgress {
+                current: index + 1,
+                total,
+                current_file: file_name,
+                analyzed,
+                failed,
+            });
+            
+            // Analyze loudness
+            let path = std::path::Path::new(&track.file_path);
+            match analyze_loudness(path) {
+                Ok(result) => {
+                    // Update the track with normalization gain
+                    if let Err(e) = DbOperations::update_track_normalization_gain(
+                        db,
+                        track.id,
+                        result.normalization_gain_db,
+                    ) {
+                        eprintln!("Failed to update normalization gain for {}: {}", track.file_path, e);
+                        failed += 1;
+                    } else {
+                        analyzed += 1;
+                        eprintln!(
+                            "Loudness analysis: {} -> {:.1} LUFS, gain: {:.1} dB",
+                            track.title,
+                            result.integrated_lufs,
+                            result.normalization_gain_db
+                        );
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Loudness analysis failed for {}: {}", track.file_path, e);
+                    // Set gain to 0 dB to prevent re-analyzing failed files every scan
+                    let _ = DbOperations::update_track_normalization_gain(db, track.id, 0.0);
+                    failed += 1;
+                }
+            }
+        }
+        
+        Ok((analyzed, failed))
     }
 }

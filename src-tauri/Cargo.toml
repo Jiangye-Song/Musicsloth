@@ -76,6 +76,9 @@ parking_lot = "0.12"
 # Sample rate conversion
 rubato = "0.15"
 
+# Loudness analysis for ReplayGain/volume normalization (EBU R128 standard)
+ebur128 = "0.1"
+
 # Image decoding for app icon
 image = { version = "0.25", default-features = false, features = ["png"] }
 

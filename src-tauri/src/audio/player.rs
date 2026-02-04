@@ -20,6 +20,8 @@ pub struct PlayerState {
     pub duration_ms: i64,
     pub volume: f32,      // Linear gain (0.0 to 1.0)
     pub volume_db: f32,   // Volume in dB (-60 to 0)
+    pub normalization_enabled: bool,
+    pub track_gain_db: f32, // Current track's normalization gain
 }
 
 /// Audio player with Symphonia decoding and cpal output
@@ -37,6 +39,13 @@ pub struct Player {
     volume_db: Arc<RwLock<f32>>,
     // Linear gain computed from dB (0.0 to 1.0)
     volume_linear: Arc<RwLock<f32>>,
+    
+    // Track-specific normalization gain in dB (ReplayGain)
+    track_gain_db: Arc<RwLock<f32>>,
+    // Track normalization gain as linear multiplier
+    track_gain_linear: Arc<RwLock<f32>>,
+    // Whether normalization is enabled
+    normalization_enabled: Arc<AtomicBool>,
     
     // Current file path
     current_file: Arc<RwLock<Option<PathBuf>>>,
@@ -62,11 +71,31 @@ impl Player {
             duration_ms: Arc::new(AtomicI64::new(0)),
             volume_db: Arc::new(RwLock::new(0.0)),      // 0 dB = full volume
             volume_linear: Arc::new(RwLock::new(1.0)),   // gain = 1.0
+            track_gain_db: Arc::new(RwLock::new(0.0)),   // No track gain by default
+            track_gain_linear: Arc::new(RwLock::new(1.0)), // gain = 1.0
+            normalization_enabled: Arc::new(AtomicBool::new(true)), // Enabled by default
             current_file: Arc::new(RwLock::new(None)),
             seek_request: Arc::new(AtomicI64::new(-1)),
             playback_thread: Mutex::new(None),
             track_ended: Arc::new(AtomicBool::new(false)),
         }
+    }
+    
+    /// Start playing a file with optional track-specific normalization gain
+    pub fn play_with_gain(&self, file_path: PathBuf, track_gain_db: Option<f32>) -> Result<(), String> {
+        // Set track gain before starting playback
+        let gain_db = track_gain_db.unwrap_or(0.0);
+        *self.track_gain_db.write() = gain_db;
+        // Convert dB to linear: gain = 10^(dB/20)
+        let gain_linear = if gain_db.abs() < 0.001 {
+            1.0
+        } else {
+            10.0_f32.powf(gain_db / 20.0)
+        };
+        *self.track_gain_linear.write() = gain_linear;
+        
+        // Now play the file
+        self.play(file_path)
     }
     
     /// Start playing a file
@@ -94,6 +123,8 @@ impl Player {
         let position_ms = self.position_ms.clone();
         let duration_ms = self.duration_ms.clone();
         let volume = self.volume_linear.clone();
+        let track_gain = self.track_gain_linear.clone();
+        let normalization_enabled = self.normalization_enabled.clone();
         let seek_request = self.seek_request.clone();
         let track_ended = self.track_ended.clone();
         
@@ -107,6 +138,8 @@ impl Player {
                 position_ms,
                 duration_ms,
                 volume,
+                track_gain,
+                normalization_enabled,
                 seek_request,
                 track_ended.clone(),
             ) {
@@ -134,6 +167,8 @@ impl Player {
         position_ms: Arc<AtomicI64>,
         duration_ms: Arc<AtomicI64>,
         volume: Arc<RwLock<f32>>,
+        track_gain: Arc<RwLock<f32>>,
+        normalization_enabled: Arc<AtomicBool>,
         seek_request: Arc<AtomicI64>,
         _track_ended: Arc<AtomicBool>,
     ) -> Result<(), String> {
@@ -223,8 +258,17 @@ impl Player {
                 }
             }
             
-            // Apply volume to output
-            output.set_volume(*volume.read());
+            // Apply combined volume: user volume * track normalization gain
+            // If normalization is disabled, track_gain is treated as 1.0
+            let user_vol = *volume.read();
+            let norm_gain = if normalization_enabled.load(Ordering::SeqCst) {
+                *track_gain.read()
+            } else {
+                1.0
+            };
+            // Clamp the combined gain to prevent clipping (max 1.0)
+            let combined_vol = (user_vol * norm_gain).min(1.0);
+            output.set_volume(combined_vol);
             
             // Decode next packet
             match decoder.decode_next() {
@@ -417,10 +461,12 @@ impl Player {
         self.seek_request.store(position_ms.max(0), Ordering::SeqCst);
     }
     
-    /// Set volume in dB (-60 to 0, or use special value -inf for mute)
-    /// Also accepts linear 0.0-1.0 for backward compatibility if use_db is false
+    /// Set volume in dB (-60 to +15)
+    /// 0 dB = unity gain (no boost/cut)
+    /// +15 dB = max boost (~5.6x gain)
+    /// -60 dB = essentially mute
     pub fn set_volume_db(&self, db: f32) {
-        let db_clamped = db.clamp(-60.0, 0.0);
+        let db_clamped = db.clamp(-60.0, 15.0);
         *self.volume_db.write() = db_clamped;
         // Convert dB to linear gain: gain = 10^(dB/20)
         let linear = if db_clamped <= -60.0 {
@@ -431,22 +477,50 @@ impl Player {
         *self.volume_linear.write() = linear;
     }
     
-    /// Set volume using linear gain (0.0 to 1.0) - converts to dB internally
+    /// Set volume using linear gain (0.0 to ~5.6) - converts to dB internally
+    /// 1.0 = 0dB (unity), ~5.6 = +15dB (max boost)
     pub fn set_volume(&self, linear: f32) {
-        let linear_clamped = linear.clamp(0.0, 1.0);
+        let linear_clamped = linear.clamp(0.0, 5.623); // 10^(15/20) ≈ 5.623
         // Convert linear to dB: dB = 20 * log10(gain)
         let db = if linear_clamped <= 0.001 {
             -60.0 // Treat very small values as mute
         } else {
             20.0 * linear_clamped.log10()
         };
-        *self.volume_db.write() = db.clamp(-60.0, 0.0);
+        *self.volume_db.write() = db.clamp(-60.0, 15.0);
         *self.volume_linear.write() = linear_clamped;
     }
     
     /// Get current volume in dB
     pub fn volume_db(&self) -> f32 {
         *self.volume_db.read()
+    }
+    
+    /// Set whether volume normalization is enabled
+    pub fn set_normalization_enabled(&self, enabled: bool) {
+        self.normalization_enabled.store(enabled, Ordering::SeqCst);
+    }
+    
+    /// Get whether normalization is enabled
+    pub fn is_normalization_enabled(&self) -> bool {
+        self.normalization_enabled.load(Ordering::SeqCst)
+    }
+    
+    /// Set the track-specific normalization gain in dB
+    pub fn set_track_gain(&self, gain_db: f32) {
+        *self.track_gain_db.write() = gain_db;
+        // Convert dB to linear: gain = 10^(dB/20)
+        let gain_linear = if gain_db.abs() < 0.001 {
+            1.0
+        } else {
+            10.0_f32.powf(gain_db / 20.0)
+        };
+        *self.track_gain_linear.write() = gain_linear;
+    }
+    
+    /// Get the current track's normalization gain in dB
+    pub fn track_gain_db(&self) -> f32 {
+        *self.track_gain_db.read()
     }
     
     /// Get current player state
@@ -459,6 +533,8 @@ impl Player {
             duration_ms: self.duration_ms.load(Ordering::SeqCst),
             volume: *self.volume_linear.read(),
             volume_db: *self.volume_db.read(),
+            normalization_enabled: self.normalization_enabled.load(Ordering::SeqCst),
+            track_gain_db: *self.track_gain_db.read(),
         }
     }
     

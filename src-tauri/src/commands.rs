@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
-use crate::library::indexer::{LibraryIndexer, IndexingResult, IndexingProgress};
+use crate::library::indexer::{LibraryIndexer, IndexingResult, IndexingProgress, LoudnessAnalysisProgress};
 use crate::db::operations::DbOperations;
 use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath, Playlist};
 use lofty::file::TaggedFileExt;
@@ -815,6 +815,63 @@ pub fn player_get_state(state: State<'_, AppState>) -> Result<PlayerState, Strin
 pub fn player_has_track_ended(state: State<'_, AppState>) -> Result<bool, String> {
     let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
     Ok(player.has_track_ended())
+}
+
+#[tauri::command]
+pub fn player_play_with_normalization(
+    file_path: String,
+    normalization_gain_db: Option<f32>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.play_with_gain(PathBuf::from(file_path), normalization_gain_db)
+}
+
+#[tauri::command]
+pub fn player_set_track_gain(
+    gain_db: f32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.set_track_gain(gain_db);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_set_normalization_enabled(
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.set_normalization_enabled(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_get_normalization_enabled(state: State<'_, AppState>) -> Result<bool, String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(player.is_normalization_enabled())
+}
+
+/// Analyze loudness for all tracks that don't have normalization data yet
+/// This is CPU-intensive and runs as a background task after the main scan
+#[tauri::command]
+pub async fn analyze_library_loudness(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(usize, usize), String> {
+    let db = state.db.clone();
+    
+    let result = tokio::task::spawn_blocking(move || {
+        LibraryIndexer::analyze_loudness_with_progress(&db, |progress| {
+            let _ = app.emit("loudness-analysis-progress", progress);
+        })
+        .map_err(|e| format!("Loudness analysis failed: {}", e))
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))??;
+    
+    Ok(result)
 }
 
 // ============================================================================

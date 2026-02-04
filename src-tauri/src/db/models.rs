@@ -23,6 +23,12 @@ pub struct Track {
     pub play_count: i32,
     pub last_played: Option<i64>,
     pub file_hash: Option<String>,
+    /// ReplayGain normalization gain in dB (EBU R128 standard).
+    /// Positive values = track is quieter than reference, needs boost.
+    /// Negative values = track is louder than reference, needs reduction.
+    /// Target loudness is -14 LUFS (streaming standard).
+    #[serde(default)]
+    pub normalization_gain_db: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -7,6 +7,10 @@ export interface Track {
   artist?: string;
   album?: string;
   duration_ms?: number;
+  /** ReplayGain normalization gain in dB (EBU R128 standard).
+   * Positive = track needs boost, Negative = track needs reduction.
+   * Target loudness is -14 LUFS. */
+  normalization_gain_db?: number;
 }
 
 export interface Album {
@@ -39,4 +43,24 @@ export interface PlayerState {
   volume: number;
   progress: number;
   duration: number;
+}
+
+export interface BackendPlayerState {
+  is_playing: boolean;
+  is_paused: boolean;
+  current_file?: string;
+  position_ms: number;
+  duration_ms: number;
+  volume: number;
+  volume_db: number;
+  normalization_enabled: boolean;
+  track_gain_db: number;
+}
+
+export interface LoudnessAnalysisProgress {
+  current: number;
+  total: number;
+  current_file: string;
+  analyzed: number;
+  failed: number;
 }

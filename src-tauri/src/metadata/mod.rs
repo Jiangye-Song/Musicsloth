@@ -5,3 +5,4 @@ pub mod extractor;
 pub mod artwork;
 pub mod lyrics;
 pub mod parser;
+pub mod loudness;

@@ -40,7 +40,11 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   });
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
-  const [volume, setVolume] = useState(100);
+  const [volume, setVolume] = useState(() => {
+    // Load saved volume from localStorage, default to 80 (0dB)
+    const saved = localStorage.getItem('musicsloth-volume');
+    return saved !== null ? Number(saved) : 80;
+  });
   const [titleOverflows, setTitleOverflows] = useState(false);
   const [artistOverflows, setArtistOverflows] = useState(false);
   const [albumOverflows, setAlbumOverflows] = useState(false);
@@ -63,6 +67,20 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
 
     return () => clearInterval(interval);
   }, [isSeeking]);
+
+  // Restore saved volume to backend on mount
+  useEffect(() => {
+    const restoreVolume = async () => {
+      try {
+        const db = playerApi.sliderToDb(volume);
+        await playerApi.setVolumeDb(db);
+      } catch (error) {
+        console.error("Failed to restore volume:", error);
+      }
+    };
+    restoreVolume();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   // Check if text overflows and needs scrolling
   useEffect(() => {
@@ -120,6 +138,8 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   const handleVolumeChange = async (_: Event, value: number | number[]) => {
     const newVolume = value as number;
     setVolume(newVolume);
+    // Persist volume setting
+    localStorage.setItem('musicsloth-volume', String(newVolume));
     try {
       // Convert slider position to dB for more natural volume curve
       const db = playerApi.sliderToDb(newVolume);
