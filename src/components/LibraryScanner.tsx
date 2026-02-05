@@ -28,6 +28,14 @@ interface ScanProgress {
   current_file: string;
 }
 
+interface LoudnessProgress {
+  current: number;
+  total: number;
+  current_file: string;
+  analyzed: number;
+  failed: number;
+}
+
 interface LibraryScannerProps {
   onScanStart?: () => void;
   onScanComplete?: () => void;
@@ -41,6 +49,7 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
   const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<IndexingResult | null>(null);
   const [progress, setProgress] = useState<ScanProgress | null>(null);
+  const [loudnessProgress, setLoudnessProgress] = useState<LoudnessProgress | null>(null);
   const [scanPaths, setScanPaths] = useState<ScanPath[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -48,6 +57,13 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
     // Listen for scan progress events
     const unlisten = listen<ScanProgress>("scan-progress", (event) => {
       setProgress(event.payload);
+      setLoudnessProgress(null); // Clear loudness progress when scan progress updates
+    });
+
+    // Listen for loudness analysis progress events
+    const unlistenLoudness = listen<LoudnessProgress>("loudness-analysis-progress", (event) => {
+      setLoudnessProgress(event.payload);
+      setProgress(null); // Clear scan progress when loudness progress updates
     });
 
     // Load initial scan paths
@@ -61,6 +77,7 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
 
     return () => {
       unlisten.then((fn) => fn());
+      unlistenLoudness.then((fn) => fn());
       clearInterval(interval);
     };
   }, []);
@@ -114,6 +131,7 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
     setScanning(true);
     setResult(null);
     setProgress(null);
+    setLoudnessProgress(null);
     
     // Store scanning state in sessionStorage so it persists across tab switches
     sessionStorage.setItem('isScanning', 'true');
@@ -123,6 +141,7 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
       const scanResult = await libraryApi.scanLibrary();
       setResult(scanResult);
       setProgress(null);
+      setLoudnessProgress(null);
       sessionStorage.removeItem('isScanning');
       onScanComplete?.();
     } catch (error) {
@@ -230,7 +249,7 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
         </Button>
       </Stack>
 
-      {(scanning || progress) && (
+      {(scanning || progress || loudnessProgress) && (
         <Paper
           elevation={2}
           sx={{
@@ -242,16 +261,38 @@ export default function LibraryScanner({ onScanStart, onScanComplete }: LibraryS
         >
           <Box sx={{ mb: 2 }}>
             <Typography variant="body1" fontWeight="bold" gutterBottom>
-              ⏳ {scanning ? "Scanning directory and indexing files..." : "Scan in progress..."}
+              ⏳ {loudnessProgress 
+                ? "Analyzing loudness for volume normalization..." 
+                : scanning 
+                  ? "Scanning directory and indexing files..." 
+                  : "Scan in progress..."}
             </Typography>
             {progress && (
               <Typography variant="body2" color="text.secondary">
                 {progress.current_file}
               </Typography>
             )}
+            {loudnessProgress && (
+              <Typography variant="body2" color="text.secondary">
+                {loudnessProgress.current_file}
+              </Typography>
+            )}
           </Box>
           
-          {progress ? (
+          {loudnessProgress ? (
+            <Box>
+              <LinearProgress
+                variant="determinate"
+                value={(loudnessProgress.current / loudnessProgress.total) * 100}
+                sx={{ height: 8, borderRadius: 1, mb: 1 }}
+                color="secondary"
+              />
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                {loudnessProgress.current} / {loudnessProgress.total} tracks ({Math.round((loudnessProgress.current / loudnessProgress.total) * 100)}%)
+                {loudnessProgress.failed > 0 && ` · ${loudnessProgress.failed} failed`}
+              </Typography>
+            </Box>
+          ) : progress ? (
             <Box>
               <LinearProgress
                 variant="determinate"

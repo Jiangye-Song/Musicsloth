@@ -23,7 +23,7 @@ interface TrackListProps {
 export default function TrackList({ tracks, onBack, title }: TrackListProps) {
   const handlePlayTrack = async (track: Track) => {
     try {
-      await playerApi.playFile(track.file_path);
+      await playerApi.playFile(track.file_path, track.normalization_gain_db);
     } catch (error) {
       alert(`Failed to play track: ${error}`);
     }

@@ -52,6 +52,9 @@ blake3 = "1.5"
 # Random number generation for shuffle
 rand = "0.8"
 
+# Parallel processing for loudness analysis
+rayon = "1.10"
+
 # Audio decoding (pure Rust)
 symphonia = { version = "0.5", features = [
     "mp3",      # MP3 support

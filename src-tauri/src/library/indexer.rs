@@ -1,12 +1,15 @@
 use std::path::Path;
 use std::fs::File;
 use std::io::Read;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use crate::db::connection::DatabaseConnection;
 use crate::db::operations::DbOperations;
 use crate::metadata::extractor::MetadataExtractor;
 use crate::metadata::parser::{parse_artists, parse_genres};
-use crate::metadata::loudness::analyze_loudness;
+use crate::metadata::loudness::analyze_loudness_sampled;
 use blake3;
+use rayon::prelude::*;
 
 /// Result of an indexing operation
 #[derive(Debug, Clone, serde::Serialize)]
@@ -207,7 +210,7 @@ impl LibraryIndexer {
     }
     
     /// Analyze loudness for all tracks that don't have normalization data yet
-    /// This is CPU-intensive and should be run as a separate phase after indexing
+    /// This is CPU-intensive and runs in PARALLEL using all available cores
     pub fn analyze_loudness_with_progress<F>(
         db: &DatabaseConnection,
         mut progress_callback: F,
@@ -223,56 +226,132 @@ impl LibraryIndexer {
             return Ok((0, 0));
         }
         
-        let mut analyzed = 0;
-        let mut failed = 0;
+        // Atomic counters for thread-safe progress tracking
+        let processed = Arc::new(AtomicUsize::new(0));
+        let analyzed_count = Arc::new(AtomicUsize::new(0));
+        let failed_count = Arc::new(AtomicUsize::new(0));
         
-        for (index, track) in tracks.iter().enumerate() {
-            let file_name = std::path::Path::new(&track.file_path)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
+        // Clone Arcs for the parallel thread
+        let processed_clone = processed.clone();
+        let analyzed_clone = analyzed_count.clone();
+        let failed_clone = failed_count.clone();
+        
+        // Store current file name for progress display
+        let current_file_name = Arc::new(parking_lot::Mutex::new(String::new()));
+        let current_file_clone = current_file_name.clone();
+        
+        // Send initial progress
+        progress_callback(LoudnessAnalysisProgress {
+            current: 0,
+            total,
+            current_file: "Starting parallel analysis...".to_string(),
+            analyzed: 0,
+            failed: 0,
+        });
+        
+        // Spawn the parallel analysis in a separate thread so we can report progress
+        let tracks_clone = tracks.clone();
+        let analysis_handle = std::thread::spawn(move || {
+            // Analyze tracks in parallel and collect results
+            // Result: (track_id, Option<normalization_gain_db>)
+            let results: Vec<(i64, Option<f32>)> = tracks_clone
+                .par_iter()
+                .map(|track| {
+                    // Update current file name for progress display
+                    {
+                        let file_name = std::path::Path::new(&track.file_path)
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+                        *current_file_clone.lock() = file_name;
+                    }
+                    
+                    let path = std::path::Path::new(&track.file_path);
+                    
+                    // Use sampled analysis for speed during scanning (5-10x faster)
+                    let result = match analyze_loudness_sampled(path) {
+                        Ok(loudness_result) => {
+                            analyzed_clone.fetch_add(1, Ordering::Relaxed);
+                            Some(loudness_result.normalization_gain_db)
+                        }
+                        Err(e) => {
+                            eprintln!("Loudness analysis failed for {}: {}", track.file_path, e);
+                            failed_clone.fetch_add(1, Ordering::Relaxed);
+                            None // Will set to 0.0 dB to mark as processed
+                        }
+                    };
+                    
+                    // Increment processed counter
+                    processed_clone.fetch_add(1, Ordering::Relaxed);
+                    
+                    (track.id, result)
+                })
+                .collect();
             
-            // Send progress update
+            results
+        });
+        
+        // Poll progress while analysis runs
+        loop {
+            let current = processed.load(Ordering::Relaxed);
+            let analyzed = analyzed_count.load(Ordering::Relaxed);
+            let failed = failed_count.load(Ordering::Relaxed);
+            let file_name = current_file_name.lock().clone();
+            
             progress_callback(LoudnessAnalysisProgress {
-                current: index + 1,
+                current,
                 total,
                 current_file: file_name,
                 analyzed,
                 failed,
             });
             
-            // Analyze loudness
-            let path = std::path::Path::new(&track.file_path);
-            match analyze_loudness(path) {
-                Ok(result) => {
-                    // Update the track with normalization gain
-                    if let Err(e) = DbOperations::update_track_normalization_gain(
-                        db,
-                        track.id,
-                        result.normalization_gain_db,
-                    ) {
-                        eprintln!("Failed to update normalization gain for {}: {}", track.file_path, e);
-                        failed += 1;
+            // Check if analysis thread is done
+            if analysis_handle.is_finished() {
+                break;
+            }
+            
+            // Sleep briefly before next poll
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        
+        // Get the results from the analysis thread
+        let results = analysis_handle.join().map_err(|_| anyhow::anyhow!("Analysis thread panicked"))?;
+        
+        // Now update the database sequentially (database is not thread-safe)
+        let mut final_analyzed = 0;
+        let mut final_failed = 0;
+        
+        for (index, (track_id, gain_result)) in results.iter().enumerate() {
+            // Periodic progress update during DB writes
+            if index % 100 == 0 || index == results.len() - 1 {
+                progress_callback(LoudnessAnalysisProgress {
+                    current: index + 1,
+                    total,
+                    current_file: format!("Saving results to database... ({}/{})", index + 1, total),
+                    analyzed: final_analyzed,
+                    failed: final_failed,
+                });
+            }
+            
+            match gain_result {
+                Some(gain_db) => {
+                    if let Err(e) = DbOperations::update_track_normalization_gain(db, *track_id, *gain_db) {
+                        eprintln!("Failed to update normalization gain for track {}: {}", track_id, e);
+                        final_failed += 1;
                     } else {
-                        analyzed += 1;
-                        eprintln!(
-                            "Loudness analysis: {} -> {:.1} LUFS, gain: {:.1} dB",
-                            track.title,
-                            result.integrated_lufs,
-                            result.normalization_gain_db
-                        );
+                        final_analyzed += 1;
                     }
                 }
-                Err(e) => {
-                    eprintln!("Loudness analysis failed for {}: {}", track.file_path, e);
-                    // Set gain to 0 dB to prevent re-analyzing failed files every scan
-                    let _ = DbOperations::update_track_normalization_gain(db, track.id, 0.0);
-                    failed += 1;
+                None => {
+                    // Analysis failed - set to 0.0 dB to prevent re-analyzing every scan
+                    let _ = DbOperations::update_track_normalization_gain(db, *track_id, 0.0);
+                    final_failed += 1;
                 }
             }
         }
         
-        Ok((analyzed, failed))
+        Ok((final_analyzed, final_failed))
     }
 }

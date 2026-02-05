@@ -12,8 +12,14 @@ export interface PlayerState {
 
 // Player API now uses frontend audio player
 export const playerApi = {
-  playFile: async (filePath: string): Promise<void> => {
-    await audioPlayer.play(filePath);
+  /**
+   * Play a file with optional ReplayGain normalization
+   * @param filePath Path to the audio file
+   * @param normalizationGainDb Optional ReplayGain value in dB. If null/undefined, no normalization is applied.
+   */
+  playFile: async (filePath: string, normalizationGainDb?: number | null): Promise<void> => {
+    // Convert null to undefined for the audioPlayer API
+    await audioPlayer.play(filePath, normalizationGainDb ?? undefined);
     // Notify backend of current track
     await invoke("set_current_track", { filePath });
   },

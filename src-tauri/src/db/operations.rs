@@ -383,6 +383,55 @@ impl DbOperations {
         }
     }
     
+    /// Get track by ID
+    pub fn get_track_by_id(
+        db: &DatabaseConnection,
+        track_id: i64,
+    ) -> Result<Option<Track>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, file_path, title, artist, album, album_artist, year,
+                    track_number, disc_number, duration_ms, genre,
+                    file_size, file_format, bitrate, sample_rate,
+                    play_count, last_played, date_added, date_modified, file_hash,
+                    normalization_gain_db
+             FROM tracks
+             WHERE id = ?1"
+        )?;
+        
+        let mut rows = stmt.query([track_id])?;
+        
+        if let Some(row) = rows.next()? {
+            Ok(Some(Track {
+                id: row.get(0)?,
+                file_path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                album_artist: row.get(5)?,
+                year: row.get::<_, Option<i32>>(6)?.map(|y| y as u32),
+                track_number: row.get(7)?,
+                disc_number: row.get(8)?,
+                duration_ms: row.get(9)?,
+                genre: row.get(10)?,
+                file_size: row.get(11)?,
+                file_format: row.get(12)?,
+                bitrate: row.get(13)?,
+                sample_rate: row.get(14)?,
+                play_count: row.get(15)?,
+                last_played: row.get(16)?,
+                date_added: row.get(17)?,
+                date_modified: row.get(18)?,
+                file_hash: row.get(19)?,
+                normalization_gain_db: row.get(20)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+    
     /// Get all albums with song counts
     pub fn get_all_albums(
         db: &DatabaseConnection,

@@ -518,7 +518,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         // Immediately update the current playing file and queue index for instant visual feedback
         setCurrentPlayingFile(track.file_path);
         setQueueCurrentIndex(index);
-        await playerApi.playFile(track.file_path);
+        await playerApi.playFile(track.file_path, track.normalization_gain_db);
         // Update queue position
         await updateQueuePosition(queueId, index);
         // Notify parent to refresh queue status
@@ -555,7 +555,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
 
         // Play the clicked track immediately (don't wait for full queue to load)
         console.log(`[Frontend] Playing track: ${track.file_path}`);
-        await playerApi.playFile(track.file_path);
+        await playerApi.playFile(track.file_path, track.normalization_gain_db);
         console.log(`[Frontend] Track playback started`);
 
         // Update queue position - clicked track is always at position 0 after reordering

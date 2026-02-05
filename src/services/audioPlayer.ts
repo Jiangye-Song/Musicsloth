@@ -96,9 +96,14 @@ class AudioPlayer {
     }
   }
 
-  async play(filePath: string): Promise<void> {
+  async play(filePath: string, normalizationGainDb?: number): Promise<void> {
     try {
-      await invoke('player_play', { filePath });
+      // Use normalization-aware play command
+      // If normalizationGainDb is undefined/null, backend will use 0dB (no adjustment)
+      await invoke('player_play_with_normalization', { 
+        filePath, 
+        normalizationGainDb: normalizationGainDb ?? null 
+      });
     } catch (error) {
       console.error('Failed to play audio:', error);
       throw error;

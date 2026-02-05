@@ -172,6 +172,7 @@ pub fn run() {
             commands::player_set_normalization_enabled,
             commands::player_get_normalization_enabled,
             commands::analyze_library_loudness,
+            commands::recalculate_track_replaygain,
             // SMTC commands
             commands::smtc_update_metadata,
             commands::smtc_set_playback_status,

@@ -212,7 +212,8 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
       // Play from that position (or first track if index is 0)
       if (queueTracks.length > 0) {
         const trackIndex = Math.max(0, Math.min(currentIndex, queueTracks.length - 1));
-        await playerApi.playFile(queueTracks[trackIndex].file_path);
+        const trackToPlayHere = queueTracks[trackIndex];
+        await playerApi.playFile(trackToPlayHere.file_path, trackToPlayHere.normalization_gain_db);
         
         // Update PlayerContext with the new queue position
         await updateQueuePosition(selectedQueue.id, trackIndex);
@@ -254,7 +255,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
 
           // Play from the saved position
           if (trackToPlay) {
-            await playerApi.playFile(trackToPlay.file_path);
+            await playerApi.playFile(trackToPlay.file_path, trackToPlay.normalization_gain_db);
 
             // Update PlayerContext with the new queue position
             await updateQueuePosition(nextQueue.id, currentIndex);

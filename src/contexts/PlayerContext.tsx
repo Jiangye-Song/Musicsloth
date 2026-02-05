@@ -104,8 +104,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         // Update Media Session metadata immediately
         updateMediaSessionMetadata(nextTrack, artUrl);
 
-        // Play the track
-        await playerApi.playFile(nextTrack.file_path);
+        // Play the track with ReplayGain normalization (if available)
+        await playerApi.playFile(nextTrack.file_path, nextTrack.normalization_gain_db);
       }
     } catch (error) {
       console.error('Failed to play next track:', error);
@@ -160,8 +160,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         // Update Media Session metadata immediately
         updateMediaSessionMetadata(prevTrack, artUrl);
 
-        // Play the track
-        await playerApi.playFile(prevTrack.file_path);
+        // Play the track with ReplayGain normalization (if available)
+        await playerApi.playFile(prevTrack.file_path, prevTrack.normalization_gain_db);
       }
     } catch (error) {
       console.error('Failed to play previous track:', error);
@@ -351,7 +351,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         console.log('[PlayerContext] Track ended, repeating current track');
         if (currentTrack) {
           try {
-            await playerApi.playFile(currentTrack.file_path);
+            await playerApi.playFile(currentTrack.file_path, currentTrack.normalization_gain_db);
           } catch (error) {
             console.error('Failed to repeat track:', error);
           }

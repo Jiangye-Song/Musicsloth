@@ -122,9 +122,9 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
         await playerApi.resume();
       } else if (currentTrack && !playerState.current_file) {
         // No file playing but we have a track loaded from active queue
-        // Play the loaded track
+        // Play the loaded track with ReplayGain normalization (if available)
         console.log(`[PlayerControls] Playing loaded track from active queue: ${currentTrack.file_path}`);
-        await playerApi.playFile(currentTrack.file_path);
+        await playerApi.playFile(currentTrack.file_path, currentTrack.normalization_gain_db);
       }
     } catch (error) {
       console.error("Failed to toggle playback:", error);

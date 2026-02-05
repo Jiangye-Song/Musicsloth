@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
 use crate::library::indexer::{LibraryIndexer, IndexingResult, IndexingProgress, LoudnessAnalysisProgress};
+use crate::metadata::loudness::analyze_loudness;
 use crate::db::operations::DbOperations;
 use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath, Playlist};
 use lofty::file::TaggedFileExt;
@@ -105,6 +106,17 @@ pub async fn scan_library(
             });
         })
         .unwrap_or(0);
+        
+        // Analyze loudness for tracks that don't have normalization data yet
+        // This is CPU-intensive but essential for ReplayGain-style volume normalization
+        let (loudness_analyzed, loudness_failed) = LibraryIndexer::analyze_loudness_with_progress(&db, |progress| {
+            let _ = app.emit("loudness-analysis-progress", progress);
+        })
+        .unwrap_or((0, 0));
+        
+        if loudness_analyzed > 0 || loudness_failed > 0 {
+            eprintln!("[Scan] Loudness analysis: {} analyzed, {} failed", loudness_analyzed, loudness_failed);
+        }
         
         Ok::<IndexingResult, String>(IndexingResult {
             total_files,
@@ -872,6 +884,39 @@ pub async fn analyze_library_loudness(
     .map_err(|e| format!("Task join error: {}", e))??;
     
     Ok(result)
+}
+
+/// Recalculate ReplayGain for a specific track using FULL analysis (not sampled)
+/// This is slower but more accurate than the sampled version used during scanning.
+/// Use this when a user wants to recalculate the gain for a specific track.
+#[tauri::command]
+pub async fn recalculate_track_replaygain(
+    track_id: i64,
+    state: State<'_, AppState>,
+) -> Result<f32, String> {
+    let db = state.db.clone();
+    
+    // Get the track's file path
+    let track = DbOperations::get_track_by_id(&db, track_id)
+        .map_err(|e| format!("Failed to get track: {}", e))?
+        .ok_or_else(|| "Track not found".to_string())?;
+    
+    let file_path = track.file_path.clone();
+    
+    // Run full analysis in blocking task
+    let result = tokio::task::spawn_blocking(move || {
+        let path = std::path::Path::new(&file_path);
+        analyze_loudness(path)
+            .map_err(|e| format!("Loudness analysis failed: {}", e))
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))??;
+    
+    // Update the track with the new normalization gain
+    DbOperations::update_track_normalization_gain(&db, track_id, result.normalization_gain_db)
+        .map_err(|e| format!("Failed to update normalization gain: {}", e))?;
+    
+    Ok(result.normalization_gain_db)
 }
 
 // ============================================================================
