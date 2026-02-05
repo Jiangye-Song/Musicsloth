@@ -480,3 +480,70 @@ export const loudnessApi = {
     return await invoke("analyze_library_loudness");
   },
 };
+
+// ============================================================================
+// Settings Types & API
+// ============================================================================
+
+export interface TabConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  order: number;
+}
+
+export interface LanguageSettings {
+  language: string;
+}
+
+export interface ThemeSettings {
+  mode: "dark" | "light";
+  accent_color: string;
+  font_family: string;
+}
+
+export interface InterfaceSettings {
+  theme: ThemeSettings;
+  tabs: TabConfig[];
+  quick_actions: string[];
+}
+
+export interface FadeSettings {
+  enabled: boolean;
+  fade_in_ms: number;
+  fade_out_ms: number;
+}
+
+export interface ReplayGainSettings {
+  enabled: boolean;
+  calculate_unanalyzed: boolean;
+  analyze_on_scan: boolean;
+  segments_per_minute: number;
+}
+
+export interface PlaybackSettings {
+  gapless: boolean;
+  fade: FadeSettings;
+  equalizer_enabled: boolean;
+  equalizer_preset: string;
+  replay_gain: ReplayGainSettings;
+}
+
+export interface AppSettings {
+  version: number;
+  language: LanguageSettings;
+  interface: InterfaceSettings;
+  playback: PlaybackSettings;
+}
+
+export const settingsApi = {
+  /** Load settings from disk */
+  getSettings: async (): Promise<AppSettings> => {
+    return await invoke("get_settings");
+  },
+
+  /** Save settings to disk */
+  saveSettings: async (settings: AppSettings): Promise<void> => {
+    return await invoke("save_settings", { settings });
+  },
+};

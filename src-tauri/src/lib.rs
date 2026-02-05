@@ -7,6 +7,7 @@ mod library;
 mod metadata;
 mod playlist;
 mod queue;
+mod settings;
 mod smtc;
 mod state;
 
@@ -86,8 +87,8 @@ pub fn run() {
                 });
             }
 
-            // Create and manage app state
-            let app_state = AppState::new(player, db, smtc);
+            // Create and manage app state (now includes app_dir for settings)
+            let app_state = AppState::new(player, db, smtc, app_dir);
             app.manage(app_state);
 
             // Set window icon
@@ -178,6 +179,9 @@ pub fn run() {
             commands::smtc_set_playback_status,
             commands::smtc_set_timeline,
             commands::get_artwork_temp_path,
+            // Settings commands
+            commands::get_settings,
+            commands::save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

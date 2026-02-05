@@ -12,6 +12,7 @@ import {
   useTheme,
   Dialog,
   Slide,
+  Divider,
 } from "@mui/material";
 import {
   LibraryMusic,
@@ -20,6 +21,7 @@ import {
   Person,
   Album,
   LocalOffer,
+  Settings,
 } from "@mui/icons-material";
 import { TransitionProps } from "@mui/material/transitions";
 import "./App.css";
@@ -32,11 +34,13 @@ import PlaylistsView from "./views/PlaylistsView";
 import ArtistsView from "./views/ArtistsView";
 import AlbumsView from "./views/AlbumsView";
 import GenresView from "./views/GenresView";
+import OptionsView from "./views/OptionsView";
 // import { playerApi } from "./services/api";
 import { PlayerProvider } from "./contexts/PlayerContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import React from "react";
 
-type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres";
+type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres" | "options";
 
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & {
@@ -111,6 +115,8 @@ function App() {
         return <AlbumsView key={`albums-${navigationKey}`} searchQuery={globalSearchQuery} initialAlbumName={selectedAlbumName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
       case "genres":
         return <GenresView key={`genres-${navigationKey}`} searchQuery={globalSearchQuery} initialGenreName={selectedGenreName} initialTrackId={selectedTrackId} onClearSearch={() => setGlobalSearchQuery("")} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
+      case "options":
+        return <OptionsView />;
       default:
         return <LibraryView searchQuery={globalSearchQuery} onNavigateToArtist={handleNavigateToArtist} onNavigateToAlbum={handleNavigateToAlbum} onNavigateToGenre={handleNavigateToGenre} />;
     }
@@ -125,7 +131,8 @@ function App() {
             activeTab === "genres" ? "Search a genre..." :
               activeTab === "playlists" ? "Search a playlist..." : "";
 
-  const tabs: { key: Tab; label: string; icon: React.ReactElement }[] = [
+  // Main navigation tabs (without options)
+  const mainTabs: { key: Tab; label: string; icon: React.ReactElement }[] = [
     { key: "queues", label: "Queues", icon: <QueueMusic /> },
     { key: "library", label: "Library", icon: <LibraryMusic /> },
     { key: "playlists", label: "Playlists", icon: <PlaylistPlay /> },
@@ -133,6 +140,12 @@ function App() {
     { key: "albums", label: "Albums", icon: <Album /> },
     { key: "genres", label: "Genres", icon: <LocalOffer /> },
   ];
+
+  // Options tab (separate for positioning)
+  const optionsTab = { key: "options" as Tab, label: "Options", icon: <Settings /> };
+
+  // Combined tabs for mobile (options at the end)
+  const mobileTabs = [...mainTabs, optionsTab];
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
@@ -144,6 +157,7 @@ function App() {
   };
 
   return (
+    <SettingsProvider>
     <PlayerProvider>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
         {/* Mobile Top Navigation */}
@@ -156,7 +170,7 @@ function App() {
             elevation={2}
           >
             <List sx={{ display: "flex", flexDirection: "row", p: 0, overflowX: "auto" }}>
-              {tabs.map((tab) => (
+              {mobileTabs.map((tab) => (
                 <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
                   <ListItemButton
                     selected={activeTab === tab.key}
@@ -195,7 +209,7 @@ function App() {
             sx={{
               width: isMobile ? 0 : drawerWidth,
               flexShrink: 0,
-              display: isMobile ? "none" : "block",
+              display: isMobile ? "none" : "flex",
               "& .MuiDrawer-paper": {
                 width: drawerWidth,
                 boxSizing: "border-box",
@@ -203,11 +217,14 @@ function App() {
                 borderRight: 1,
                 borderColor: "divider",
                 position: "static",
+                display: "flex",
+                flexDirection: "column",
               },
             }}
           >
-            <List>
-              {tabs.map((tab) => (
+            {/* Main navigation tabs */}
+            <List sx={{ flex: 1 }}>
+              {mainTabs.map((tab) => (
                 <ListItem key={tab.key} disablePadding>
                   <ListItemButton
                     selected={activeTab === tab.key}
@@ -224,6 +241,26 @@ function App() {
                   </ListItemButton>
                 </ListItem>
               ))}
+            </List>
+            
+            {/* Options tab at bottom */}
+            <Divider />
+            <List>
+              <ListItem disablePadding>
+                <ListItemButton
+                  selected={activeTab === "options"}
+                  onClick={() => handleTabChange("options")}
+                  sx={{
+                    borderLeft: activeTab === "options" ? 3 : 0,
+                    borderColor: "success.main",
+                  }}
+                >
+                  <ListItemIcon sx={{ color: activeTab === "options" ? "success.main" : "inherit" }}>
+                    <Settings />
+                  </ListItemIcon>
+                  <ListItemText primary="Options" />
+                </ListItemButton>
+              </ListItem>
             </List>
           </Drawer>
 
@@ -286,6 +323,7 @@ function App() {
         </Dialog>
       </Box>
     </PlayerProvider>
+    </SettingsProvider>
   );
 }
 

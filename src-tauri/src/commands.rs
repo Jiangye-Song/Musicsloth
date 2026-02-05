@@ -1030,3 +1030,19 @@ pub async fn get_artwork_temp_path(app: AppHandle, file_path: String) -> Result<
         Ok(None)
     }
 }
+
+// ============================================================================
+// Settings Commands
+// ============================================================================
+
+use crate::settings::AppSettings;
+
+#[tauri::command]
+pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
+    AppSettings::load(&state.app_dir)
+}
+
+#[tauri::command]
+pub fn save_settings(settings: AppSettings, state: State<'_, AppState>) -> Result<(), String> {
+    settings.save(&state.app_dir)
+}
