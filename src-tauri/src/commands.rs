@@ -1052,9 +1052,3 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
 pub fn save_settings(settings: AppSettings, state: State<'_, AppState>) -> Result<(), String> {
     settings.save(&state.app_dir)
 }
-
-#[tauri::command]
-pub fn get_minimize_behaviour(state: State<'_, AppState>) -> Result<String, String> {
-    let settings = AppSettings::load(&state.app_dir)?;
-    Ok(settings.interface.behaviour.on_minimize.clone())
-}

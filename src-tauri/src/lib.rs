@@ -192,6 +192,18 @@ pub fn run() {
                         let _ = window.hide();
                     }
                 }
+                WindowEvent::Focused(false) => {
+                    // Check if window was minimized and should go to tray instead
+                    if window.is_minimized().unwrap_or(false) {
+                        let app_dir = window.app_handle().path().app_data_dir()
+                            .expect("Failed to get app data directory");
+                        let settings = AppSettings::load(&app_dir).unwrap_or_default();
+                        if settings.interface.behaviour.on_minimize == "tray" {
+                            let _ = window.unminimize();
+                            let _ = window.hide();
+                        }
+                    }
+                }
                 _ => {}
             }
         })
@@ -274,7 +286,6 @@ pub fn run() {
             // Settings commands
             commands::get_settings,
             commands::save_settings,
-            commands::get_minimize_behaviour,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

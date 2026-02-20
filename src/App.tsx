@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Box,
   Drawer,
@@ -25,8 +25,6 @@ import {
 } from "@mui/icons-material";
 import { TransitionProps } from "@mui/material/transitions";
 import "./App.css";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
 import PlayerControls from "./components/PlayerControls";
 import SearchBar from "./components/SearchBar";
 import NowPlayingView from "./views/NowPlayingView";
@@ -68,35 +66,6 @@ function App() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const queuesViewRef = useRef<QueuesViewRef>(null);
-
-  // Handle minimize-to-tray behaviour
-  useEffect(() => {
-    const appWindow = getCurrentWindow();
-    const unlisten = appWindow.onCloseRequested(async () => {
-      // Close behavior is handled by the Rust backend
-    });
-
-    // Listen for window minimize to implement minimize-to-tray
-    const unlistenMinimize = appWindow.listen("tauri://resize", async () => {
-      const isMinimized = await appWindow.isMinimized();
-      if (isMinimized) {
-        try {
-          const behaviour: string = await invoke("get_minimize_behaviour");
-          if (behaviour === "tray") {
-            await appWindow.unminimize();
-            await appWindow.hide();
-          }
-        } catch (e) {
-          console.error("Failed to get minimize behaviour:", e);
-        }
-      }
-    });
-
-    return () => {
-      unlisten.then((fn) => fn());
-      unlistenMinimize.then((fn) => fn());
-    };
-  }, []);
 
   // Navigation callbacks - shared by all views with track lists
   const handleNavigateToArtist = (artistName: string, trackId: number) => {
