@@ -51,7 +51,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useSettings } from "../contexts/SettingsContext";
-import { TabConfig } from "../services/api";
+import { TabConfig, BehaviourSettings } from "../services/api";
 import { MuiColorInput } from "mui-color-input";
 
 // Preset accent colors
@@ -143,6 +143,7 @@ export default function OptionsView() {
     updatePlaybackSettings,
     updateFadeSettings,
     updateReplayGainSettings,
+    updateBehaviourSettings,
   } = useSettings();
 
   const [expandedPanel, setExpandedPanel] = useState<string | false>("language");
@@ -344,6 +345,41 @@ export default function OptionsView() {
           <Typography variant="caption" color="text.secondary">
             Quick action customization will be available in a future update.
           </Typography>
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* Behaviour */}
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+            Behaviour
+          </Typography>
+
+          <Box sx={{ mb: 3 }}>
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>When minimize button clicked</InputLabel>
+              <Select
+                value={settings.interface.behaviour.on_minimize}
+                label="When minimize button clicked"
+                onChange={(e) => updateBehaviourSettings({ on_minimize: e.target.value as BehaviourSettings["on_minimize"] })}
+              >
+                <MenuItem value="taskbar">Minimize to taskbar</MenuItem>
+                <MenuItem value="tray">Minimize to tray</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+
+          <Box sx={{ mb: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>When close button clicked</InputLabel>
+              <Select
+                value={settings.interface.behaviour.on_close}
+                label="When close button clicked"
+                onChange={(e) => updateBehaviourSettings({ on_close: e.target.value as BehaviourSettings["on_close"] })}
+              >
+                <MenuItem value="tray">Minimize to tray</MenuItem>
+                <MenuItem value="quit">Close app</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </AccordionDetails>
       </Accordion>
 

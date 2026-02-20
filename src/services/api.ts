@@ -509,10 +509,16 @@ export interface ThemeSettings {
   font_family: string;
 }
 
+export interface BehaviourSettings {
+  on_minimize: "taskbar" | "tray";
+  on_close: "tray" | "quit";
+}
+
 export interface InterfaceSettings {
   theme: ThemeSettings;
   tabs: TabConfig[];
   quick_actions: string[];
+  behaviour: BehaviourSettings;
 }
 
 export interface FadeSettings {

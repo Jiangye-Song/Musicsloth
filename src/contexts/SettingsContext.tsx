@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { settingsApi, AppSettings, ThemeSettings, PlaybackSettings, TabConfig, FadeSettings, ReplayGainSettings } from "../services/api";
+import { settingsApi, AppSettings, ThemeSettings, PlaybackSettings, TabConfig, FadeSettings, ReplayGainSettings, BehaviourSettings } from "../services/api";
 
 // Default settings to use when loading fails
 const defaultSettings: AppSettings = {
@@ -22,6 +22,10 @@ const defaultSettings: AppSettings = {
       { id: "genres", label: "Genres", visible: true, order: 5 },
     ],
     quick_actions: [],
+    behaviour: {
+      on_minimize: "taskbar",
+      on_close: "quit",
+    },
   },
   playback: {
     gapless: false,
@@ -52,6 +56,8 @@ interface SettingsContextType {
   updatePlaybackSettings: (playback: Partial<PlaybackSettings>) => Promise<void>;
   updateFadeSettings: (fade: Partial<FadeSettings>) => Promise<void>;
   updateReplayGainSettings: (replayGain: Partial<ReplayGainSettings>) => Promise<void>;
+  // Behaviour
+  updateBehaviourSettings: (behaviour: Partial<BehaviourSettings>) => Promise<void>;
   // Language
   updateLanguage: (language: string) => Promise<void>;
   // Full reload
@@ -147,6 +153,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     await saveSettings(newSettings);
   }, [settings, saveSettings]);
 
+  const updateBehaviourSettings = useCallback(async (behaviour: Partial<BehaviourSettings>) => {
+    const newSettings = {
+      ...settings,
+      interface: {
+        ...settings.interface,
+        behaviour: { ...settings.interface.behaviour, ...behaviour },
+      },
+    };
+    await saveSettings(newSettings);
+  }, [settings, saveSettings]);
+
   const updateLanguage = useCallback(async (language: string) => {
     const newSettings = {
       ...settings,
@@ -177,6 +194,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         updatePlaybackSettings,
         updateFadeSettings,
         updateReplayGainSettings,
+        updateBehaviourSettings,
         updateLanguage,
         reloadSettings,
       }}

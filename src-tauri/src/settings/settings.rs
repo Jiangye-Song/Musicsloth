@@ -55,12 +55,30 @@ impl Default for ThemeSettings {
     }
 }
 
+/// Behaviour settings for minimize/close actions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehaviourSettings {
+    pub on_minimize: String, // "taskbar" or "tray"
+    pub on_close: String,    // "tray" or "quit"
+}
+
+impl Default for BehaviourSettings {
+    fn default() -> Self {
+        Self {
+            on_minimize: "taskbar".to_string(),
+            on_close: "quit".to_string(),
+        }
+    }
+}
+
 /// Interface settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterfaceSettings {
     pub theme: ThemeSettings,
     pub tabs: Vec<TabConfig>,
     pub quick_actions: Vec<String>, // Placeholder for future quick actions
+    #[serde(default)]
+    pub behaviour: BehaviourSettings,
 }
 
 impl Default for InterfaceSettings {
@@ -76,6 +94,7 @@ impl Default for InterfaceSettings {
                 TabConfig { id: "genres".to_string(), label: "Genres".to_string(), visible: true, order: 5 },
             ],
             quick_actions: vec![],
+            behaviour: BehaviourSettings::default(),
         }
     }
 }

@@ -13,13 +13,14 @@ mod state;
 
 use audio::player::Player;
 use db::connection::DatabaseConnection;
+use settings::AppSettings;
 use smtc::{SmtcButton, SmtcManager};
 use state::AppState;
 use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Emitter, Manager,
+    Emitter, Manager, WindowEvent,
 };
 
 #[cfg(target_os = "windows")]
@@ -180,6 +181,20 @@ pub fn run() {
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let app_dir = window.app_handle().path().app_data_dir()
+                        .expect("Failed to get app data directory");
+                    let settings = AppSettings::load(&app_dir).unwrap_or_default();
+                    if settings.interface.behaviour.on_close == "tray" {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                }
+                _ => {}
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::set_current_track,
             commands::clear_current_track,
@@ -259,6 +274,7 @@ pub fn run() {
             // Settings commands
             commands::get_settings,
             commands::save_settings,
+            commands::get_minimize_behaviour,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
