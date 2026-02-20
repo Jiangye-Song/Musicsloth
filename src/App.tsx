@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Box,
   Drawer,
@@ -37,6 +37,7 @@ import GenresView from "./views/GenresView";
 import OptionsView from "./views/OptionsView";
 // import { playerApi } from "./services/api";
 import { PlayerProvider } from "./contexts/PlayerContext";
+import { useSettings } from "./contexts/SettingsContext";
 import React from "react";
 
 type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres" | "options";
@@ -130,15 +131,32 @@ function App() {
             activeTab === "genres" ? "Search a genre..." :
               activeTab === "playlists" ? "Search a playlist..." : "";
 
-  // Main navigation tabs (without options)
-  const mainTabs: { key: Tab; label: string; icon: React.ReactElement }[] = [
-    { key: "queues", label: "Queues", icon: <QueueMusic /> },
-    { key: "library", label: "Library", icon: <LibraryMusic /> },
-    { key: "playlists", label: "Playlists", icon: <PlaylistPlay /> },
-    { key: "artists", label: "Artists", icon: <Person /> },
-    { key: "albums", label: "Albums", icon: <Album /> },
-    { key: "genres", label: "Genres", icon: <LocalOffer /> },
-  ];
+  // Icon map for tab IDs
+  const tabIcons: Record<string, React.ReactElement> = {
+    queues: <QueueMusic />,
+    library: <LibraryMusic />,
+    playlists: <PlaylistPlay />,
+    artists: <Person />,
+    albums: <Album />,
+    genres: <LocalOffer />,
+  };
+
+  const { settings } = useSettings();
+
+  // Build visible tabs from settings, sorted by order
+  const mainTabs = useMemo(() => {
+    return [...settings.interface.tabs]
+      .sort((a, b) => a.order - b.order)
+      .filter((tab) => tab.visible && tabIcons[tab.id])
+      .map((tab) => ({
+        key: tab.id as Tab,
+        label: tab.label,
+        icon: tabIcons[tab.id],
+      }));
+  }, [settings.interface.tabs]);
+
+  // Check if the active tab is visible (for hiding selection on hidden tabs)
+  const isActiveTabVisible = activeTab === "options" || mainTabs.some((t) => t.key === activeTab);
 
   // Options tab (separate for positioning)
   const optionsTab = { key: "options" as Tab, label: "Options", icon: <Settings /> };
@@ -171,16 +189,16 @@ function App() {
               {mobileTabs.map((tab) => (
                 <ListItem key={tab.key} disablePadding sx={{ flex: 1 }}>
                   <ListItemButton
-                    selected={activeTab === tab.key}
+                    selected={isActiveTabVisible && activeTab === tab.key}
                     onClick={() => handleTabChange(tab.key)}
                     sx={{
                       flexDirection: "column",
                       py: 1,
-                      borderBottom: activeTab === tab.key ? 3 : 0,
+                      borderBottom: isActiveTabVisible && activeTab === tab.key ? 3 : 0,
                       borderColor: "success.main",
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 0, color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                    <ListItemIcon sx={{ minWidth: 0, color: isActiveTabVisible && activeTab === tab.key ? "success.main" : "inherit" }}>
                       {tab.icon}
                     </ListItemIcon>
                   </ListItemButton>
@@ -225,14 +243,14 @@ function App() {
               {mainTabs.map((tab) => (
                 <ListItem key={tab.key} disablePadding>
                   <ListItemButton
-                    selected={activeTab === tab.key}
+                    selected={isActiveTabVisible && activeTab === tab.key}
                     onClick={() => handleTabChange(tab.key)}
                     sx={{
-                      borderLeft: activeTab === tab.key ? 3 : 0,
+                      borderLeft: isActiveTabVisible && activeTab === tab.key ? 3 : 0,
                       borderColor: "success.main",
                     }}
                   >
-                    <ListItemIcon sx={{ color: activeTab === tab.key ? "success.main" : "inherit" }}>
+                    <ListItemIcon sx={{ color: isActiveTabVisible && activeTab === tab.key ? "success.main" : "inherit" }}>
                       {tab.icon}
                     </ListItemIcon>
                     <ListItemText primary={tab.label} />
@@ -246,14 +264,14 @@ function App() {
             <List>
               <ListItem disablePadding>
                 <ListItemButton
-                  selected={activeTab === "options"}
+                  selected={isActiveTabVisible && activeTab === "options"}
                   onClick={() => handleTabChange("options")}
                   sx={{
-                    borderLeft: activeTab === "options" ? 3 : 0,
+                    borderLeft: isActiveTabVisible && activeTab === "options" ? 3 : 0,
                     borderColor: "success.main",
                   }}
                 >
-                  <ListItemIcon sx={{ color: activeTab === "options" ? "success.main" : "inherit" }}>
+                  <ListItemIcon sx={{ color: isActiveTabVisible && activeTab === "options" ? "success.main" : "inherit" }}>
                     <Settings />
                   </ListItemIcon>
                   <ListItemText primary="Options" />
