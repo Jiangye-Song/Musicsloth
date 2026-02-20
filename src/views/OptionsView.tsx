@@ -33,6 +33,23 @@ import {
   Visibility,
   VisibilityOff,
 } from "@mui/icons-material";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useSettings } from "../contexts/SettingsContext";
 import { TabConfig } from "../services/api";
 import { MuiColorInput } from "mui-color-input";
@@ -58,8 +75,66 @@ const FONT_OPTIONS = [
   { name: "Segoe UI", value: "'Segoe UI', sans-serif" },
 ];
 
-export default function OptionsView() {
+function SortableTabItem({ tab, onToggleVisibility }: { key?: React.Key; tab: TabConfig; onToggleVisibility: (id: string) => void }) {
   const theme = useTheme();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tab.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+    position: "relative" as const,
+  };
+
+  return (
+    <ListItem
+      ref={setNodeRef}
+      style={style}
+      sx={{
+        opacity: isDragging ? 0.8 : tab.visible ? 1 : 0.5,
+        bgcolor: isDragging
+          ? alpha(theme.palette.primary.main, 0.08)
+          : tab.visible
+          ? "transparent"
+          : alpha(theme.palette.action.disabled, 0.1),
+        boxShadow: isDragging ? 4 : 0,
+        borderRadius: isDragging ? 1 : 0,
+      }}
+    >
+      <Box
+        {...attributes}
+        {...listeners}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          mr: 1,
+          cursor: isDragging ? "grabbing" : "grab",
+          touchAction: "none",
+        }}
+      >
+        <DragIndicator sx={{ fontSize: 20, color: "text.secondary" }} />
+      </Box>
+      <ListItemText primary={tab.label} />
+      <ListItemSecondaryAction>
+        <IconButton
+          edge="end"
+          onClick={() => onToggleVisibility(tab.id)}
+        >
+          {tab.visible ? <Visibility /> : <VisibilityOff />}
+        </IconButton>
+      </ListItemSecondaryAction>
+    </ListItem>
+  );
+}
+
+export default function OptionsView() {
   const {
     settings,
     isLoading,
@@ -84,26 +159,20 @@ export default function OptionsView() {
     await updateTabs(newTabs);
   };
 
-  // Tab reorder (simple move up/down for now)
-  const handleMoveTab = async (tabId: string, direction: "up" | "down") => {
-    const tabs = [...settings.interface.tabs].sort((a, b) => a.order - b.order);
-    const index = tabs.findIndex((t) => t.id === tabId);
-    if (
-      (direction === "up" && index === 0) ||
-      (direction === "down" && index === tabs.length - 1)
-    ) {
-      return;
-    }
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    const newTabs = [...tabs];
-    [newTabs[index], newTabs[newIndex]] = [newTabs[newIndex], newTabs[index]];
-    
-    // Update order values
-    const reorderedTabs: TabConfig[] = newTabs.map((tab, idx) => ({
-      ...tab,
-      order: idx,
-    }));
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const sortedTabs = [...settings.interface.tabs].sort((a, b) => a.order - b.order);
+    const oldIndex = sortedTabs.findIndex((t) => t.id === active.id);
+    const newIndex = sortedTabs.findIndex((t) => t.id === over.id);
+    const reordered = arrayMove(sortedTabs, oldIndex, newIndex);
+    const reorderedTabs: TabConfig[] = reordered.map((tab, idx) => ({ ...tab, order: idx }));
     await updateTabs(reorderedTabs);
   };
 
@@ -246,47 +315,24 @@ export default function OptionsView() {
             Show, hide, or reorder tabs in the navigation.
           </Typography>
           <Paper variant="outlined" sx={{ mb: 3 }}>
-            <List dense>
-              {[...settings.interface.tabs]
-                .sort((a, b) => a.order - b.order)
-                .map((tab, index) => (
-                  <ListItem
-                    key={tab.id}
-                    sx={{
-                      opacity: tab.visible ? 1 : 0.5,
-                      bgcolor: tab.visible ? "transparent" : alpha(theme.palette.action.disabled, 0.1),
-                    }}
-                  >
-                    <Box sx={{ display: "flex", flexDirection: "column", mr: 1 }}>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleMoveTab(tab.id, "up")}
-                        disabled={index === 0}
-                        sx={{ p: 0.25 }}
-                      >
-                        <DragIndicator sx={{ fontSize: 16, transform: "rotate(-90deg)" }} />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleMoveTab(tab.id, "down")}
-                        disabled={index === settings.interface.tabs.length - 1}
-                        sx={{ p: 0.25 }}
-                      >
-                        <DragIndicator sx={{ fontSize: 16, transform: "rotate(90deg)" }} />
-                      </IconButton>
-                    </Box>
-                    <ListItemText primary={tab.label} />
-                    <ListItemSecondaryAction>
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleTabVisibilityToggle(tab.id)}
-                      >
-                        {tab.visible ? <Visibility /> : <VisibilityOff />}
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                ))}
-            </List>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext
+                items={[...settings.interface.tabs].sort((a, b) => a.order - b.order).map((t) => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <List dense>
+                  {[...settings.interface.tabs]
+                    .sort((a, b) => a.order - b.order)
+                    .map((tab) => (
+                      <SortableTabItem
+                        key={tab.id}
+                        tab={tab}
+                        onToggleVisibility={handleTabVisibilityToggle}
+                      />
+                    ))}
+                </List>
+              </SortableContext>
+            </DndContext>
           </Paper>
 
           <Divider sx={{ my: 3 }} />
