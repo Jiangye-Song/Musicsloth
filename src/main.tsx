@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import App from "./App";
-import { darkTheme } from "./theme";
+import { createAppTheme, darkTheme } from "./theme";
+import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 
 // Prevent browser's default context menu
 document.addEventListener("contextmenu", (e) => {
@@ -20,11 +21,31 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+function DynamicThemeProvider({ children }: { children: React.ReactNode }) {
+  const { settings, isLoading } = useSettings();
+
+  const theme = useMemo(() => {
+    if (isLoading) return darkTheme;
+    return createAppTheme(
+      settings.interface.theme.mode,
+      settings.interface.theme.accent_color,
+    );
+  }, [settings.interface.theme.mode, settings.interface.theme.accent_color, isLoading]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      {children}
+    </ThemeProvider>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
+    <SettingsProvider>
+      <DynamicThemeProvider>
+        <App />
+      </DynamicThemeProvider>
+    </SettingsProvider>
   </React.StrictMode>,
 );

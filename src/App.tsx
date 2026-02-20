@@ -37,7 +37,6 @@ import GenresView from "./views/GenresView";
 import OptionsView from "./views/OptionsView";
 // import { playerApi } from "./services/api";
 import { PlayerProvider } from "./contexts/PlayerContext";
-import { SettingsProvider } from "./contexts/SettingsContext";
 import React from "react";
 
 type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres" | "options";
@@ -157,7 +156,6 @@ function App() {
   };
 
   return (
-    <SettingsProvider>
     <PlayerProvider>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "background.default" }}>
         {/* Mobile Top Navigation */}
@@ -323,7 +321,6 @@ function App() {
         </Dialog>
       </Box>
     </PlayerProvider>
-    </SettingsProvider>
   );
 }
 
