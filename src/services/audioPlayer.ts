@@ -25,10 +25,12 @@ interface BackendPlayerState {
 
 type StateChangeCallback = (state: PlayerState) => void;
 type TrackEndedCallback = () => void;
+type GaplessTransitionCallback = () => void;
 
 class AudioPlayer {
   private stateCallbacks: Set<StateChangeCallback> = new Set();
   private trackEndedCallbacks: Set<TrackEndedCallback> = new Set();
+  private gaplessTransitionCallbacks: Set<GaplessTransitionCallback> = new Set();
   private pollInterval: number | null = null;
   private lastState: PlayerState | null = null;
   private currentVolume: number = 1.0;
@@ -64,6 +66,13 @@ class AudioPlayer {
       if (trackEnded) {
         console.log('[AudioPlayer] Track ended signal received');
         this.notifyTrackEnded();
+      }
+      
+      // Check for gapless transition
+      const gaplessTransition = await invoke<boolean>('player_has_gapless_transition');
+      if (gaplessTransition) {
+        console.log('[AudioPlayer] Gapless transition signal received');
+        this.notifyGaplessTransition();
       }
       
       this.lastState = state;
@@ -125,6 +134,20 @@ class AudioPlayer {
   seek(positionMs: number): void {
     invoke('player_seek', { positionMs: Math.floor(positionMs) })
       .catch(e => console.error('Failed to seek:', e));
+  }
+
+  /** Preload the next track for gapless playback */
+  preloadNextTrack(filePath: string, normalizationGainDb?: number): void {
+    invoke('player_preload_next_track', { 
+      filePath, 
+      normalizationGainDb: normalizationGainDb ?? null 
+    }).catch(e => console.error('Failed to preload next track:', e));
+  }
+
+  /** Clear any preloaded next track */
+  clearPreloadedTrack(): void {
+    invoke('player_clear_preloaded_track')
+      .catch(e => console.error('Failed to clear preloaded track:', e));
   }
 
   setVolume(volume: number): void {
@@ -219,6 +242,11 @@ class AudioPlayer {
     return () => this.trackEndedCallbacks.delete(callback);
   }
 
+  onGaplessTransition(callback: GaplessTransitionCallback): () => void {
+    this.gaplessTransitionCallbacks.add(callback);
+    return () => this.gaplessTransitionCallbacks.delete(callback);
+  }
+
   private notifyStateChange(state: PlayerState): void {
     this.stateCallbacks.forEach(callback => callback(state));
   }
@@ -227,12 +255,17 @@ class AudioPlayer {
     this.trackEndedCallbacks.forEach(callback => callback());
   }
 
+  private notifyGaplessTransition(): void {
+    this.gaplessTransitionCallbacks.forEach(callback => callback());
+  }
+
   destroy(): void {
     if (this.pollInterval !== null) {
       clearInterval(this.pollInterval);
     }
     this.stateCallbacks.clear();
     this.trackEndedCallbacks.clear();
+    this.gaplessTransitionCallbacks.clear();
   }
 }
 

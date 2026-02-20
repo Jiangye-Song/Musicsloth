@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { playerApi, libraryApi, queueApi, playlistApi, Track } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import { smtcService } from "../services/smtcService";
+import { useSettings } from "../contexts/SettingsContext";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface PlayerContextType {
@@ -35,6 +36,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [shuffleSeed, setShuffleSeed] = useState<number>(1);
   const [isShuffled, setIsShuffled] = useState<boolean>(false);
   const [isRepeating, setIsRepeating] = useState<boolean>(false); // true = repeat track, false = repeat queue
+  const { settings } = useSettings();
+  
+  // Ref to track the preloaded next track info for gapless transitions
+  const preloadedNextRef = useRef<{ track: Track; queueIndex: number } | null>(null);
 
   const updateQueuePosition = async (queueId: number, trackIndex: number) => {
     console.log(`[PlayerContext] updateQueuePosition - queueId: ${queueId}, trackIndex: ${trackIndex}`);
@@ -55,6 +60,41 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       console.log(`[PlayerContext] Updated Media Session metadata: ${track.title}`);
     }
   }, []);
+
+  // Helper to preload the next track for gapless playback
+  const preloadNextTrackForGapless = useCallback(async (queueId: number, trackIndex: number, repeating: boolean) => {
+    if (!settings.playback.gapless) {
+      return;
+    }
+
+    try {
+      if (repeating) {
+        // Loop mode: preload the current track again
+        const currentTrackAtPos = await queueApi.getQueueTrackAtPosition(queueId, trackIndex);
+        if (currentTrackAtPos) {
+          console.log(`[Gapless] Preloading current track for loop: ${currentTrackAtPos.title}`);
+          preloadedNextRef.current = { track: currentTrackAtPos, queueIndex: trackIndex };
+          audioPlayer.preloadNextTrack(currentTrackAtPos.file_path, currentTrackAtPos.normalization_gain_db ?? undefined);
+        }
+      } else {
+        // Normal mode: preload the next track in queue
+        let nextIndex = trackIndex + 1;
+        const queueLength = await queueApi.getQueueLength(queueId);
+        if (nextIndex >= queueLength) {
+          nextIndex = 0; // Loop back to start of queue
+        }
+
+        const nextTrack = await queueApi.getQueueTrackAtPosition(queueId, nextIndex);
+        if (nextTrack) {
+          console.log(`[Gapless] Preloading next track: ${nextTrack.title} (index ${nextIndex})`);
+          preloadedNextRef.current = { track: nextTrack, queueIndex: nextIndex };
+          audioPlayer.preloadNextTrack(nextTrack.file_path, nextTrack.normalization_gain_db ?? undefined);
+        }
+      }
+    } catch (error) {
+      console.error('[Gapless] Failed to preload next track:', error);
+    }
+  }, [settings.playback.gapless]);
 
   const playNext = useCallback(async () => {
     if (currentQueueId === null || currentTrackIndex === null) {
@@ -106,11 +146,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
         // Play the track with ReplayGain normalization (if available)
         await playerApi.playFile(nextTrack.file_path, nextTrack.normalization_gain_db);
+        
+        // Preload next track for gapless playback
+        await preloadNextTrackForGapless(currentQueueId, nextIndex, isRepeating);
       }
     } catch (error) {
       console.error('Failed to play next track:', error);
     }
-  }, [currentQueueId, currentTrackIndex, updateQueuePosition, updateMediaSessionMetadata]);
+  }, [currentQueueId, currentTrackIndex, updateQueuePosition, updateMediaSessionMetadata, preloadNextTrackForGapless, isRepeating]);
 
   const playPrevious = useCallback(async () => {
     if (currentQueueId === null || currentTrackIndex === null) {
@@ -162,11 +205,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
         // Play the track with ReplayGain normalization (if available)
         await playerApi.playFile(prevTrack.file_path, prevTrack.normalization_gain_db);
+        
+        // Preload next track for gapless playback
+        await preloadNextTrackForGapless(currentQueueId, prevIndex, isRepeating);
       }
     } catch (error) {
       console.error('Failed to play previous track:', error);
     }
-  }, [currentQueueId, currentTrackIndex, updateQueuePosition, updateMediaSessionMetadata]);
+  }, [currentQueueId, currentTrackIndex, updateQueuePosition, updateMediaSessionMetadata, preloadNextTrackForGapless, isRepeating]);
 
   const toggleShuffle = useCallback(async () => {
     if (currentQueueId === null || !currentTrack) {
@@ -195,6 +241,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setIsRepeating(prev => {
       const newState = !prev;
       console.log(`[PlayerContext] Repeat toggled: ${newState ? 'Track Loop' : 'Queue Loop'}`);
+      // Clear preloaded track since the preload target changes
+      audioPlayer.clearPreloadedTrack();
+      preloadedNextRef.current = null;
       return newState;
     });
   }, []);
@@ -362,6 +411,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (currentTrack) {
           try {
             await playerApi.playFile(currentTrack.file_path, currentTrack.normalization_gain_db);
+            // Preload for next loop iteration
+            if (currentQueueId !== null && currentTrackIndex !== null) {
+              await preloadNextTrackForGapless(currentQueueId, currentTrackIndex, true);
+            }
           } catch (error) {
             console.error('Failed to repeat track:', error);
           }
@@ -376,7 +429,78 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe();
     };
-  }, [playNext, isRepeating, currentTrack]);
+  }, [playNext, isRepeating, currentTrack, currentQueueId, currentTrackIndex, preloadNextTrackForGapless]);
+
+  // Set up gapless transition listener
+  useEffect(() => {
+    const unsubscribe = audioPlayer.onGaplessTransition(async () => {
+      const preloaded = preloadedNextRef.current;
+      if (!preloaded) {
+        console.warn('[Gapless] Transition occurred but no preloaded track info');
+        return;
+      }
+      
+      const { track: nextTrack, queueIndex: nextIndex } = preloaded;
+      preloadedNextRef.current = null;
+      
+      console.log(`[Gapless] Transition to: ${nextTrack.title} (index ${nextIndex})`);
+      
+      // Record play time for the finished track
+      if (currentTrack && currentTrack.duration_ms) {
+        const durationSeconds = Math.floor(currentTrack.duration_ms / 1000);
+        try {
+          await playlistApi.recordTrackPlay(currentTrack.id, durationSeconds);
+        } catch (error) {
+          console.error('Failed to record track play time:', error);
+        }
+      }
+      
+      // Update UI state
+      if (currentQueueId !== null) {
+        await updateQueuePosition(currentQueueId, nextIndex);
+      }
+      setCurrentTrack(nextTrack);
+      
+      // Notify backend of current track
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("set_current_track", { filePath: nextTrack.file_path });
+      } catch {}
+      
+      // Load album art and update Media Session
+      let artUrl: string | null = null;
+      try {
+        const artBytes = await libraryApi.getAlbumArt(nextTrack.file_path);
+        if (artBytes && artBytes.length > 0) {
+          const blob = new Blob([new Uint8Array(artBytes)], { type: "image/jpeg" });
+          artUrl = URL.createObjectURL(blob);
+          setAlbumArt(prevArt => {
+            if (prevArt) {
+              URL.revokeObjectURL(prevArt);
+            }
+            return artUrl;
+          });
+        } else {
+          setAlbumArt(null);
+        }
+      } catch (error) {
+        console.error("Failed to load album art:", error);
+        setAlbumArt(null);
+      }
+      
+      // Update Media Session metadata
+      updateMediaSessionMetadata(nextTrack, artUrl);
+      
+      // Preload the next-next track for continued gapless playback
+      if (currentQueueId !== null) {
+        await preloadNextTrackForGapless(currentQueueId, nextIndex, isRepeating);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentTrack, currentQueueId, isRepeating, updateQueuePosition, updateMediaSessionMetadata, preloadNextTrackForGapless]);
 
   // Initialize SMTC (Windows System Media Transport Controls)
   useEffect(() => {
@@ -449,6 +573,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     
     updateSmtc();
   }, [currentTrack]);
+
+  // Preload next track for gapless when current track / queue position changes
+  useEffect(() => {
+    if (currentQueueId !== null && currentTrackIndex !== null && currentTrack) {
+      preloadNextTrackForGapless(currentQueueId, currentTrackIndex, isRepeating);
+    }
+  }, [currentTrack?.id, currentQueueId, currentTrackIndex, isRepeating, preloadNextTrackForGapless]);
 
   useEffect(() => {
     console.log('[PlayerContext] Setting up polling interval');

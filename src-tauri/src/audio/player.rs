@@ -24,6 +24,17 @@ pub struct PlayerState {
     pub track_gain_db: f32, // Current track's normalization gain
 }
 
+/// A pre-opened decoder ready for gapless transition
+struct PreloadedDecoder {
+    decoder: AudioDecoder,
+    file_path: PathBuf,
+    gain_db: f32,
+}
+
+// Safety: AudioDecoder owns its data (File, Box<dyn FormatReader>, Box<dyn Decoder>)
+// which are all Send. We transfer ownership across threads.
+unsafe impl Send for PreloadedDecoder {}
+
 /// Audio player with Symphonia decoding and cpal output
 pub struct Player {
     // Playback state flags
@@ -58,6 +69,11 @@ pub struct Player {
     
     // Track ended callback trigger
     track_ended: Arc<AtomicBool>,
+    
+    // Gapless playback: pre-opened decoder for the next track
+    next_decoder: Arc<Mutex<Option<PreloadedDecoder>>>,
+    // Signals that a gapless transition just occurred
+    gapless_transition: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -78,6 +94,8 @@ impl Player {
             seek_request: Arc::new(AtomicI64::new(-1)),
             playback_thread: Mutex::new(None),
             track_ended: Arc::new(AtomicBool::new(false)),
+            next_decoder: Arc::new(Mutex::new(None)),
+            gapless_transition: Arc::new(AtomicBool::new(false)),
         }
     }
     
@@ -106,6 +124,10 @@ impl Player {
         // Reset track ended flag
         self.track_ended.store(false, Ordering::SeqCst);
         
+        // Clear any preloaded next track
+        *self.next_decoder.lock() = None;
+        self.gapless_transition.store(false, Ordering::SeqCst);
+        
         // Update current file
         *self.current_file.write() = Some(file_path.clone());
         
@@ -124,9 +146,13 @@ impl Player {
         let duration_ms = self.duration_ms.clone();
         let volume = self.volume_linear.clone();
         let track_gain = self.track_gain_linear.clone();
+        let track_gain_db_arc = self.track_gain_db.clone();
         let normalization_enabled = self.normalization_enabled.clone();
         let seek_request = self.seek_request.clone();
         let track_ended = self.track_ended.clone();
+        let next_decoder = self.next_decoder.clone();
+        let gapless_transition = self.gapless_transition.clone();
+        let current_file = self.current_file.clone();
         
         // Spawn playback thread
         let handle = thread::spawn(move || {
@@ -139,9 +165,13 @@ impl Player {
                 duration_ms,
                 volume,
                 track_gain,
+                track_gain_db_arc,
                 normalization_enabled,
                 seek_request,
                 track_ended.clone(),
+                next_decoder,
+                gapless_transition,
+                current_file,
             ) {
                 eprintln!("Playback error: {}", e);
             }
@@ -168,9 +198,13 @@ impl Player {
         duration_ms: Arc<AtomicI64>,
         volume: Arc<RwLock<f32>>,
         track_gain: Arc<RwLock<f32>>,
+        track_gain_db_arc: Arc<RwLock<f32>>,
         normalization_enabled: Arc<AtomicBool>,
         seek_request: Arc<AtomicI64>,
         _track_ended: Arc<AtomicBool>,
+        next_decoder: Arc<Mutex<Option<PreloadedDecoder>>>,
+        gapless_transition: Arc<AtomicBool>,
+        current_file: Arc<RwLock<Option<PathBuf>>>,
     ) -> Result<(), String> {
         // Open the audio file
         let mut decoder = AudioDecoder::open(&file_path)?;
@@ -184,8 +218,8 @@ impl Player {
         let output = AudioOutput::new()?;
         
         // Get rates and channels
-        let input_sample_rate = decoder.sample_rate();
-        let input_channels = decoder.channels();
+        let mut input_sample_rate = decoder.sample_rate();
+        let mut input_channels = decoder.channels();
         let output_sample_rate = output.sample_rate();
         let output_channels = output.channels() as usize;
         
@@ -195,36 +229,20 @@ impl Player {
         );
         
         // Create resampler if sample rates don't match
-        let needs_resample = input_sample_rate != output_sample_rate;
+        let mut needs_resample = input_sample_rate != output_sample_rate;
+        let chunk_size = 1024;
         let mut resampler: Option<SincFixedIn<f32>> = if needs_resample {
-            let params = SincInterpolationParameters {
-                sinc_len: 256,
-                f_cutoff: 0.95,
-                interpolation: SincInterpolationType::Linear,
-                oversampling_factor: 256,
-                window: WindowFunction::BlackmanHarris2,
-            };
-            
-            let resample_ratio = output_sample_rate as f64 / input_sample_rate as f64;
-            
-            Some(SincFixedIn::new(
-                resample_ratio,
-                2.0, // max relative ratio (for seeking)
-                params,
-                1024, // chunk size
-                input_channels,
-            ).map_err(|e| format!("Failed to create resampler: {}", e))?)
+            Some(Self::create_resampler(input_sample_rate, output_sample_rate, input_channels, chunk_size)?)
         } else {
             None
         };
         
         // Calculate samples per millisecond for position tracking (at input rate)
-        let samples_per_ms = (input_sample_rate as f64 * input_channels as f64) / 1000.0;
+        let mut samples_per_ms = (input_sample_rate as f64 * input_channels as f64) / 1000.0;
         
         let mut samples_decoded: i64 = 0;
         
         // Buffer for accumulating samples for the resampler (planar format)
-        let chunk_size = 1024;
         let mut input_buffer: Vec<Vec<f32>> = vec![Vec::new(); input_channels];
         
         // Main decode/playback loop
@@ -358,6 +376,79 @@ impl Player {
                         }
                     }
                     
+                    // Check for gapless next track (pre-opened decoder)
+                    let preloaded = next_decoder.lock().take();
+                    if let Some(preloaded) = preloaded {
+                        let next_gain = preloaded.gain_db;
+                        let next_file = preloaded.file_path;
+                        let new_decoder = preloaded.decoder;
+                        
+                        eprintln!("Gapless transition to: {:?}", next_file);
+                        
+                        // Update track gain for the new track
+                        *track_gain_db_arc.write() = next_gain;
+                        let gain_linear = if next_gain.abs() < 0.001 {
+                            1.0
+                        } else {
+                            10.0_f32.powf(next_gain / 20.0)
+                        };
+                        *track_gain.write() = gain_linear;
+                        
+                        // Use the pre-opened decoder (no file I/O delay!)
+                        {
+                                // Update current file
+                                *current_file.write() = Some(next_file);
+                                
+                                // Update duration
+                                if let Some(dur) = new_decoder.duration_ms() {
+                                    duration_ms.store(dur, Ordering::SeqCst);
+                                }
+                                
+                                // Reset position
+                                samples_decoded = 0;
+                                position_ms.store(0, Ordering::SeqCst);
+                                
+                                // Check if resampler needs to be recreated
+                                let new_input_sr = new_decoder.sample_rate();
+                                let new_input_ch = new_decoder.channels();
+                                
+                                if new_input_sr != input_sample_rate || new_input_ch != input_channels {
+                                    input_sample_rate = new_input_sr;
+                                    input_channels = new_input_ch;
+                                    samples_per_ms = (input_sample_rate as f64 * input_channels as f64) / 1000.0;
+                                    
+                                    needs_resample = input_sample_rate != output_sample_rate;
+                                    resampler = if needs_resample {
+                                        match Self::create_resampler(input_sample_rate, output_sample_rate, input_channels, chunk_size) {
+                                            Ok(rs) => Some(rs),
+                                            Err(e) => {
+                                                eprintln!("Failed to create resampler for gapless: {}", e);
+                                                None
+                                            }
+                                        }
+                                    } else {
+                                        None
+                                    };
+                                } else if let Some(ref mut rs) = resampler {
+                                    rs.reset();
+                                }
+                                
+                                // Reset input buffer for new channel count
+                                input_buffer = vec![Vec::new(); input_channels];
+                                
+                                // Replace decoder and continue the loop
+                                decoder = new_decoder;
+                                
+                                // Signal the gapless transition
+                                gapless_transition.store(true, Ordering::SeqCst);
+                                
+                                eprintln!("Audio: gapless input {}Hz {}ch -> output {}Hz {}ch",
+                                    input_sample_rate, input_channels, output_sample_rate, output_channels);
+                                
+                                continue; // Continue the main decode loop seamlessly
+                        }
+                    }
+                    
                     // Wait for buffer to drain before exiting
                     thread::sleep(Duration::from_millis(100));
                     break;
@@ -371,6 +462,32 @@ impl Player {
         
         is_playing.store(false, Ordering::SeqCst);
         Ok(())
+    }
+    
+    /// Create a resampler with the given parameters
+    fn create_resampler(
+        input_sample_rate: u32,
+        output_sample_rate: u32,
+        input_channels: usize,
+        chunk_size: usize,
+    ) -> Result<SincFixedIn<f32>, String> {
+        let params = SincInterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        
+        let resample_ratio = output_sample_rate as f64 / input_sample_rate as f64;
+        
+        SincFixedIn::new(
+            resample_ratio,
+            2.0,
+            params,
+            chunk_size,
+            input_channels,
+        ).map_err(|e| format!("Failed to create resampler: {}", e))
     }
     
     /// Interleave planar audio and convert channels if needed
@@ -441,6 +558,10 @@ impl Player {
         // Signal the playback thread to stop
         self.should_stop.store(true, Ordering::SeqCst);
         self.is_paused.store(false, Ordering::SeqCst); // Unpause so thread can exit
+        
+        // Clear preloaded next track
+        *self.next_decoder.lock() = None;
+        self.gapless_transition.store(false, Ordering::SeqCst);
         
         // Wait for playback thread to finish
         if let Some(handle) = self.playback_thread.lock().take() {
@@ -541,6 +662,40 @@ impl Player {
     /// Check if the current track has ended
     pub fn has_track_ended(&self) -> bool {
         self.track_ended.swap(false, Ordering::SeqCst)
+    }
+    
+    /// Preload the next track for gapless playback by opening the decoder in the background
+    pub fn preload_next_track(&self, file_path: PathBuf, gain_db: Option<f32>) {
+        let next_decoder = self.next_decoder.clone();
+        let gain = gain_db.unwrap_or(0.0);
+        let path = file_path.clone();
+        
+        // Open the decoder in a background thread so it's ready instantly at EOF
+        thread::spawn(move || {
+            match AudioDecoder::open(&path) {
+                Ok(decoder) => {
+                    eprintln!("[Gapless] Pre-opened decoder for: {:?}", path);
+                    *next_decoder.lock() = Some(PreloadedDecoder {
+                        decoder,
+                        file_path: path,
+                        gain_db: gain,
+                    });
+                }
+                Err(e) => {
+                    eprintln!("[Gapless] Failed to pre-open decoder: {}", e);
+                }
+            }
+        });
+    }
+    
+    /// Clear any preloaded next track
+    pub fn clear_preloaded_track(&self) {
+        *self.next_decoder.lock() = None;
+    }
+    
+    /// Check if a gapless transition just occurred (atomically checks and clears)
+    pub fn has_gapless_transition(&self) -> bool {
+        self.gapless_transition.swap(false, Ordering::SeqCst)
     }
     
     // Legacy compatibility methods

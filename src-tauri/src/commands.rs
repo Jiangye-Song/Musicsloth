@@ -836,6 +836,30 @@ pub fn player_has_track_ended(state: State<'_, AppState>) -> Result<bool, String
 }
 
 #[tauri::command]
+pub fn player_preload_next_track(
+    file_path: String,
+    normalization_gain_db: Option<f32>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.preload_next_track(PathBuf::from(file_path), normalization_gain_db);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_clear_preloaded_track(state: State<'_, AppState>) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.clear_preloaded_track();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn player_has_gapless_transition(state: State<'_, AppState>) -> Result<bool, String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(player.has_gapless_transition())
+}
+
+#[tauri::command]
 pub fn player_play_with_normalization(
     file_path: String,
     normalization_gain_db: Option<f32>,
