@@ -113,6 +113,9 @@ export interface Track {
    * Positive = track quieter than -14 LUFS target, needs boost.
    * Negative = track louder than target, needs reduction. */
   normalization_gain_db: number | null;
+  /** Accumulated play time in seconds. Each time a track finishes,
+   * its duration in seconds is added to this value. */
+  play_time_seconds: number;
 }
 
 export interface Album {
@@ -340,6 +343,10 @@ export const playlistApi = {
 
   getUnplayedTracks: async (): Promise<Track[]> => {
     return await invoke("get_unplayed_tracks");
+  },
+
+  recordTrackPlay: async (trackId: number, durationSeconds: number): Promise<void> => {
+    return await invoke("record_track_play", { trackId, durationSeconds });
   },
 
   getAllPlaylists: async (): Promise<Playlist[]> => {

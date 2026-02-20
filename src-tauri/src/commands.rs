@@ -602,6 +602,12 @@ pub fn get_recent_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, Strin
 }
 
 #[tauri::command]
+pub fn record_track_play(track_id: i64, duration_seconds: i64, state: State<'_, AppState>) -> Result<(), String> {
+    DbOperations::record_track_play(&state.db, track_id, duration_seconds)
+        .map_err(|e| format!("Failed to record track play: {}", e))
+}
+
+#[tauri::command]
 pub fn get_most_played_tracks(state: State<'_, AppState>) -> Result<Vec<Track>, String> {
     DbOperations::get_most_played_tracks(&state.db)
         .map_err(|e| format!("Failed to get most played tracks: {}", e))

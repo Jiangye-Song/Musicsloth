@@ -29,6 +29,11 @@ pub struct Track {
     /// Target loudness is -14 LUFS (streaming standard).
     #[serde(default)]
     pub normalization_gain_db: Option<f32>,
+    /// Accumulated play time in seconds. Each time a track finishes playing,
+    /// its duration (in seconds) is added to this value.
+    /// Used for "Most Played" sorting instead of a simple play count.
+    #[serde(default)]
+    pub play_time_seconds: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

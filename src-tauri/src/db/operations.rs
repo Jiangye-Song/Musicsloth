@@ -150,7 +150,7 @@ impl DbOperations {
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     play_count, last_played, date_added, date_modified, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
              ORDER BY date_added DESC"
         )?;
@@ -178,6 +178,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -198,7 +199,7 @@ impl DbOperations {
                     t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
                     t.play_count, t.last_played, t.date_added, t.date_modified, t.file_hash,
-                    t.normalization_gain_db
+                    t.normalization_gain_db, t.play_time_seconds
              FROM tracks t
              INNER JOIN track_artists ta ON ta.track_id = t.id
              WHERE ta.artist_id = ?1
@@ -228,6 +229,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -248,7 +250,7 @@ impl DbOperations {
                     t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
                     t.play_count, t.last_played, t.date_added, t.date_modified, t.file_hash,
-                    t.normalization_gain_db
+                    t.normalization_gain_db, t.play_time_seconds
              FROM tracks t
              INNER JOIN track_genres tg ON tg.track_id = t.id
              WHERE tg.genre_id = ?1
@@ -278,6 +280,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -298,7 +301,7 @@ impl DbOperations {
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     play_count, last_played, date_added, date_modified, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
              WHERE album = ?1
              ORDER BY disc_number, track_number"
@@ -327,6 +330,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -347,7 +351,7 @@ impl DbOperations {
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     play_count, last_played, date_added, date_modified, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
              WHERE file_path = ?1"
         )?;
@@ -377,6 +381,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             }))
         } else {
             Ok(None)
@@ -396,7 +401,7 @@ impl DbOperations {
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     play_count, last_played, date_added, date_modified, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
              WHERE id = ?1"
         )?;
@@ -426,6 +431,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             }))
         } else {
             Ok(None)
@@ -643,7 +649,7 @@ impl DbOperations {
                     t.year, t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
                     t.date_added, t.date_modified, t.play_count, t.last_played, t.file_hash,
-                    t.normalization_gain_db
+                    t.normalization_gain_db, t.play_time_seconds
              FROM tracks t
              INNER JOIN queue_tracks qt ON qt.track_id = t.id
              WHERE qt.queue_id = ?1
@@ -673,6 +679,7 @@ impl DbOperations {
                 last_played: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -869,7 +876,7 @@ impl DbOperations {
                     t.year, t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
                     t.date_added, t.date_modified, t.play_count, t.last_played, t.file_hash,
-                    t.normalization_gain_db
+                    t.normalization_gain_db, t.play_time_seconds
              FROM tracks t
              INNER JOIN queue_tracks qt ON qt.track_id = t.id
              WHERE qt.queue_id = ?1 AND qt.position = ?2"
@@ -898,6 +905,7 @@ impl DbOperations {
                 last_played: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         }).optional()?;
         
@@ -988,7 +996,7 @@ impl DbOperations {
                     year, track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     date_added, date_modified, play_count, last_played, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
              ORDER BY date_added DESC"
         )?;
@@ -1016,6 +1024,7 @@ impl DbOperations {
                 last_played: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1035,10 +1044,10 @@ impl DbOperations {
                     year, track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     date_added, date_modified, play_count, last_played, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
-             WHERE play_count > 0
-             ORDER BY play_count DESC, last_played DESC"
+             WHERE play_time_seconds > 0
+             ORDER BY play_time_seconds DESC, last_played DESC"
         )?;
         
         let tracks = stmt.query_map([], |row| {
@@ -1064,6 +1073,7 @@ impl DbOperations {
                 last_played: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1083,9 +1093,9 @@ impl DbOperations {
                     year, track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     date_added, date_modified, play_count, last_played, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
-             WHERE play_count = 0
+             WHERE play_time_seconds = 0
              ORDER BY date_added DESC"
         )?;
         
@@ -1112,11 +1122,34 @@ impl DbOperations {
                 last_played: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
         
         Ok(tracks)
+    }
+
+    /// Record that a track has been played by adding its duration to play_time_seconds.
+    /// Also increments play_count and updates last_played timestamp.
+    pub fn record_track_play(
+        db: &DatabaseConnection,
+        track_id: i64,
+        duration_seconds: i64,
+    ) -> Result<(), anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs() as i64;
+        
+        conn.execute(
+            "UPDATE tracks SET play_time_seconds = COALESCE(play_time_seconds, 0) + ?1, play_count = play_count + 1, last_played = ?2 WHERE id = ?3",
+            rusqlite::params![duration_seconds, now, track_id],
+        )?;
+        
+        Ok(())
     }
 
     /// Get the number of tracks in a queue
@@ -1678,7 +1711,7 @@ impl DbOperations {
                     track_number, disc_number, duration_ms, genre,
                     file_size, file_format, bitrate, sample_rate,
                     play_count, last_played, date_added, date_modified, file_hash,
-                    normalization_gain_db
+                    normalization_gain_db, play_time_seconds
              FROM tracks
              WHERE normalization_gain_db IS NULL
              ORDER BY id"
@@ -1707,6 +1740,7 @@ impl DbOperations {
                 date_modified: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1868,7 +1902,7 @@ impl DbOperations {
                     t.year, t.track_number, t.disc_number, t.duration_ms, t.genre,
                     t.file_size, t.file_format, t.bitrate, t.sample_rate,
                     t.date_added, t.date_modified, t.play_count, t.last_played, t.file_hash,
-                    t.normalization_gain_db
+                    t.normalization_gain_db, t.play_time_seconds
              FROM tracks t
              INNER JOIN playlist_tracks pt ON t.id = pt.track_id
              WHERE pt.playlist_id = ?1
@@ -1898,6 +1932,7 @@ impl DbOperations {
                 last_played: row.get(18)?,
                 file_hash: row.get(19)?,
                 normalization_gain_db: row.get(20)?,
+                play_time_seconds: row.get(21)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

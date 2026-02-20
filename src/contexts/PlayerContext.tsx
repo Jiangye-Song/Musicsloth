@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { playerApi, libraryApi, queueApi, Track } from "../services/api";
+import { playerApi, libraryApi, queueApi, playlistApi, Track } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import { smtcService } from "../services/smtcService";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -346,6 +346,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Set up track ended listener to auto-play next track or repeat
   useEffect(() => {
     const unsubscribe = audioPlayer.onTrackEnded(async () => {
+      // Record play time for the finished track
+      if (currentTrack && currentTrack.duration_ms) {
+        const durationSeconds = Math.floor(currentTrack.duration_ms / 1000);
+        try {
+          await playlistApi.recordTrackPlay(currentTrack.id, durationSeconds);
+        } catch (error) {
+          console.error('Failed to record track play time:', error);
+        }
+      }
+
       if (isRepeating) {
         // Track loop: replay the same track
         console.log('[PlayerContext] Track ended, repeating current track');

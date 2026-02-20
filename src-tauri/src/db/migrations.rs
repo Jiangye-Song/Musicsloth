@@ -251,6 +251,20 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         }
     }
 
+    // Migration: Add play_time_seconds column to tracks table for accumulated play time tracking
+    // Each time a track finishes, its duration in seconds is added here
+    let play_time_seconds_exists: Result<i64, _> = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('tracks') WHERE name='play_time_seconds'",
+        [],
+        |row| row.get(0)
+    );
+    
+    if let Ok(count) = play_time_seconds_exists {
+        if count == 0 {
+            conn.execute("ALTER TABLE tracks ADD COLUMN play_time_seconds INTEGER DEFAULT 0", [])?;
+        }
+    }
+
     // Create indexes for better query performance
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist)",

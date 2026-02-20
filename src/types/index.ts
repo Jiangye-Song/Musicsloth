@@ -11,6 +11,8 @@ export interface Track {
    * Positive = track needs boost, Negative = track needs reduction.
    * Target loudness is -14 LUFS. */
   normalization_gain_db?: number;
+  /** Accumulated play time in seconds. */
+  play_time_seconds?: number;
 }
 
 export interface Album {

@@ -119,6 +119,7 @@ impl MetadataExtractor {
             last_played: None,
             file_hash: None,
             normalization_gain_db: None, // Will be calculated during loudness analysis
+            play_time_seconds: 0,
         })
     }
     
@@ -202,6 +203,7 @@ impl MetadataExtractor {
             last_played: None,
             file_hash: None,
             normalization_gain_db: None,
+            play_time_seconds: 0,
         })
     }
     
@@ -248,6 +250,7 @@ impl MetadataExtractor {
             last_played: None,
             file_hash: None,
             normalization_gain_db: None,
+            play_time_seconds: 0,
         })
     }
 }

@@ -144,6 +144,7 @@ pub fn run() {
             commands::get_recent_tracks,
             commands::get_most_played_tracks,
             commands::get_unplayed_tracks,
+            commands::record_track_play,
             commands::get_all_playlists,
             commands::create_playlist,
             commands::rename_playlist,
