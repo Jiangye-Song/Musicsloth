@@ -7,6 +7,7 @@ import {
   Tab,
   Slider,
   useMediaQuery,
+  useTheme,
   Menu,
   MenuItem,
 } from "@mui/material";
@@ -47,6 +48,7 @@ interface NowPlayingViewProps {
 
 export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
   const isShortHeight = useMediaQuery('(max-height:600px)'); const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "details");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPosition, setCurrentPosition] = useState(0);
@@ -938,7 +940,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
                 {renderTrackInfo()}
               </Box>
             </Box>
-            <hr style={{borderColor: "#2f2f2f"}}/>
+            <hr style={{borderColor: theme.palette.divider}}/>
             {/* Right: Tabs */}
             <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
               <Tabs

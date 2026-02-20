@@ -4,7 +4,7 @@ import VirtualTrackList from "../components/VirtualTrackList";
 import PlaylistContextMenu from "../components/PlaylistContextMenu";
 import TextInputDialog from "../components/TextInputDialog";
 
-import { IconButton, Button } from "@mui/material";
+import { IconButton, Button, useTheme } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PlaylistPlayIcon from "@mui/icons-material/PlaylistPlay";
 import AddIcon from "@mui/icons-material/Add";
@@ -32,6 +32,7 @@ interface PlaylistsViewProps {
 }
 
 function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
+  const theme = useTheme();
   return (
     <div
       onClick={onClick}
@@ -45,14 +46,14 @@ function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
         transition: "background-color 0.15s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#2a2a2a";
+        e.currentTarget.style.backgroundColor = theme.palette.background.paper;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.backgroundColor = "transparent";
       }}
     >
       <span style={{ color: "#888" }}>{playlist.icon}</span>
-      <span style={{ color: "#fff", fontSize: "14px" }}>{playlist.name}</span>
+      <span style={{ color: theme.palette.text.primary, fontSize: "14px" }}>{playlist.name}</span>
     </div>
   );
 }
@@ -93,6 +94,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
+  const theme = useTheme();
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ top: number; left: number } | null>(null);
@@ -253,8 +255,8 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
         <div
           style={{
             padding: "15px 20px",
-            backgroundColor: "#1a1a1a",
-            borderBottom: "1px solid #333",
+            backgroundColor: theme.palette.background.default,
+            borderBottom: `1px solid ${theme.palette.divider}`,
             display: "flex",
             alignItems: "center",
             gap: "15px",
@@ -306,7 +308,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
             style={{
               padding: "20px",
               margin: "20px",
-              backgroundColor: "#2a2a2a",
+              backgroundColor: theme.palette.background.paper,
               borderRadius: "8px",
               textAlign: "center",
             }}
@@ -326,8 +328,8 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
           display: "flex",
           alignItems: "center",
           padding: "15px 20px",
-          backgroundColor: "#1a1a1a",
-          borderBottom: "1px solid #333",
+          backgroundColor: theme.palette.background.default,
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <h2 style={{ margin: 0, fontSize: "18px" }}>Playlists</h2>
@@ -397,14 +399,14 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
                     transition: "background-color 0.15s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#2a2a2a";
+                    e.currentTarget.style.backgroundColor = theme.palette.background.paper;
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
                   <PlaylistPlayIcon sx={{ fontSize: 24, color: "#888" }} />
-                  <span style={{ color: "#fff", fontSize: "14px" }}>{playlist.name}</span>
+                  <span style={{ color: theme.palette.text.primary, fontSize: "14px" }}>{playlist.name}</span>
                 </div>
               ))}
             </div>

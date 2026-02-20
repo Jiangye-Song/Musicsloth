@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTheme } from "@mui/material";
 import { libraryApi, Track } from "../services/api";
 import LibraryScanner from "../components/LibraryScanner";
 import VirtualTrackList from "../components/VirtualTrackList";
@@ -12,6 +13,7 @@ interface LibraryViewProps {
 
 export default function LibraryView({ searchQuery = "", onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: LibraryViewProps) {
     console.log(`[LibraryView] Render - searchQuery: "${searchQuery}"`);
+    const theme = useTheme();
     const [tracks, setTracks] = useState<Track[]>([]);
     const [filteredTracks, setFilteredTracks] = useState<Track[]>([]);
     const [loading, setLoading] = useState(true);
@@ -74,8 +76,8 @@ export default function LibraryView({ searchQuery = "", onNavigateToArtist, onNa
                     display: "flex",
                     alignItems: "center",
                     padding: "15px 20px",
-                    backgroundColor: "#1a1a1a",
-                    borderBottom: "1px solid #333",
+                    backgroundColor: theme.palette.background.default,
+                    borderBottom: `1px solid ${theme.palette.divider}`,
                 }}
             >
                 <h2 style={{ margin: 0, fontSize: "18px" }}>Library</h2>
@@ -99,13 +101,13 @@ export default function LibraryView({ searchQuery = "", onNavigateToArtist, onNa
                         {loading ? (
                             <p style={{ color: "#888" }}>Loading tracks...</p>
                         ) : tracks.length === 0 ? (
-                            <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
+                            <div style={{ padding: "20px", backgroundColor: theme.palette.background.paper, borderRadius: "8px", textAlign: "center" }}>
                                 <p style={{ color: "#888", margin: 0 }}>
                                     No tracks in library. Use the scanner above to add music files.
                                 </p>
                             </div>
                         ) : filteredTracks.length === 0 ? (
-                            <div style={{ padding: "20px", backgroundColor: "#2a2a2a", borderRadius: "8px", textAlign: "center" }}>
+                            <div style={{ padding: "20px", backgroundColor: theme.palette.background.paper, borderRadius: "8px", textAlign: "center" }}>
                                 <p style={{ color: "#888", margin: 0 }}>
                                     No tracks found matching "{searchQuery}"
                                 </p>

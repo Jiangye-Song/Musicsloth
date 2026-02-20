@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList, { VirtualTrackListRef } from "../components/VirtualTrackList";
-import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress, useMediaQuery, Select, MenuItem, FormControl } from "@mui/material";
+import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress, useMediaQuery, Select, MenuItem, FormControl, useTheme } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
@@ -32,6 +32,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
   const [isReorderMode, setIsReorderMode] = useState(false);
   const trackListRef = useRef<VirtualTrackListRef>(null);
   const isMobile = useMediaQuery('(max-width:660px)');
+  const theme = useTheme();
 
   // Expose scrollToActiveTrack to parent via ref
   useImperativeHandle(ref, () => ({
@@ -295,8 +296,8 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
               display: "flex",
               alignItems: "center",
               padding: "15px 20px",
-              backgroundColor: "#1a1a1a",
-              borderBottom: "1px solid #333",
+              backgroundColor: theme.palette.background.default,
+              borderBottom: `1px solid ${theme.palette.divider}`,
             }}
           >
             <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>
@@ -328,7 +329,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
         <div
           style={{
             width: "33%",
-            borderRight: "1px solid #333",
+            borderRight: `1px solid ${theme.palette.divider}`,
             overflowY: "auto",
             flexShrink: 0,
           }}
@@ -339,8 +340,8 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
               display: "flex",
               alignItems: "center",
               padding: "15px 20px",
-              backgroundColor: "#1a1a1a",
-              borderBottom: "1px solid #333",
+              backgroundColor: theme.palette.background.default,
+              borderBottom: `1px solid ${theme.palette.divider}`,
             }}
           >
             <h2 style={{ margin: 0, fontSize: "18px" }}>Queues</h2>

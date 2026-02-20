@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { libraryApi, Track, playerApi, queueApi, playlistApi } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
-import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener, Checkbox, Button, IconButton } from "@mui/material";
+import { Box, Avatar, Typography, TextField, Paper, List, ListItem, ListItemButton, ListItemText, InputAdornment, ClickAwayListener, Checkbox, Button, IconButton, useTheme } from "@mui/material";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
@@ -44,6 +44,7 @@ interface VirtualTrackListProps {
 const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(({ tracks, contextType, contextName, queueId, isActiveQueue = true, playlistId, isSystemPlaylist = false, showPlayingIndicator = false, onQueueActivated, onQueueTracksChanged, onPlaylistTracksChanged, showSearch = false, initialTrackId, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre, isReorderMode = false, onReorderModeChange }, ref) => {
   // console.log(`[VirtualTrackList] Render - contextType: ${contextType}, tracks: ${tracks.length}, showSearch: ${showSearch}`);
   const { updateQueuePosition, currentQueueId, currentTrackIndex, isShuffled, loadShuffleStateFromQueue, setShuffleStateForNewQueue } = usePlayer();
+  const theme = useTheme();
   const albumArtCacheRef = useRef<Map<string, string>>(new Map());
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(20);
@@ -850,7 +851,7 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         ref={containerRef}
         onScroll={handleScroll}
         style={{
-          backgroundColor: "#2a2a2a",
+          backgroundColor: theme.palette.background.paper,
           borderRadius: showSearch ? "0 0 8px 8px" : "8px",
           overflow: "auto",
           height: "600px",

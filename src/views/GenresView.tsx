@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { libraryApi, Genre, Track } from "../services/api";
 import VirtualTrackList from "../components/VirtualTrackList";
 import IconButton from "@mui/material/IconButton";
+import { useTheme } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
 interface GenresViewProps {
@@ -21,6 +22,7 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [genreTracks, setGenreTracks] = useState<Track[]>([]);
   const [trackIdToFlash, setTrackIdToFlash] = useState<number | undefined>(initialTrackId);
+  const theme = useTheme();
 
   // Load genres on mount
   useEffect(() => {
@@ -83,8 +85,8 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
         <div
           style={{
             padding: "15px 20px",
-            backgroundColor: "#1a1a1a",
-            borderBottom: "1px solid #333",
+            backgroundColor: theme.palette.background.default,
+            borderBottom: `1px solid ${theme.palette.divider}`,
             display: "flex",
             alignItems: "center",
             gap: "15px",
@@ -111,8 +113,8 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
           display: "flex",
           alignItems: "center",
           padding: "15px 20px",
-          backgroundColor: "#1a1a1a",
-          borderBottom: "1px solid #333",
+          backgroundColor: theme.palette.background.default,
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <h2 style={{ margin: 0, fontSize: "18px" }}>Genres</h2>
@@ -125,7 +127,7 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
           <div
             style={{
               padding: "20px",
-              backgroundColor: "#2a2a2a",
+              backgroundColor: theme.palette.background.paper,
               borderRadius: "8px",
               textAlign: "center",
             }}
@@ -139,7 +141,7 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
           <div
             style={{
               padding: "20px",
-              backgroundColor: "#2a2a2a",
+              backgroundColor: theme.palette.background.paper,
               borderRadius: "8px",
               textAlign: "center",
             }}
@@ -158,13 +160,13 @@ export default function GenresView({ searchQuery = "", initialGenreName, initial
                   display: "flex",
                   alignItems: "center",
                   padding: "20px",
-                  borderBottom: "1px solid #2a2a2a",
+                  borderBottom: `1px solid ${theme.palette.divider}`,
                   cursor: "pointer",
                   transition: "background-color 0.2s",
                   gap: "15px",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#2a2a2a";
+                  e.currentTarget.style.backgroundColor = theme.palette.background.paper;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "transparent";
