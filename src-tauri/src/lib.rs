@@ -15,7 +15,12 @@ use audio::player::Player;
 use db::connection::DatabaseConnection;
 use smtc::{SmtcButton, SmtcManager};
 use state::AppState;
-use tauri::{image::Image, Emitter, Manager};
+use tauri::{
+    image::Image,
+    menu::{MenuBuilder, MenuItemBuilder},
+    tray::TrayIconBuilder,
+    Emitter, Manager,
+};
 
 #[cfg(target_os = "windows")]
 fn set_app_user_model_id() {
@@ -36,6 +41,33 @@ fn set_app_user_model_id() {
             fn SetCurrentProcessExplicitAppUserModelID(appid: *const u16) -> i32;
         }
         SetCurrentProcessExplicitAppUserModelID(wide.as_ptr());
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn is_dark_theme() -> bool {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    if let Ok(key) = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize") {
+        if let Ok(val) = key.get_value::<u32, _>("AppsUseLightTheme") {
+            return val == 0; // 0 = dark theme, 1 = light theme
+        }
+    }
+    true // Default to dark theme
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_dark_theme() -> bool {
+    true
+}
+
+fn get_tray_icon() -> &'static [u8] {
+    if is_dark_theme() {
+        include_bytes!("../icons/transparent_white.png")
+    } else {
+        include_bytes!("../icons/transparent_black.png")
     }
 }
 
@@ -101,6 +133,50 @@ pub fn run() {
                     let _ = window.set_icon(icon);
                 }
             }
+
+            // Set up system tray icon (theme-aware)
+            let tray_icon_bytes = get_tray_icon();
+            let tray_img = image::load_from_memory(tray_icon_bytes)
+                .expect("Failed to decode tray icon");
+            let tray_rgba = tray_img.to_rgba8();
+            let (tw, th) = tray_rgba.dimensions();
+            let tray_icon = Image::new_owned(tray_rgba.into_raw(), tw, th);
+
+            let show_item = MenuItemBuilder::with_id("show", "Show").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+            let tray_menu = MenuBuilder::new(app)
+                .items(&[&show_item, &quit_item])
+                .build()?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(tray_icon)
+                .menu(&tray_menu)
+                .tooltip("Musicsloth")
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        ..
+                    } = event
+                    {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
 
             Ok(())
         })
