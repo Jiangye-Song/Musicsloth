@@ -300,7 +300,7 @@ function App() {
           sx={{
             position: "fixed",
             bottom: 0,
-            left: 0,
+            left: isMobile ? 0 : drawerWidth,
             right: 0,
             p: 0,
             borderTop: 1,
