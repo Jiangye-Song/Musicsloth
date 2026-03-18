@@ -291,6 +291,10 @@ pub fn run() {
             // Settings commands
             commands::get_settings,
             commands::save_settings,
+            // Audio analysis commands
+            commands::enable_audio_analysis,
+            commands::get_audio_analysis,
+            commands::is_audio_analysis_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

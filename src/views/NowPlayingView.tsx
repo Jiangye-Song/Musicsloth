@@ -28,6 +28,7 @@ import {
   Album
 } from "@mui/icons-material";
 import { playerApi, libraryApi } from "../services/api";
+import AudioVisualizer from "../components/AudioVisualizer";
 import { audioPlayer } from "../services/audioPlayer";
 import { usePlayer } from "../contexts/PlayerContext";
 import { invoke } from "@tauri-apps/api/core";
@@ -522,6 +523,14 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
   const renderControls = () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, px: isNarrow ? 2 : 0 }}>
+      {/* Audio Visualizer */}
+      <AudioVisualizer 
+        enabled={isPlaying} 
+        height={60} 
+        barCount={48}
+        mirrored={true}
+      />
+      
       {/* Time and Seekbar */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Typography variant="caption" sx={{ minWidth: "45px", textAlign: "right", color: "text.secondary" }}>

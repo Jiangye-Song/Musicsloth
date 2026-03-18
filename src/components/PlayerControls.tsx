@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import { playerApi, PlayerState } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
+import BeatPulse from "./BeatPulse";
 
 interface PlayerControlsProps {
   onExpandClick?: () => void;
@@ -180,19 +181,20 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   const isMobile = useMediaQuery('(max-width:660px)');
 
   return (
-    <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isMobile ? 0 : 2, height: "80px" }}>
-      {/* Album Art - Full height, no padding/margin */}
-      <Box
-        onClick={onExpandClick}
-        sx={{
-          width: "80px",
-          bgcolor: "background.default",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: "hidden",
-          flexShrink: 0,
-          cursor: onExpandClick ? "pointer" : "default",
+    <BeatPulse enabled={playerState.is_playing} direction="top" maxOpacity={0.3} spread={60}>
+      <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isMobile ? 0 : 2, height: "80px" }}>
+        {/* Album Art - Full height, no padding/margin */}
+        <Box
+          onClick={onExpandClick}
+          sx={{
+            width: "80px",
+            bgcolor: "background.default",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            flexShrink: 0,
+            cursor: onExpandClick ? "pointer" : "default",
         }}
       >
         {albumArt ? (
@@ -544,6 +546,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
           </Box>
         </Box>
       )}
-    </Box>
+      </Box>
+    </BeatPulse>
   );
 }

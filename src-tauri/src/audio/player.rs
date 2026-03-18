@@ -1,5 +1,6 @@
 // Audio player using Symphonia for decoding and cpal for output
 
+use super::analyzer::{AudioAnalysis, SharedAnalyzer};
 use super::decoder::AudioDecoder;
 use super::output::AudioOutput;
 use parking_lot::{Mutex, RwLock};
@@ -87,6 +88,9 @@ pub struct Player {
     fade_start: Arc<RwLock<Option<Instant>>>,
     // Whether we're currently fading out before pause
     fading_to_pause: Arc<AtomicBool>,
+    
+    // Audio analyzer for visualization
+    analyzer: Arc<SharedAnalyzer>,
 }
 
 impl Player {
@@ -117,6 +121,7 @@ impl Player {
             fade_target: Arc::new(RwLock::new(1.0)),
             fade_start: Arc::new(RwLock::new(None)),
             fading_to_pause: Arc::new(AtomicBool::new(false)),
+            analyzer: Arc::new(SharedAnalyzer::new()),
         }
     }
     
@@ -184,6 +189,9 @@ impl Player {
         let fade_start = self.fade_start.clone();
         let fading_to_pause = self.fading_to_pause.clone();
         
+        // Clone analyzer for visualization
+        let analyzer = self.analyzer.clone();
+        
         // Reset fade state for new playback - start with fade in if enabled
         if self.fade_enabled.load(Ordering::SeqCst) && self.fade_in_ms.load(Ordering::SeqCst) > 0 {
             *self.fade_multiplier.write() = 0.0;
@@ -221,6 +229,7 @@ impl Player {
                 fade_target,
                 fade_start,
                 fading_to_pause,
+                analyzer,
             ) {
                 eprintln!("Playback error: {}", e);
             }
@@ -261,6 +270,7 @@ impl Player {
         fade_target: Arc<RwLock<f32>>,
         fade_start: Arc<RwLock<Option<Instant>>>,
         fading_to_pause: Arc<AtomicBool>,
+        analyzer: Arc<SharedAnalyzer>,
     ) -> Result<(), String> {
         // Open the audio file
         let mut decoder = AudioDecoder::open(&file_path)?;
@@ -371,6 +381,7 @@ impl Player {
                             rs.reset();
                         }
                         output.clear();
+                        analyzer.clear();
                     }
                     Err(e) => {
                         eprintln!("Seek failed: {}", e);
@@ -447,6 +458,8 @@ impl Player {
                     
                     // Write samples to output (blocking to prevent buffer overrun)
                     if !output_samples.is_empty() {
+                        // Feed samples to analyzer for visualization
+                        analyzer.push_samples(&output_samples, output_channels);
                         output.write_blocking(&output_samples);
                     }
                 }
@@ -477,6 +490,8 @@ impl Player {
                                 }
                                 
                                 if !final_samples.is_empty() {
+                                    // Feed samples to analyzer for visualization
+                                    analyzer.push_samples(&final_samples, output_channels);
                                     output.write_blocking(&final_samples);
                                 }
                             }
@@ -858,5 +873,31 @@ impl Player {
 
     pub fn clear_current_file(&self) {
         *self.current_file.write() = None;
+    }
+    
+    // ===== Audio Analysis Methods =====
+    
+    /// Enable or disable audio analysis for visualization
+    pub fn set_analysis_enabled(&self, enabled: bool) {
+        self.analyzer.set_enabled(enabled);
+    }
+    
+    /// Check if audio analysis is enabled
+    pub fn is_analysis_enabled(&self) -> bool {
+        self.analyzer.is_enabled()
+    }
+    
+    /// Get current audio analysis data
+    /// Returns None if analysis is disabled or no data available
+    pub fn get_analysis(&self) -> Option<AudioAnalysis> {
+        if !self.analyzer.is_enabled() {
+            return None;
+        }
+        self.analyzer.analyze()
+    }
+    
+    /// Get the last available analysis (even if no new data)
+    pub fn get_last_analysis(&self) -> AudioAnalysis {
+        self.analyzer.get_last_analysis()
     }
 }

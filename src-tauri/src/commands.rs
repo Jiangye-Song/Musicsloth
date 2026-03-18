@@ -8,6 +8,7 @@ use crate::library::indexer::{LibraryIndexer, IndexingResult, IndexingProgress, 
 use crate::metadata::loudness::analyze_loudness;
 use crate::db::operations::DbOperations;
 use crate::db::models::{Track, Album, Artist, Genre, Queue, ScanPath, Playlist};
+use crate::audio::AudioAnalysis;
 use lofty::file::TaggedFileExt;
 
 // Backend now only tracks current file - playback is in frontend
@@ -1087,4 +1088,34 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
 #[tauri::command]
 pub fn save_settings(settings: AppSettings, state: State<'_, AppState>) -> Result<(), String> {
     settings.save(&state.app_dir)
+}
+
+// ============================================================================
+// Audio Analysis Commands (for visualization)
+// ============================================================================
+
+#[tauri::command]
+pub fn enable_audio_analysis(
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.set_analysis_enabled(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_audio_analysis(
+    state: State<'_, AppState>,
+) -> Result<Option<AudioAnalysis>, String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(player.get_analysis())
+}
+
+#[tauri::command]
+pub fn is_audio_analysis_enabled(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    Ok(player.is_analysis_enabled())
 }
