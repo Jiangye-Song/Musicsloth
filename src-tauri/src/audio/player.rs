@@ -5,10 +5,10 @@ use super::output::AudioOutput;
 use parking_lot::{Mutex, RwLock};
 use rubato::{Resampler, SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicI32, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Player state that can be serialized and sent to frontend
 #[derive(Clone, Debug, serde::Serialize)]
@@ -74,6 +74,19 @@ pub struct Player {
     next_decoder: Arc<Mutex<Option<PreloadedDecoder>>>,
     // Signals that a gapless transition just occurred
     gapless_transition: Arc<AtomicBool>,
+    
+    // Fade settings
+    fade_enabled: Arc<AtomicBool>,
+    fade_in_ms: Arc<AtomicI32>,
+    fade_out_ms: Arc<AtomicI32>,
+    // Fade state: current fade multiplier (0.0 to 1.0)
+    fade_multiplier: Arc<RwLock<f32>>,
+    // Fade target: 1.0 for fade in, 0.0 for fade out
+    fade_target: Arc<RwLock<f32>>,
+    // Fade start time
+    fade_start: Arc<RwLock<Option<Instant>>>,
+    // Whether we're currently fading out before pause
+    fading_to_pause: Arc<AtomicBool>,
 }
 
 impl Player {
@@ -96,6 +109,14 @@ impl Player {
             track_ended: Arc::new(AtomicBool::new(false)),
             next_decoder: Arc::new(Mutex::new(None)),
             gapless_transition: Arc::new(AtomicBool::new(false)),
+            // Fade settings
+            fade_enabled: Arc::new(AtomicBool::new(false)),
+            fade_in_ms: Arc::new(AtomicI32::new(0)),
+            fade_out_ms: Arc::new(AtomicI32::new(0)),
+            fade_multiplier: Arc::new(RwLock::new(1.0)),
+            fade_target: Arc::new(RwLock::new(1.0)),
+            fade_start: Arc::new(RwLock::new(None)),
+            fading_to_pause: Arc::new(AtomicBool::new(false)),
         }
     }
     
@@ -154,6 +175,27 @@ impl Player {
         let gapless_transition = self.gapless_transition.clone();
         let current_file = self.current_file.clone();
         
+        // Clone fade-related Arcs
+        let fade_enabled = self.fade_enabled.clone();
+        let fade_in_ms = self.fade_in_ms.clone();
+        let fade_out_ms = self.fade_out_ms.clone();
+        let fade_multiplier = self.fade_multiplier.clone();
+        let fade_target = self.fade_target.clone();
+        let fade_start = self.fade_start.clone();
+        let fading_to_pause = self.fading_to_pause.clone();
+        
+        // Reset fade state for new playback - start with fade in if enabled
+        if self.fade_enabled.load(Ordering::SeqCst) && self.fade_in_ms.load(Ordering::SeqCst) > 0 {
+            *self.fade_multiplier.write() = 0.0;
+            *self.fade_target.write() = 1.0;
+            *self.fade_start.write() = Some(Instant::now());
+        } else {
+            *self.fade_multiplier.write() = 1.0;
+            *self.fade_target.write() = 1.0;
+            *self.fade_start.write() = None;
+        }
+        self.fading_to_pause.store(false, Ordering::SeqCst);
+        
         // Spawn playback thread
         let handle = thread::spawn(move || {
             if let Err(e) = Self::playback_loop(
@@ -172,6 +214,13 @@ impl Player {
                 next_decoder,
                 gapless_transition,
                 current_file,
+                fade_enabled,
+                fade_in_ms,
+                fade_out_ms,
+                fade_multiplier,
+                fade_target,
+                fade_start,
+                fading_to_pause,
             ) {
                 eprintln!("Playback error: {}", e);
             }
@@ -205,6 +254,13 @@ impl Player {
         next_decoder: Arc<Mutex<Option<PreloadedDecoder>>>,
         gapless_transition: Arc<AtomicBool>,
         current_file: Arc<RwLock<Option<PathBuf>>>,
+        fade_enabled: Arc<AtomicBool>,
+        fade_in_ms: Arc<AtomicI32>,
+        fade_out_ms: Arc<AtomicI32>,
+        fade_multiplier: Arc<RwLock<f32>>,
+        fade_target: Arc<RwLock<f32>>,
+        fade_start: Arc<RwLock<Option<Instant>>>,
+        fading_to_pause: Arc<AtomicBool>,
     ) -> Result<(), String> {
         // Open the audio file
         let mut decoder = AudioDecoder::open(&file_path)?;
@@ -247,8 +303,54 @@ impl Player {
         
         // Main decode/playback loop
         while !should_stop.load(Ordering::SeqCst) {
-            // Handle pause
-            if is_paused.load(Ordering::SeqCst) {
+            // Update fade multiplier if fading
+            if fade_enabled.load(Ordering::SeqCst) {
+                // Check if we have an active fade
+                let fade_start_opt = *fade_start.read();
+                if let Some(start_time) = fade_start_opt {
+                    let elapsed_ms = start_time.elapsed().as_millis() as i32;
+                    let target = *fade_target.read();
+                    
+                    // Determine fade direction based on target
+                    let fading_in = target > 0.5; // target 1.0 = fade in, target 0.0 = fade out
+                    let fade_duration = if fading_in {
+                        fade_in_ms.load(Ordering::SeqCst)
+                    } else {
+                        fade_out_ms.load(Ordering::SeqCst)
+                    };
+                    
+                    if fade_duration > 0 {
+                        let progress = (elapsed_ms as f32 / fade_duration as f32).clamp(0.0, 1.0);
+                        let new_mult = if fading_in {
+                            progress
+                        } else {
+                            1.0 - progress
+                        };
+                        *fade_multiplier.write() = new_mult;
+                        
+                        // Check if fade completed
+                        if progress >= 1.0 {
+                            *fade_start.write() = None;
+                            *fade_multiplier.write() = target;
+                            
+                            // If we were fading to pause, fade is complete - clear flag
+                            if fading_to_pause.load(Ordering::SeqCst) && target == 0.0 {
+                                fading_to_pause.store(false, Ordering::SeqCst);
+                            }
+                        }
+                    } else {
+                        // No fade duration, complete immediately
+                        *fade_start.write() = None;
+                        *fade_multiplier.write() = target;
+                        if fading_to_pause.load(Ordering::SeqCst) && target == 0.0 {
+                            fading_to_pause.store(false, Ordering::SeqCst);
+                        }
+                    }
+                }
+            }
+            
+            // Handle pause - but if we're fading out, keep playing until fade completes
+            if is_paused.load(Ordering::SeqCst) && !fading_to_pause.load(Ordering::SeqCst) {
                 thread::sleep(Duration::from_millis(10));
                 continue;
             }
@@ -276,7 +378,7 @@ impl Player {
                 }
             }
             
-            // Apply combined volume: user volume * track normalization gain
+            // Apply combined volume: user volume * track normalization gain * fade multiplier
             // If normalization is disabled, track_gain is treated as 1.0
             let user_vol = *volume.read();
             let norm_gain = if normalization_enabled.load(Ordering::SeqCst) {
@@ -284,8 +386,13 @@ impl Player {
             } else {
                 1.0
             };
+            let fade_mult = if fade_enabled.load(Ordering::SeqCst) {
+                *fade_multiplier.read()
+            } else {
+                1.0
+            };
             // Clamp the combined gain to prevent clipping (max 1.0)
-            let combined_vol = (user_vol * norm_gain).min(1.0);
+            let combined_vol = (user_vol * norm_gain * fade_mult).min(1.0);
             output.set_volume(combined_vol);
             
             // Decode next packet
@@ -543,14 +650,40 @@ impl Player {
         output
     }
     
-    /// Pause playback
+    /// Pause playback with optional fade out
     pub fn pause(&self) {
+        // If fade is enabled and fade_out_ms > 0, start fading out
+        if self.fade_enabled.load(Ordering::SeqCst) {
+            let fade_out = self.fade_out_ms.load(Ordering::SeqCst);
+            if fade_out > 0 && self.is_playing.load(Ordering::SeqCst) && !self.is_paused.load(Ordering::SeqCst) {
+                // Start fade out - set is_paused immediately so UI updates
+                // but fading_to_pause lets the playback loop continue until fade completes
+                *self.fade_target.write() = 0.0;
+                *self.fade_start.write() = Some(Instant::now());
+                self.fading_to_pause.store(true, Ordering::SeqCst);
+                self.is_paused.store(true, Ordering::SeqCst);
+                return;
+            }
+        }
+        // Immediate pause
         self.is_paused.store(true, Ordering::SeqCst);
     }
     
-    /// Resume playback
+    /// Resume playback with optional fade in
     pub fn resume(&self) {
+        // If fade is enabled and fade_in_ms > 0, start fading in
+        if self.fade_enabled.load(Ordering::SeqCst) {
+            let fade_in = self.fade_in_ms.load(Ordering::SeqCst);
+            if fade_in > 0 && self.is_paused.load(Ordering::SeqCst) {
+                // Start from silence and fade in
+                *self.fade_multiplier.write() = 0.0;
+                *self.fade_target.write() = 1.0;
+                *self.fade_start.write() = Some(Instant::now());
+            }
+        }
+        // Unpause immediately - the fade in happens while playing
         self.is_paused.store(false, Ordering::SeqCst);
+        self.fading_to_pause.store(false, Ordering::SeqCst);
     }
     
     /// Stop playback completely
@@ -642,6 +775,21 @@ impl Player {
     /// Get the current track's normalization gain in dB
     pub fn track_gain_db(&self) -> f32 {
         *self.track_gain_db.read()
+    }
+    
+    /// Set fade settings
+    pub fn set_fade_settings(&self, enabled: bool, fade_in_ms: i32, fade_out_ms: i32) {
+        self.fade_enabled.store(enabled, Ordering::SeqCst);
+        self.fade_in_ms.store(fade_in_ms.clamp(0, 2000), Ordering::SeqCst);
+        self.fade_out_ms.store(fade_out_ms.clamp(0, 2000), Ordering::SeqCst);
+        
+        // If disabling fade, reset fade state to full volume
+        if !enabled {
+            *self.fade_multiplier.write() = 1.0;
+            *self.fade_target.write() = 1.0;
+            *self.fade_start.write() = None;
+            self.fading_to_pause.store(false, Ordering::SeqCst);
+        }
     }
     
     /// Get current player state

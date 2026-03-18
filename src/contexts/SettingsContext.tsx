@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { settingsApi, AppSettings, ThemeSettings, PlaybackSettings, TabConfig, FadeSettings, ReplayGainSettings, BehaviourSettings } from "../services/api";
+import { audioPlayer } from "../services/audioPlayer";
 
 // Default settings to use when loading fails
 const defaultSettings: AppSettings = {
@@ -78,6 +79,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         const loaded = await settingsApi.getSettings();
         setSettings(loaded);
         console.log("[SettingsContext] Settings loaded:", loaded);
+        
+        // Apply fade settings to audio player
+        audioPlayer.setFadeSettings(
+          loaded.playback.fade.enabled,
+          loaded.playback.fade.fade_in_ms,
+          loaded.playback.fade.fade_out_ms
+        );
       } catch (error) {
         console.error("[SettingsContext] Failed to load settings, using defaults:", error);
         setSettings(defaultSettings);
@@ -132,14 +140,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings, saveSettings]);
 
   const updateFadeSettings = useCallback(async (fade: Partial<FadeSettings>) => {
+    const newFade = { ...settings.playback.fade, ...fade };
     const newSettings = {
       ...settings,
       playback: {
         ...settings.playback,
-        fade: { ...settings.playback.fade, ...fade },
+        fade: newFade,
       },
     };
     await saveSettings(newSettings);
+    
+    // Apply fade settings to audio player immediately
+    audioPlayer.setFadeSettings(
+      newFade.enabled,
+      newFade.fade_in_ms,
+      newFade.fade_out_ms
+    );
   }, [settings, saveSettings]);
 
   const updateReplayGainSettings = useCallback(async (replayGain: Partial<ReplayGainSettings>) => {

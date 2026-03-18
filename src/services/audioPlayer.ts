@@ -169,6 +169,20 @@ class AudioPlayer {
   }
 
   /**
+   * Set fade settings for pause/resume
+   * @param enabled - Whether fade effects are enabled
+   * @param fadeInMs - Duration of fade in when resuming (0-2000ms)
+   * @param fadeOutMs - Duration of fade out when pausing (0-2000ms)
+   */
+  setFadeSettings(enabled: boolean, fadeInMs: number, fadeOutMs: number): void {
+    invoke('player_set_fade_settings', { 
+      enabled, 
+      fadeInMs: Math.floor(fadeInMs),
+      fadeOutMs: Math.floor(fadeOutMs)
+    }).catch(e => console.error('Failed to set fade settings:', e));
+  }
+
+  /**
    * Convert slider position (0-100) to dB
    * 0% = -∞ (mute, represented as -60dB)
    * 80% = 0dB (unity gain)

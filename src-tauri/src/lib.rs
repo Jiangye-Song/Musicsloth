@@ -280,6 +280,7 @@ pub fn run() {
             commands::player_set_track_gain,
             commands::player_set_normalization_enabled,
             commands::player_get_normalization_enabled,
+            commands::player_set_fade_settings,
             commands::analyze_library_loudness,
             commands::recalculate_track_replaygain,
             // SMTC commands

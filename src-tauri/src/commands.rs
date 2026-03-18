@@ -895,6 +895,18 @@ pub fn player_get_normalization_enabled(state: State<'_, AppState>) -> Result<bo
     Ok(player.is_normalization_enabled())
 }
 
+#[tauri::command]
+pub fn player_set_fade_settings(
+    enabled: bool,
+    fade_in_ms: i32,
+    fade_out_ms: i32,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let player = state.player.lock().map_err(|e| format!("Lock error: {}", e))?;
+    player.set_fade_settings(enabled, fade_in_ms, fade_out_ms);
+    Ok(())
+}
+
 /// Analyze loudness for all tracks that don't have normalization data yet
 /// This is CPU-intensive and runs as a background task after the main scan
 #[tauri::command]
