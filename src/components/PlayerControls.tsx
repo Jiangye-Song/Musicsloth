@@ -181,7 +181,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   const isMobile = useMediaQuery('(max-width:660px)');
 
   return (
-    <BeatPulse enabled={playerState.is_playing} direction="top" maxOpacity={0.3} spread={60}>
+    <BeatPulse enabled={true} direction="bottom" maxOpacity={0.3} spread={60}>
       <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isMobile ? 0 : 2, height: "80px" }}>
         {/* Album Art - Full height, no padding/margin */}
         <Box

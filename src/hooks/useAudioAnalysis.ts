@@ -13,6 +13,10 @@ interface UseAudioAnalysisOptions {
    * Target frame rate for analysis updates (default 30)
    */
   frameRate?: number;
+  /**
+   * If true, keep analysis running even after unmount (for global components)
+   */
+  keepAlive?: boolean;
 }
 
 interface AudioAnalysisState {
@@ -41,7 +45,7 @@ interface AudioAnalysisState {
 export function useAudioAnalysis(
   options: UseAudioAnalysisOptions = {}
 ): AudioAnalysisState {
-  const { enabled = true, frameRate = 30 } = options;
+  const { enabled = true, frameRate = 30, keepAlive = false } = options;
 
   const [state, setState] = useState<AudioAnalysisState>({
     frequencyBands: new Array(32).fill(0),
@@ -53,12 +57,16 @@ export function useAudioAnalysis(
   });
 
   const enabledRef = useRef(enabled);
+  const keepAliveRef = useRef(keepAlive);
   enabledRef.current = enabled;
+  keepAliveRef.current = keepAlive;
 
   useEffect(() => {
     if (!enabled) {
-      // If disabled, reset state and ensure service is disabled
-      audioAnalysis.disable();
+      // If disabled, reset state but only disable service if not keepAlive
+      if (!keepAlive) {
+        audioAnalysis.disable();
+      }
       setState((prev) => ({
         ...prev,
         frequencyBands: new Array(32).fill(0),
@@ -91,9 +99,12 @@ export function useAudioAnalysis(
 
     return () => {
       unsubscribe();
-      audioAnalysis.disable();
+      // Only disable if not keeping alive
+      if (!keepAliveRef.current) {
+        audioAnalysis.disable();
+      }
     };
-  }, [enabled, frameRate]);
+  }, [enabled, frameRate, keepAlive]);
 
   return state;
 }

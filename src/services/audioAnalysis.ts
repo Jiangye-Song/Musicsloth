@@ -17,6 +17,8 @@ class AudioAnalysisService {
   private listeners: Set<AnalysisCallback> = new Set();
   private pollInterval: number | null = null;
   private enabled: boolean = false;
+  private enabling: boolean = false; // Prevent double initialization
+  private refCount: number = 0; // Track how many consumers are using the service
   private lastAnalysis: AudioAnalysis = {
     frequency_bands: new Array(32).fill(0),
     peak_level: 0,
@@ -27,14 +29,21 @@ class AudioAnalysisService {
 
   /**
    * Enable audio analysis and start polling
+   * Uses reference counting to support multiple consumers
    * @param frameRate Target frames per second (default 30)
    */
   async enable(frameRate: number = 30): Promise<void> {
-    if (this.enabled) return;
+    this.refCount++;
+    
+    // Already enabled or currently enabling
+    if (this.enabled || this.enabling) return;
+    
+    this.enabling = true;
 
     try {
       await invoke("enable_audio_analysis", { enabled: true });
       this.enabled = true;
+      console.log("[AudioAnalysis] Enabled, starting polling at", frameRate, "fps");
 
       // Start polling at the specified frame rate
       const intervalMs = Math.floor(1000 / frameRate);
@@ -43,17 +52,26 @@ class AudioAnalysisService {
       }, intervalMs);
     } catch (error) {
       console.error("[AudioAnalysis] Failed to enable:", error);
+      this.refCount--;
       throw error;
+    } finally {
+      this.enabling = false;
     }
   }
 
   /**
    * Disable audio analysis and stop polling
+   * Only actually disables when all consumers have called disable
    */
   async disable(): Promise<void> {
-    if (!this.enabled) return;
+    this.refCount = Math.max(0, this.refCount - 1);
+    
+    // Only disable if no more consumers
+    if (this.refCount > 0 || !this.enabled) return;
 
     try {
+      console.log("[AudioAnalysis] All consumers disabled, stopping");
+      
       if (this.pollInterval !== null) {
         window.clearInterval(this.pollInterval);
         this.pollInterval = null;
@@ -103,15 +121,24 @@ class AudioAnalysisService {
     return this.lastAnalysis;
   }
 
+  private pollCount = 0;
+  
   private async poll(): Promise<void> {
     try {
       const analysis = await invoke<AudioAnalysis | null>("get_audio_analysis");
       if (analysis) {
         this.lastAnalysis = analysis;
         this.notifyListeners(analysis);
+        
+        // Log occasionally to show it's working
+        this.pollCount++;
+        if (this.pollCount % 60 === 0) {
+          const maxBand = Math.max(...analysis.frequency_bands);
+          console.log("[AudioAnalysis] Data received, max band:", maxBand.toFixed(3), "rms:", analysis.rms_level.toFixed(3));
+        }
       }
     } catch (error) {
-      // Silently ignore poll errors to avoid console spam
+      console.error("[AudioAnalysis] Poll error:", error);
     }
   }
 

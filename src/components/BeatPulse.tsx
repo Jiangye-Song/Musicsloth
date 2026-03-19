@@ -47,10 +47,11 @@ function BeatPulseComponent({
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Get beat data
+  // Get beat data - keepAlive ensures analysis stays running globally
   const { beatIntensity, rmsLevel } = useAudioAnalysis({
     enabled,
     frameRate: 60,
+    keepAlive: true, // BeatPulse is a global component, don't disable on unmount
   });
 
   const color = glowColor || theme.palette.primary.main;
@@ -61,10 +62,10 @@ function BeatPulseComponent({
 
     // Combine beat intensity with RMS for smoother visuals
     // Beat gives sharp peaks, RMS gives overall energy feel
-    const combinedIntensity = Math.max(
-      beatIntensity * 0.8,
-      rmsLevel * 0.4
-    );
+    const combinedIntensity = Math.min(1, Math.max(
+      beatIntensity * 1.2,
+      rmsLevel * 0.8
+    ));
 
     const opacity = combinedIntensity * maxOpacity;
     containerRef.current.style.setProperty("--beat-opacity", String(opacity));

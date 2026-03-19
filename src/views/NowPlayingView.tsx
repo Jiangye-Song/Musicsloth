@@ -28,8 +28,8 @@ import {
   Album
 } from "@mui/icons-material";
 import { playerApi, libraryApi } from "../services/api";
-import AudioVisualizer from "../components/AudioVisualizer";
 import { audioPlayer } from "../services/audioPlayer";
+import BeatPulse from "../components/BeatPulse";
 import { usePlayer } from "../contexts/PlayerContext";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -523,14 +523,6 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
   const renderControls = () => (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, px: isNarrow ? 2 : 0 }}>
-      {/* Audio Visualizer */}
-      <AudioVisualizer 
-        enabled={isPlaying} 
-        height={60} 
-        barCount={48}
-        mirrored={true}
-      />
-      
       {/* Time and Seekbar */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Typography variant="caption" sx={{ minWidth: "45px", textAlign: "right", color: "text.secondary" }}>
@@ -895,6 +887,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   );
 
   return (
+    <BeatPulse enabled={true} direction="top" maxOpacity={0.6} spread={80}>
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default", overflow: "hidden" }}>
       {/* Close Button */}
       <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
@@ -1010,5 +1003,6 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         <MenuItem onClick={handleSaveImage}>Save Image...</MenuItem>
       </Menu>
     </Box>
+    </BeatPulse>
   );
 }
