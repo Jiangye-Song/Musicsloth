@@ -10,6 +10,7 @@ import {
   useTheme,
   Menu,
   MenuItem,
+  Popover,
 } from "@mui/material";
 import {
   Close,
@@ -31,6 +32,7 @@ import { playerApi, libraryApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import BeatPulse from "../components/BeatPulse";
 import { usePlayer } from "../contexts/PlayerContext";
+import { useLayoutMode } from "../hooks/useLayoutMode";
 import { invoke } from "@tauri-apps/api/core";
 
 interface LyricLine {
@@ -39,7 +41,8 @@ interface LyricLine {
 }
 
 interface NowPlayingViewProps {
-  isNarrow: boolean;
+  isNarrow?: boolean;
+  isMedium?: boolean;
   onClose: () => void;
   onQueueClick?: () => void;
   onNavigateToArtist?: (artistName: string, trackId: number) => void;
@@ -47,8 +50,9 @@ interface NowPlayingViewProps {
   onNavigateToGenre?: (genreName: string, trackId: number) => void;
 }
 
-export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
+export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
   const isShortHeight = useMediaQuery('(max-height:600px)'); const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
+  const { isNarrow } = useLayoutMode();
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "details");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -79,6 +83,7 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
   } | null>(null);
   
   const [albumArtBytes, setAlbumArtBytes] = useState<number[] | null>(null);
+  const [volumeAnchorEl, setVolumeAnchorEl] = useState<HTMLElement | null>(null);
 
   // Parse LRC format lyrics
   const parseLrcLyrics = (lrcText: string): LyricLine[] => {
@@ -555,6 +560,17 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
 
       {/* Playback Controls */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
+        {/* Volume button - left side in wide view */}
+        {!isNarrow && (
+          <IconButton
+            size="small"
+            onClick={(e) => setVolumeAnchorEl(e.currentTarget)}
+            sx={{ color: "text.secondary" }}
+            title="Volume"
+          >
+            <VolumeUp />
+          </IconButton>
+        )}
         <IconButton
           onClick={toggleShuffle}
           size="small"
@@ -597,25 +613,50 @@ export default function NowPlayingView({ isNarrow, onClose, onQueueClick, onNavi
         >
           <Repeat />
         </IconButton>
+        {/* Queue button - right side in wide view */}
+        {!isNarrow && (
+          <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }} title="Queue">
+            <QueueMusic />
+          </IconButton>
+        )}
       </Box>
 
-      {/* Bottom Controls - Volume & Queue */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "space-between" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, maxWidth: 200 }}>
-          <VolumeUp fontSize="small" sx={{ color: "text.secondary" }} />
-          <Slider
-            min={0}
-            max={100}
-            value={volume}
-            onChange={handleVolumeChange}
+      {/* Bottom Controls - Volume & Queue (narrow view only) */}
+      {isNarrow && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "space-between" }}>
+          <IconButton
             size="small"
-            sx={{ flex: 1 }}
-          />
+            onClick={(e) => setVolumeAnchorEl(e.currentTarget)}
+            sx={{ color: "text.secondary" }}
+            title="Volume"
+          >
+            <VolumeUp fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }}>
+            <QueueMusic />
+          </IconButton>
         </Box>
-        <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }}>
-          <QueueMusic />
-        </IconButton>
-      </Box>
+      )}
+
+      {/* Volume Popover */}
+      <Popover
+        open={Boolean(volumeAnchorEl)}
+        anchorEl={volumeAnchorEl}
+        onClose={() => setVolumeAnchorEl(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        slotProps={{ paper: { sx: { p: 2, display: "flex", alignItems: "center", gap: 1, width: 200 } } }}
+      >
+        <VolumeUp fontSize="small" sx={{ color: "text.secondary" }} />
+        <Slider
+          min={0}
+          max={100}
+          value={volume}
+          onChange={handleVolumeChange}
+          size="small"
+          sx={{ flex: 1 }}
+        />
+      </Popover>
     </Box>
   );
 

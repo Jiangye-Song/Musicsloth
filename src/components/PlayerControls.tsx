@@ -4,7 +4,6 @@ import {
   IconButton,
   Slider,
   Typography,
-  useMediaQuery,
 } from "@mui/material";
 import {
   PlayArrow,
@@ -23,6 +22,7 @@ import {
 } from "@mui/icons-material";
 import { playerApi, PlayerState } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
+import { useLayoutMode } from "../hooks/useLayoutMode";
 import BeatPulse from "./BeatPulse";
 
 interface PlayerControlsProps {
@@ -49,9 +49,11 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   const [titleOverflows, setTitleOverflows] = useState(false);
   const [artistOverflows, setArtistOverflows] = useState(false);
   const [albumOverflows, setAlbumOverflows] = useState(false);
+  const [mobileTitleOverflows, setMobileTitleOverflows] = useState(false);
   const titleRef = useRef<HTMLDivElement>(null);
   const artistRef = useRef<HTMLDivElement>(null);
   const albumRef = useRef<HTMLDivElement>(null);
+  const mobileTitleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Update player state periodically (faster for smoother seekbar)
@@ -105,6 +107,13 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
         const textElement = container.querySelector('span');
         if (textElement) {
           setAlbumOverflows(textElement.scrollWidth > container.clientWidth);
+        }
+      }
+      if (mobileTitleRef.current) {
+        const container = mobileTitleRef.current;
+        const textElement = container.querySelector('span');
+        if (textElement) {
+          setMobileTitleOverflows(textElement.scrollWidth > container.clientWidth);
         }
       }
     };
@@ -178,11 +187,11 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
 
   const currentPosition = isSeeking ? seekPosition : playerState.position_ms;
   const duration = playerState.duration_ms || 0;
-  const isMobile = useMediaQuery('(max-width:660px)');
+  const { isNarrow, isWide } = useLayoutMode();
 
   return (
     <BeatPulse enabled={true} direction="bottom" maxOpacity={0.3} spread={60}>
-      <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isMobile ? 0 : 2, height: "80px" }}>
+      <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isNarrow ? 0 : 2, height: "80px" }}>
         {/* Album Art - Full height, no padding/margin */}
         <Box
           onClick={onExpandClick}
@@ -204,14 +213,14 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
         )}
       </Box>
 
-      {/* Track Info - Hidden on mobile */}
-      {!isMobile && (
+      {/* Track Info - Hidden on narrow */}
+      {!isNarrow && (
         <Box
           onClick={onExpandClick}
           sx={{
-            flex: "0 0 calc(20%)",
-            maxWidth: "160px",
-            minWidth: "80px",
+            width: "160px",
+            flexShrink: 1,
+            flexGrow: 0,
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
@@ -222,7 +231,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             } : {},
             px: 2,
             py: 1,
-            overflow: "hidden",
+            overflow: "clip",
           }}
         >
           <Box
@@ -231,6 +240,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
               overflow: "hidden",
               whiteSpace: "nowrap",
               position: "relative",
+              width: "100%",
               maskImage: titleOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
               WebkitMaskImage: titleOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
             }}
@@ -288,6 +298,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
                 whiteSpace: "nowrap",
                 flex: 1,
                 position: "relative",
+                width: 0,
                 maskImage: artistOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
                 WebkitMaskImage: artistOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
               }}
@@ -348,6 +359,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
                 whiteSpace: "nowrap",
                 flex: 1,
                 position: "relative",
+                width: 0,
                 maskImage: albumOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
                 WebkitMaskImage: albumOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
               }}
@@ -396,21 +408,60 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
       )}
 
       {/* Center: Playback Controls with Seekbar */}
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.5, mx: 0 }}>
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.5, mx: 0, minWidth: 0, overflow: "hidden" }}>
         {/* Control Buttons */}
-        <Box sx={{ display: "flex", gap: 3, alignItems: "center", justifyContent: isMobile ? "space-between" : "center", mx: "16px" }}>
-          {isMobile && (<div>
+        <Box sx={{ display: "flex", gap: isNarrow ? 1 : 1, alignItems: "center", justifyContent: isNarrow ? "space-between" : "center", mx: isNarrow ? "8px" : "16px", minWidth: 0 }}>
+          {isNarrow && (<Box
+            ref={mobileTitleRef}
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              position: "relative",
+              maskImage: mobileTitleOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+              WebkitMaskImage: mobileTitleOverflows ? "linear-gradient(to right, black 85%, transparent)" : "none",
+            }}
+          >
             <Typography
               variant="body2"
               fontWeight="bold"
-              noWrap
-              sx={{ color: "text.primary" }}
+              component="span"
+              sx={{
+                color: "text.primary",
+                display: "inline-block",
+                paddingRight: mobileTitleOverflows ? "40px" : "0",
+                animation: mobileTitleOverflows ? "scroll-text 10s linear infinite" : "none",
+                "@keyframes scroll-text": {
+                  "0%": { transform: "translateX(0%)" },
+                  "100%": { transform: "translateX(-100%)" },
+                },
+              }}
             >
               {currentTrack ? currentTrack.title : "Track title"}
             </Typography>
-          </div>)}
+            {mobileTitleOverflows && (
+              <Typography
+                variant="body2"
+                fontWeight="bold"
+                component="span"
+                sx={{
+                  color: "text.primary",
+                  display: "inline-block",
+                  paddingRight: "40px",
+                  animation: "scroll-text 10s linear infinite",
+                  "@keyframes scroll-text": {
+                    "0%": { transform: "translateX(0%)" },
+                    "100%": { transform: "translateX(-100%)" },
+                  },
+                }}
+              >
+                {currentTrack ? currentTrack.title : "Track title"}
+              </Typography>
+            )}
+          </Box>)}
 
-          <div>
+          <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
             <IconButton
               onClick={playPrevious}
               disabled={!playerState.current_file && !currentTrack}
@@ -420,7 +471,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             >
               <SkipPrevious />
             </IconButton>
-            {!isMobile && (
+            {isWide && (
               <IconButton
                 onClick={handleRewind}
                 disabled={!playerState.current_file}
@@ -440,7 +491,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             >
               {playerState.is_playing ? <Pause /> : <PlayArrow />}
             </IconButton>
-            {!isMobile && (
+            {isWide && (
               <IconButton
                 onClick={handleFastForward}
                 disabled={!playerState.current_file}
@@ -460,7 +511,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             >
               <SkipNext />
             </IconButton>
-            {isMobile && (<IconButton
+            {isNarrow && (<IconButton
               onClick={onQueueClick}
               size="small"
               title="Queue"
@@ -468,9 +519,9 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
             >
               <QueueMusic />
             </IconButton>)}
-          </div>
-          {!isMobile && (
-            <div>
+          </Box>
+          {!isNarrow && (
+            <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
 
               <IconButton
                 onClick={toggleRepeat}
@@ -496,7 +547,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
               >
                 <QueueMusic />
               </IconButton>
-            </div>
+            </Box>
           )}
         </Box>
 
@@ -530,8 +581,8 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
         </Box>
       </Box>
 
-      {/* Right Side Controls */}
-      {!isMobile && (
+      {/* Right Side Controls - wide only */}
+      {isWide && (
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, minWidth: 100 }}>
             <VolumeUp fontSize="small" sx={{ color: "text.secondary" }} />

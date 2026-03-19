@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { queueApi, Queue, Track, playerApi } from "../services/api";
 import VirtualTrackList, { VirtualTrackListRef } from "../components/VirtualTrackList";
-import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress, useMediaQuery, Select, MenuItem, FormControl, useTheme } from "@mui/material";
+import { Box, IconButton, List, ListItem, ListItemButton, ListItemText, Typography, CircularProgress, Select, MenuItem, FormControl, useTheme } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import ShuffleIcon from "@mui/icons-material/Shuffle";
 import { usePlayer } from "../contexts/PlayerContext";
+import { useLayoutMode } from "../hooks/useLayoutMode";
 
 interface QueuesViewProps {
   searchQuery?: string;
@@ -31,7 +32,7 @@ const QueuesView = forwardRef<QueuesViewRef, QueuesViewProps>(({ searchQuery = "
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const trackListRef = useRef<VirtualTrackListRef>(null);
-  const isMobile = useMediaQuery('(max-width:660px)');
+  const { isNarrow: isMobile } = useLayoutMode();
   const theme = useTheme();
 
   // Expose scrollToActiveTrack to parent via ref

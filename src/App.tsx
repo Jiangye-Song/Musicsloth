@@ -8,8 +8,6 @@ import {
   ListItemIcon,
   ListItemText,
   Paper,
-  useMediaQuery,
-  useTheme,
   Dialog,
   Slide,
   Divider,
@@ -38,6 +36,7 @@ import OptionsView from "./views/OptionsView";
 // import { playerApi } from "./services/api";
 import { PlayerProvider } from "./contexts/PlayerContext";
 import { useSettings } from "./contexts/SettingsContext";
+import { useLayoutMode } from "./hooks/useLayoutMode";
 import React from "react";
 
 type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres" | "options";
@@ -63,8 +62,8 @@ function App() {
   const [selectedGenreName, setSelectedGenreName] = useState<string | undefined>(undefined);
   const [selectedTrackId, setSelectedTrackId] = useState<number | undefined>(undefined);
   const [navigationKey, setNavigationKey] = useState(0); // Force re-navigation when same item is clicked
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { isWide } = useLayoutMode();
+  const isMobile = !isWide; // sidebar collapses when not wide
   const queuesViewRef = useRef<QueuesViewRef>(null);
 
   // Navigation callbacks - shared by all views with track lists
@@ -325,7 +324,6 @@ function App() {
           TransitionComponent={Transition}
         >
           <NowPlayingView
-            isNarrow={isMobile}
             onClose={() => setShowNowPlaying(false)}
             onQueueClick={() => {
               setShowNowPlaying(false);
