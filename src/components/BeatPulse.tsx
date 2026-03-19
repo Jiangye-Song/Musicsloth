@@ -2,7 +2,7 @@
 // Wraps content with a pulsing glow effect that responds to beat detection
 
 import { memo, useRef, useEffect } from "react";
-import { Box, useTheme, alpha } from "@mui/material";
+import { Box, useTheme, alpha, SxProps, Theme } from "@mui/material";
 import { useAudioAnalysis } from "../hooks/useAudioAnalysis";
 
 interface BeatPulseProps {
@@ -30,6 +30,10 @@ interface BeatPulseProps {
    * Glow spread in pixels
    */
   spread?: number;
+  /**
+   * Additional sx styles for the wrapper
+   */
+  sx?: SxProps<Theme>;
 }
 
 /**
@@ -43,6 +47,7 @@ function BeatPulseComponent({
   maxOpacity = 0.4,
   direction = "top",
   spread = 40,
+  sx: sxProp,
 }: BeatPulseProps) {
   const theme = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +106,8 @@ function BeatPulseComponent({
   return (
     <Box
       ref={containerRef}
-      sx={{
+      sx={[
+        {
         position: "relative",
         "--beat-opacity": 0,
         "&::before": {
@@ -118,7 +124,9 @@ function BeatPulseComponent({
           zIndex: 1,
           transition: "opacity 0.05s ease-out",
         },
-      }}
+      },
+      ...(Array.isArray(sxProp) ? sxProp : sxProp ? [sxProp] : []),
+      ]}
     >
       {children}
     </Box>

@@ -51,8 +51,10 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArtist, onNavigateToAlbum, onNavigateToGenre }: NowPlayingViewProps) {
-  const isShortHeight = useMediaQuery('(max-height:600px)'); const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
-  const { isNarrow } = useLayoutMode();
+  const isShortHeight = useMediaQuery('(max-height:600px)');
+  const isVeryShortHeight = useMediaQuery('(max-height:615px)');
+  const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
+  const { isNarrow, isMedium } = useLayoutMode();
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "details");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -436,14 +438,13 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
   };
 
   const renderAlbumArt = () => {
-    // const size = isNarrow ? 200 : 200;
-    // const maxSize = isShortHeight ? 200 : (isNarrow ? 200 : 300);
+    const artSize = isVeryShortHeight ? 80 : isNarrow ? 160 : isMedium ? 200 : 260;
 
     return (
       <Box
         onContextMenu={handleImageContextMenu}
         sx={{
-          width: 200,
+          width: artSize,
           margin: isNarrow ? "0 auto" : 0,
           bgcolor: "background.default",
           borderRadius: 2,
@@ -560,12 +561,12 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
 
       {/* Playback Controls */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1 }}>
-        {/* Volume button - left side in wide view */}
+        {/* Volume button - left side in wide/medium view */}
         {!isNarrow && (
           <IconButton
             size="small"
             onClick={(e) => setVolumeAnchorEl(e.currentTarget)}
-            sx={{ color: "text.secondary" }}
+            sx={{ color: "text.secondary", mr: "auto" }}
             title="Volume"
           >
             <VolumeUp />
@@ -613,9 +614,9 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
         >
           <Repeat />
         </IconButton>
-        {/* Queue button - right side in wide view */}
+        {/* Queue button - right side in wide/medium view */}
         {!isNarrow && (
-          <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }} title="Queue">
+          <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary", ml: "auto" }} title="Queue">
             <QueueMusic />
           </IconButton>
         )}
@@ -928,7 +929,7 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
   );
 
   return (
-    <BeatPulse enabled={true} direction="top" maxOpacity={0.6} spread={80}>
+    <BeatPulse enabled={true} direction="top" maxOpacity={0.6} spread={80} sx={{ height: "100vh", overflow: "hidden" }}>
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default", overflow: "hidden" }}>
       {/* Close Button */}
       <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>
