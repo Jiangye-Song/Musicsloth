@@ -288,6 +288,22 @@ export default function OptionsView() {
             />
           </Box>
 
+          {/* Glow Effect */}
+          <Box sx={{ mb: 3 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.interface.theme.glow_effect ?? true}
+                  onChange={(e) => updateTheme({ glow_effect: e.target.checked })}
+                />
+              }
+              label="Glow Effect"
+            />
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4 }}>
+              Show a beat-reactive glow on the player bar and Now Playing screen
+            </Typography>
+          </Box>
+
           {/* Font Family */}
           <Box sx={{ mb: 3 }}>
             <FormControl fullWidth size="small">

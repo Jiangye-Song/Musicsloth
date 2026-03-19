@@ -32,6 +32,7 @@ import { playerApi, libraryApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import BeatPulse from "../components/BeatPulse";
 import { usePlayer } from "../contexts/PlayerContext";
+import { useSettings } from "../contexts/SettingsContext";
 import { useLayoutMode } from "../hooks/useLayoutMode";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -54,6 +55,8 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
   const isShortHeight = useMediaQuery('(max-height:600px)');
   const isVeryShortHeight = useMediaQuery('(max-height:615px)');
   const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
+  const { settings } = useSettings();
+  const glowEnabled = settings.interface.theme.glow_effect ?? true;
   const { isNarrow, isMedium } = useLayoutMode();
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<"albumart" | "lyrics" | "details">(isNarrow ? "albumart" : "details");
@@ -929,7 +932,7 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
   );
 
   return (
-    <BeatPulse enabled={true} direction="top" maxOpacity={0.6} spread={80} sx={{ height: "100vh", overflow: "hidden" }}>
+    <BeatPulse enabled={glowEnabled} direction="top" maxOpacity={0.6} spread={80} sx={{ height: "100vh", overflow: "hidden" }}>
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "background.default", overflow: "hidden" }}>
       {/* Close Button */}
       <Box sx={{ p: 2, display: "flex", justifyContent: "flex-end" }}>

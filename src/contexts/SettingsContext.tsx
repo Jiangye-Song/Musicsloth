@@ -13,6 +13,7 @@ const defaultSettings: AppSettings = {
       mode: "dark",
       accent_color: "#4CAF50",
       font_family: "system-ui",
+      glow_effect: true,
     },
     tabs: [
       { id: "queues", label: "Queues", visible: true, order: 0 },

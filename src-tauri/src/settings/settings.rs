@@ -43,6 +43,12 @@ pub struct ThemeSettings {
     pub mode: String, // "dark" or "light"
     pub accent_color: String, // Hex color code e.g. "#4CAF50"
     pub font_family: String,
+    #[serde(default = "default_glow_effect")]
+    pub glow_effect: bool,
+}
+
+fn default_glow_effect() -> bool {
+    true
 }
 
 impl Default for ThemeSettings {
@@ -51,6 +57,7 @@ impl Default for ThemeSettings {
             mode: "dark".to_string(),
             accent_color: "#4CAF50".to_string(),
             font_family: "system-ui".to_string(),
+            glow_effect: true,
         }
     }
 }

@@ -507,6 +507,7 @@ export interface ThemeSettings {
   mode: "dark" | "light";
   accent_color: string;
   font_family: string;
+  glow_effect: boolean;
 }
 
 export interface BehaviourSettings {

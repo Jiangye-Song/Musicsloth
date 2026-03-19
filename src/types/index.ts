@@ -86,6 +86,7 @@ export interface ThemeSettings {
   mode: "dark" | "light";
   accent_color: string; // Hex color code e.g. "#4CAF50"
   font_family: string;
+  glow_effect: boolean;
 }
 
 export interface InterfaceSettings {
@@ -132,6 +133,7 @@ export const defaultSettings: AppSettings = {
       mode: "dark",
       accent_color: "#4CAF50",
       font_family: "system-ui",
+      glow_effect: true,
     },
     tabs: [
       { id: "queues", label: "Queues", visible: true, order: 0 },

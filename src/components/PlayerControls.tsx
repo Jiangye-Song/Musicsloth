@@ -22,6 +22,7 @@ import {
 } from "@mui/icons-material";
 import { playerApi, PlayerState } from "../services/api";
 import { usePlayer } from "../contexts/PlayerContext";
+import { useSettings } from "../contexts/SettingsContext";
 import { useLayoutMode } from "../hooks/useLayoutMode";
 import BeatPulse from "./BeatPulse";
 
@@ -32,6 +33,8 @@ interface PlayerControlsProps {
 
 export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerControlsProps) {
   const { currentTrack, albumArt, playNext, playPrevious, isShuffled, toggleShuffle, isRepeating, toggleRepeat } = usePlayer();
+  const { settings } = useSettings();
+  const glowEnabled = settings.interface.theme.glow_effect ?? true;
   const [playerState, setPlayerState] = useState<PlayerState>({
     is_playing: false,
     is_paused: false,
@@ -190,7 +193,7 @@ export default function PlayerControls({ onExpandClick, onQueueClick }: PlayerCo
   const { isNarrow, isWide } = useLayoutMode();
 
   return (
-    <BeatPulse enabled={true} direction="bottom" maxOpacity={0.3} spread={60}>
+    <BeatPulse enabled={glowEnabled} direction="bottom" maxOpacity={0.3} spread={60}>
       <Box sx={{ display: "flex", alignItems: "stretch", gap: 0, pr: isNarrow ? 0 : 2, height: "80px" }}>
         {/* Album Art - Full height, no padding/margin */}
         <Box
