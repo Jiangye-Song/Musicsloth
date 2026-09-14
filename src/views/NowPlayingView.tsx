@@ -305,10 +305,18 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
 
   const handlePlayPause = async () => {
     try {
-      if (isPlaying) {
+      const state = await playerApi.getState();
+      if (state.is_playing) {
         await playerApi.pause();
-      } else {
+        return;
+      }
+
+      if (state.is_paused) {
         await playerApi.resume();
+      } else if (currentTrack) {
+        // A newly opened Now Playing view can have a queue-selected track but no
+        // audio file loaded yet. Resume is a no-op in that state, so start it.
+        await playerApi.playFile(currentTrack.file_path, currentTrack.normalization_gain_db);
       }
     } catch (error) {
       console.error("Failed to toggle play/pause:", error);
