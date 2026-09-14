@@ -28,6 +28,8 @@ import {
   Person,
   Album
 } from "@mui/icons-material";
+import LyricsOutlinedIcon from "@mui/icons-material/LyricsOutlined";
+import LyricsIcon from "@mui/icons-material/Lyrics";
 import { playerApi, libraryApi } from "../services/api";
 import { audioPlayer } from "../services/audioPlayer";
 import BeatPulse from "../components/BeatPulse";
@@ -35,11 +37,8 @@ import { usePlayer } from "../contexts/PlayerContext";
 import { useSettings } from "../contexts/SettingsContext";
 import { useLayoutMode } from "../hooks/useLayoutMode";
 import { invoke } from "@tauri-apps/api/core";
-
-interface LyricLine {
-  time: number; // milliseconds
-  text: string;
-}
+import { LyricLine, parseLrcLyrics } from "../utils/lyrics";
+import { FloatingLyricsMode, setFloatingLyricsMode } from "../services/floatingLyrics";
 
 interface NowPlayingViewProps {
   isNarrow?: boolean;
@@ -89,27 +88,21 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
   
   const [albumArtBytes, setAlbumArtBytes] = useState<number[] | null>(null);
   const [volumeAnchorEl, setVolumeAnchorEl] = useState<HTMLElement | null>(null);
+  const [floatingLyricsMode, setFloatingLyricsModeState] = useState<FloatingLyricsMode>("off");
 
-  // Parse LRC format lyrics
-  const parseLrcLyrics = (lrcText: string): LyricLine[] => {
-    const lines: LyricLine[] = [];
-    const lrcRegex = /\[(\d{1,2}):(\d{2})(?:\.(\d{2,3}))?\](.*)/g;
-    
-    let match;
-    while ((match = lrcRegex.exec(lrcText)) !== null) {
-      const minutes = parseInt(match[1], 10);
-      const seconds = parseInt(match[2], 10);
-      const milliseconds = match[3] ? parseInt(match[3].padEnd(3, '0'), 10) : 0;
-      const text = match[4].trim();
-      
-      const time = (minutes * 60 + seconds) * 1000 + milliseconds;
-      lines.push({ time, text });
+  const cycleFloatingLyricsMode = async () => {
+    const nextMode: FloatingLyricsMode = floatingLyricsMode === "off"
+      ? "on"
+      : floatingLyricsMode === "on"
+        ? "click-through"
+        : "off";
+    setFloatingLyricsModeState(nextMode);
+    try {
+      await setFloatingLyricsMode(nextMode);
+    } catch (error) {
+      console.error("Failed to change floating lyrics mode:", error);
+      setFloatingLyricsModeState(floatingLyricsMode);
     }
-    
-    // Sort by time in case lyrics are not ordered
-    lines.sort((a, b) => a.time - b.time);
-    
-    return lines;
   };
 
   // Helper function to split multi-value fields (artists, genres)
@@ -619,9 +612,14 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
         </IconButton>
         {/* Queue button - right side in wide/medium view */}
         {!isNarrow && (
-          <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary", ml: "auto" }} title="Queue">
-            <QueueMusic />
-          </IconButton>
+          <>
+            <IconButton size="small" onClick={() => void cycleFloatingLyricsMode()} sx={{ color: floatingLyricsMode === "off" ? "text.secondary" : "primary.main", ml: "auto" }} title={`Floating lyrics: ${floatingLyricsMode}`}>
+              {floatingLyricsMode === "click-through" ? <LyricsOutlinedIcon /> : <LyricsIcon />}
+            </IconButton>
+            <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }} title="Queue">
+              <QueueMusic />
+            </IconButton>
+          </>
         )}
       </Box>
 
@@ -635,6 +633,9 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
             title="Volume"
           >
             <VolumeUp fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={() => void cycleFloatingLyricsMode()} sx={{ color: floatingLyricsMode === "off" ? "text.secondary" : "primary.main" }} title={`Floating lyrics: ${floatingLyricsMode}`}>
+            {floatingLyricsMode === "click-through" ? <LyricsOutlinedIcon /> : <LyricsIcon />}
           </IconButton>
           <IconButton size="small" onClick={onQueueClick} sx={{ color: "text.secondary" }}>
             <QueueMusic />

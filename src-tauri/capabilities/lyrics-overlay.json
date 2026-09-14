@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "lyrics-overlay",
+  "description": "Capability for the floating lyrics window",
+  "windows": ["lyrics-overlay"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-hide",
+    "core:window:allow-start-dragging"
+  ]
+}
