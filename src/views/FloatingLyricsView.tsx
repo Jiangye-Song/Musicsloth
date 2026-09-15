@@ -79,7 +79,8 @@ export default function FloatingLyricsView() {
   const nextLine = activeLines.length === 1
     ? lyrics.slice(activeIndex + 1).find(line => line.time !== activeTime)?.text ?? ""
     : "";
-  const fallback = track ? "No synchronized lyrics available" : "Nothing playing";
+  const showTrackMetadata = Boolean(track) && lyrics.length === 0;
+  const fallback = showTrackMetadata ? track?.title : "Nothing playing";
 
   return (
     <Box sx={{ height: "100vh", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 1, px: mode === "click-through" ? 1 : 1.5, color: "common.white", backgroundColor: mode === "click-through" ? "transparent" : "rgba(15, 15, 18, 0.78)", border: mode === "click-through" ? "none" : "1px solid rgba(255,255,255,0.18)", borderRadius: mode === "click-through" ? 0 : 2, boxShadow: "none", overflow: "hidden", userSelect: "none" }}>
@@ -94,8 +95,10 @@ export default function FloatingLyricsView() {
         )) : (
           <Typography noWrap sx={{ fontSize: "1.15rem", fontWeight: 700, textShadow: "0 1px 3px #000" }}>{fallback}</Typography>
         )}
-        {nextLine && (
-          <Typography noWrap sx={{ mt: 0.4, fontSize: "0.85rem", color: "rgba(255,255,255,0.64)" }}>{nextLine}</Typography>
+        {(nextLine || (showTrackMetadata && track?.artist)) && (
+          <Typography noWrap sx={{ mt: 0.4, fontSize: "0.85rem", color: "rgba(255,255,255,0.64)" }}>
+            {nextLine || track?.artist}
+          </Typography>
         )}
       </Box>
       {mode !== "click-through" && (
