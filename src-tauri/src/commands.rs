@@ -1,6 +1,7 @@
 // Tauri command handlers
 use tauri::{State, AppHandle, Emitter, Manager};
 use std::path::PathBuf;
+use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
@@ -1089,6 +1090,99 @@ pub struct FloatingLyricsBounds {
     pub y: f64,
     #[serde(default)]
     pub logical: bool,
+}
+
+#[derive(Serialize)]
+pub struct PlaylistImportResult {
+    pub playlist_id: Option<i64>,
+    pub imported: usize,
+    pub skipped: usize,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PlaylistImportProgress {
+    pub current: usize,
+    pub total: usize,
+    pub current_file: String,
+}
+
+/// Import an M3U/M3U8 playlist. Only paths that already exist in the indexed
+/// library are included; importing a playlist never adds files to the library.
+#[tauri::command]
+pub async fn import_playlist(app: AppHandle, state: State<'_, AppState>) -> Result<PlaylistImportResult, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let Some(file) = app.dialog().file().add_filter("M3U playlists", &["m3u", "m3u8"]).blocking_pick_file() else {
+        return Ok(PlaylistImportResult { playlist_id: None, imported: 0, skipped: 0 });
+    };
+    let playlist_path = file.into_path().map_err(|e| format!("Failed to read selected playlist path: {e}"))?;
+    let db = state.db.clone();
+    tokio::task::spawn_blocking(move || import_playlist_file(&app, &db, &playlist_path))
+        .await
+        .map_err(|e| format!("Playlist import task failed: {e}"))?
+}
+
+fn import_playlist_file(app: &AppHandle, db: &crate::db::connection::DatabaseConnection, playlist_path: &std::path::Path) -> Result<PlaylistImportResult, String> {
+    let contents = std::fs::read_to_string(&playlist_path).map_err(|e| format!("Failed to read playlist: {e}"))?;
+    let entries: Vec<String> = contents.lines().map(|entry| entry.trim().trim_start_matches('\u{feff}').to_string())
+        .filter(|entry| !entry.is_empty() && !entry.starts_with('#')).collect();
+    let playlist_dir = playlist_path.parent().unwrap_or_else(|| std::path::Path::new(""));
+    let indexed_paths: HashMap<String, i64> = DbOperations::get_all_tracks(db)
+        .map_err(|e| format!("Failed to read library tracks: {e}"))?
+        .into_iter()
+        .map(|track| (normalise_playlist_path(std::path::Path::new(&track.file_path)), track.id))
+        .collect();
+    let mut matched_track_ids = Vec::new();
+    let mut seen_track_ids = HashSet::new();
+    let mut skipped = 0;
+    for (index, entry) in entries.iter().enumerate() {
+        let entry_path = m3u_entry_path(entry, playlist_dir);
+        match indexed_paths.get(&normalise_playlist_path(&entry_path)) {
+            Some(track_id) if seen_track_ids.insert(*track_id) => matched_track_ids.push(*track_id),
+            Some(_) | None => skipped += 1,
+        }
+        let _ = app.emit("playlist-import-progress", PlaylistImportProgress { current: index + 1, total: entries.len(), current_file: entry.clone() });
+    }
+    let name = playlist_path.file_stem().and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty()).unwrap_or("Imported Playlist");
+    let playlist_id = DbOperations::create_playlist(db, name, None)
+        .map_err(|e| format!("Failed to create imported playlist: {e}"))?;
+    for track_id in &matched_track_ids {
+        DbOperations::add_track_to_playlist(db, playlist_id, *track_id)
+            .map_err(|e| format!("Failed to add imported track: {e}"))?;
+    }
+    Ok(PlaylistImportResult { playlist_id: Some(playlist_id), imported: matched_track_ids.len(), skipped })
+}
+
+fn m3u_entry_path(entry: &str, playlist_dir: &std::path::Path) -> PathBuf {
+    let entry = entry.strip_prefix("file://").map(decode_file_url).unwrap_or_else(|| entry.to_string());
+    let path = PathBuf::from(entry);
+    if path.is_absolute() { path } else { playlist_dir.join(path) }
+}
+
+fn decode_file_url(value: &str) -> String {
+    let value = value.strip_prefix('/').unwrap_or(value);
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let (Some(high), Some(low)) = (hex_value(bytes[index + 1]), hex_value(bytes[index + 2])) {
+                decoded.push(high * 16 + low); index += 3; continue;
+            }
+        }
+        decoded.push(bytes[index]); index += 1;
+    }
+    String::from_utf8_lossy(&decoded).replace('/', &std::path::MAIN_SEPARATOR.to_string())
+}
+
+fn hex_value(value: u8) -> Option<u8> {
+    match value { b'0'..=b'9' => Some(value - b'0'), b'a'..=b'f' => Some(value - b'a' + 10), b'A'..=b'F' => Some(value - b'A' + 10), _ => None }
+}
+
+fn normalise_playlist_path(path: &std::path::Path) -> String {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf()).to_string_lossy()
+        .replace('/', &std::path::MAIN_SEPARATOR.to_string()).to_lowercase()
 }
 
 #[tauri::command]

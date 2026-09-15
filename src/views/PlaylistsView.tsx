@@ -4,12 +4,13 @@ import VirtualTrackList from "../components/VirtualTrackList";
 import PlaylistContextMenu from "../components/PlaylistContextMenu";
 import TextInputDialog from "../components/TextInputDialog";
 
-import { IconButton, Button, useTheme } from "@mui/material";
+import { IconButton, Button, LinearProgress, useTheme } from "@mui/material";
+import { listen } from "@tauri-apps/api/event";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PlaylistPlayIcon from "@mui/icons-material/PlaylistPlay";
 import AddIcon from "@mui/icons-material/Add";
 import { ReactNode } from "react";
-import { LibraryMusic, Input as InputIcon, Replay as ReplayIcon, PlayDisabled } from "@mui/icons-material";
+import { LibraryMusic, Input as InputIcon, Replay as ReplayIcon, PlayDisabled, FileUpload as FileUploadIcon } from "@mui/icons-material";
 
 type SystemPlaylist = {
   id: string;
@@ -29,6 +30,12 @@ interface PlaylistsViewProps {
   onNavigateToArtist?: (artistName: string, trackId: number) => void;
   onNavigateToAlbum?: (albumName: string, trackId: number) => void;
   onNavigateToGenre?: (genreName: string, trackId: number) => void;
+}
+
+interface PlaylistImportProgress {
+  current: number;
+  total: number;
+  current_file: string;
 }
 
 function PlaylistItem({ playlist, onClick }: PlaylistItemProps) {
@@ -104,10 +111,19 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "rename">("create");
   const [dialogPlaylist, setDialogPlaylist] = useState<Playlist | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<PlaylistImportProgress | null>(null);
 
   // Load user playlists on mount
   useEffect(() => {
     loadUserPlaylists();
+  }, []);
+
+  useEffect(() => {
+    const unlisten = listen<PlaylistImportProgress>("playlist-import-progress", (event) => {
+      setImportProgress(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, []);
 
   const loadUserPlaylists = async () => {
@@ -200,6 +216,23 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
     setDialogPlaylist(null);
     setDialogMode("create");
     setDialogOpen(true);
+  };
+
+  const handleImportPlaylist = async () => {
+    setImporting(true);
+    setImportProgress(null);
+    try {
+      const result = await playlistApi.importPlaylist();
+      if (result.playlist_id === null) return;
+      await loadUserPlaylists();
+      alert(`Imported ${result.imported} track${result.imported === 1 ? "" : "s"}. ${result.skipped} skipped because ${result.skipped === 1 ? "it is not" : "they are not"} in the current library.`);
+    } catch (error) {
+      console.error("Failed to import playlist:", error);
+      alert(`Failed to import playlist: ${error}`);
+    } finally {
+      setImporting(false);
+      setImportProgress(null);
+    }
   };
 
   const handleDialogSubmit = async (name: string) => {
@@ -374,14 +407,35 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
             >
               My Playlists
             </h3>
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={handleOpenCreateDialog}
-            >
-              New Playlist
-            </Button>
+            <div style={{ display: "flex", gap: "4px" }}>
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleOpenCreateDialog}
+              >
+                New Playlist
+              </Button>
+              <Button
+                size="small"
+                startIcon={<FileUploadIcon />}
+                onClick={handleImportPlaylist}
+                disabled={importing}
+              >
+                Import Playlist
+              </Button>
+            </div>
           </div>
+          {importing && (
+            <div style={{ padding: "0 20px 12px" }}>
+              <LinearProgress
+                variant={importProgress?.total ? "determinate" : "indeterminate"}
+                value={importProgress?.total ? (importProgress.current / importProgress.total) * 100 : undefined}
+              />
+              <div style={{ color: "#888", fontSize: "12px", marginTop: "6px" }}>
+                {importProgress ? `Matching tracks: ${importProgress.current} / ${importProgress.total}` : "Selecting playlist..."}
+              </div>
+            </div>
+          )}
           {filteredUserPlaylists.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
               {filteredUserPlaylists.map((playlist) => (

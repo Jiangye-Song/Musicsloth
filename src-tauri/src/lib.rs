@@ -258,6 +258,7 @@ pub fn run() {
             commands::get_all_scan_paths,
             commands::remove_scan_path,
             commands::pick_folder,
+            commands::import_playlist,
             commands::get_all_tracks,
             commands::get_all_albums,
             commands::get_all_artists,

@@ -151,6 +151,12 @@ export interface Playlist {
   description?: string;
 }
 
+export interface PlaylistImportResult {
+  playlist_id: number | null;
+  imported: number;
+  skipped: number;
+}
+
 export interface IndexingResult {
   total_files: number;
   successful: number;
@@ -333,6 +339,10 @@ export const queueApi = {
 };
 
 export const playlistApi = {
+  importPlaylist: async (): Promise<PlaylistImportResult> => {
+    return await invoke("import_playlist");
+  },
+
   getRecentTracks: async (): Promise<Track[]> => {
     return await invoke("get_recent_tracks");
   },
