@@ -196,7 +196,7 @@ export default function OptionsView() {
       </Typography>
 
       {/* Language Section */}
-      <Accordion
+      {/* <Accordion
         expanded={expandedPanel === "language"}
         onChange={handlePanelChange("language")}
         sx={{ mb: 1 }}
@@ -222,7 +222,7 @@ export default function OptionsView() {
             More languages will be available in future versions.
           </Typography>
         </AccordionDetails>
-      </Accordion>
+      </Accordion> */}
 
       {/* Interface Section */}
       <Accordion

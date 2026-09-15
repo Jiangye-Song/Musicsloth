@@ -38,7 +38,7 @@ import { useSettings } from "../contexts/SettingsContext";
 import { useLayoutMode } from "../hooks/useLayoutMode";
 import { invoke } from "@tauri-apps/api/core";
 import { LyricLine, parseLrcLyrics } from "../utils/lyrics";
-import { FloatingLyricsMode, setFloatingLyricsMode } from "../services/floatingLyrics";
+import { FloatingLyricsMode, getFloatingLyricsMode, setFloatingLyricsMode, subscribeFloatingLyricsMode } from "../services/floatingLyrics";
 
 interface NowPlayingViewProps {
   isNarrow?: boolean;
@@ -88,7 +88,9 @@ export default function NowPlayingView({ onClose, onQueueClick, onNavigateToArti
   
   const [albumArtBytes, setAlbumArtBytes] = useState<number[] | null>(null);
   const [volumeAnchorEl, setVolumeAnchorEl] = useState<HTMLElement | null>(null);
-  const [floatingLyricsMode, setFloatingLyricsModeState] = useState<FloatingLyricsMode>("off");
+  const [floatingLyricsMode, setFloatingLyricsModeState] = useState<FloatingLyricsMode>(getFloatingLyricsMode);
+
+  useEffect(() => subscribeFloatingLyricsMode(setFloatingLyricsModeState), []);
 
   const cycleFloatingLyricsMode = async () => {
     const nextMode: FloatingLyricsMode = floatingLyricsMode === "off"

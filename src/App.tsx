@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Box,
   Drawer,
@@ -37,6 +37,7 @@ import OptionsView from "./views/OptionsView";
 import { PlayerProvider } from "./contexts/PlayerContext";
 import { useSettings } from "./contexts/SettingsContext";
 import { useLayoutMode } from "./hooks/useLayoutMode";
+import { initializeFloatingLyrics } from "./services/floatingLyrics";
 import React from "react";
 
 type Tab = "nowplaying" | "library" | "queues" | "playlists" | "artists" | "albums" | "genres" | "options";
@@ -65,6 +66,13 @@ function App() {
   const { isWide } = useLayoutMode();
   const isMobile = !isWide; // sidebar collapses when not wide
   const queuesViewRef = useRef<QueuesViewRef>(null);
+
+  useEffect(() => {
+    // Create the overlay now, but keep it hidden until the user enables lyrics.
+    void initializeFloatingLyrics().catch(error => {
+      console.error("Failed to initialize floating lyrics:", error);
+    });
+  }, []);
 
   // Navigation callbacks - shared by all views with track lists
   const handleNavigateToArtist = (artistName: string, trackId: number) => {

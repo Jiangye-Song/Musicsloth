@@ -3,6 +3,19 @@ import { emitTo } from "@tauri-apps/api/event";
 
 const LABEL = "lyrics-overlay";
 export type FloatingLyricsMode = "off" | "on" | "click-through";
+let currentMode: FloatingLyricsMode = "off";
+let initializationPromise: Promise<void> | null = null;
+const MODE_CHANGE_EVENT = "floating-lyrics-mode-change";
+
+export function getFloatingLyricsMode(): FloatingLyricsMode {
+  return currentMode;
+}
+
+export function subscribeFloatingLyricsMode(listener: (mode: FloatingLyricsMode) => void): () => void {
+  const handler = () => listener(currentMode);
+  window.addEventListener(MODE_CHANGE_EVENT, handler);
+  return () => window.removeEventListener(MODE_CHANGE_EVENT, handler);
+}
 
 async function getOrCreateFloatingLyrics(initialMode: FloatingLyricsMode): Promise<WebviewWindow> {
   const existing = await WebviewWindow.getByLabel(LABEL);
@@ -18,9 +31,23 @@ async function getOrCreateFloatingLyrics(initialMode: FloatingLyricsMode): Promi
     decorations: false,
     transparent: true,
     alwaysOnTop: true,
+    visible: false,
     resizable: true,
     skipTaskbar: true,
   });
+}
+
+/** Warm up the hidden overlay so its first visible frame is already synchronized. */
+export async function initializeFloatingLyrics(): Promise<void> {
+  if (!initializationPromise) {
+    initializationPromise = getOrCreateFloatingLyrics("on")
+      .then(() => undefined)
+      .catch(error => {
+        initializationPromise = null;
+        throw error;
+      });
+  }
+  await initializationPromise;
 }
 
 /** Set the floating lyrics window's visibility and mouse-interaction mode. */
@@ -28,6 +55,8 @@ export async function setFloatingLyricsMode(mode: FloatingLyricsMode): Promise<v
   const existing = await WebviewWindow.getByLabel(LABEL);
   if (mode === "off") {
     if (existing) await existing.hide();
+    currentMode = mode;
+    window.dispatchEvent(new Event(MODE_CHANGE_EVENT));
     return;
   }
 
@@ -36,4 +65,6 @@ export async function setFloatingLyricsMode(mode: FloatingLyricsMode): Promise<v
   await overlay.show();
   if (mode === "on") await overlay.setFocus();
   await emitTo(LABEL, "floating-lyrics:mode", mode);
+  currentMode = mode;
+  window.dispatchEvent(new Event(MODE_CHANGE_EVENT));
 }
