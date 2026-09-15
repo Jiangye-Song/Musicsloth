@@ -156,6 +156,7 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.unminimize();
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
@@ -172,6 +173,7 @@ pub fn run() {
                     } = event
                     {
                         if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.unminimize();
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
@@ -182,6 +184,12 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // The floating lyrics window is an auxiliary surface. Behaviour settings
+            // belong only to the main application window.
+            if window.label() != "main" {
+                return;
+            }
+
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
                     let app_dir = window.app_handle().path().app_data_dir()
@@ -190,6 +198,10 @@ pub fn run() {
                     if settings.interface.behaviour.on_close == "tray" {
                         api.prevent_close();
                         let _ = window.hide();
+                    } else {
+                        // Closing the main window would otherwise leave the hidden
+                        // floating-lyrics window alive and keep the process running.
+                        window.app_handle().exit(0);
                     }
                 }
                 WindowEvent::Focused(false) => {

@@ -82,7 +82,7 @@ export default function FloatingLyricsView() {
   const fallback = track ? "No synchronized lyrics available" : "Nothing playing";
 
   return (
-    <Box sx={{ height: "100vh", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 1, px: mode === "click-through" ? 1 : 1.5, color: "common.white", backgroundColor: mode === "click-through" ? "transparent" : "rgba(15, 15, 18, 0.78)", border: mode === "click-through" ? "none" : "1px solid rgba(255,255,255,0.18)", borderRadius: 2, overflow: "hidden", userSelect: "none" }}>
+    <Box sx={{ height: "100vh", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 1, px: mode === "click-through" ? 1 : 1.5, color: "common.white", backgroundColor: mode === "click-through" ? "transparent" : "rgba(15, 15, 18, 0.78)", border: mode === "click-through" ? "none" : "1px solid rgba(255,255,255,0.18)", borderRadius: mode === "click-through" ? 0 : 2, boxShadow: "none", overflow: "hidden", userSelect: "none" }}>
       {mode !== "click-through" && (
         <IconButton aria-label="Drag floating lyrics" onMouseDown={() => void getCurrentWindow().startDragging()} size="small" sx={{ color: "rgba(255,255,255,0.62)", cursor: "move" }}>
           <DragIndicator fontSize="small" />

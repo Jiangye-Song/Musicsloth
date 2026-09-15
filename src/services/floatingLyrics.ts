@@ -62,6 +62,7 @@ export async function setFloatingLyricsMode(mode: FloatingLyricsMode): Promise<v
 
   const overlay = existing ?? await getOrCreateFloatingLyrics(mode);
   await overlay.setIgnoreCursorEvents(mode === "click-through");
+  await overlay.setShadow(mode !== "click-through");
   await overlay.show();
   if (mode === "on") await overlay.setFocus();
   await emitTo(LABEL, "floating-lyrics:mode", mode);
