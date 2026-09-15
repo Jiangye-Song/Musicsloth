@@ -76,6 +76,10 @@ export default function FloatingLyricsView() {
   const activeLines = activeTime === undefined
     ? []
     : lyrics.filter(line => line.time === activeTime).map(line => line.text).filter(Boolean);
+  // An LRC timestamp with no text is an intentional pause, not an absence of
+  // lyrics. Keep it distinct from the state before the first timestamp so the
+  // app name/track fallback is not shown during that pause.
+  const hasActiveLyricTimestamp = activeTime !== undefined;
   const nextLine = activeLines.length === 1
     ? lyrics.slice(activeIndex + 1).find(line => line.time !== activeTime)?.text ?? ""
     : "";
@@ -90,7 +94,7 @@ export default function FloatingLyricsView() {
         </IconButton>
       )}
       <Box sx={{ minWidth: 0, flex: 1, textAlign: "center" }}>
-        {activeLines.length > 0 ? activeLines.map((line, index) => (
+        {hasActiveLyricTimestamp ? activeLines.map((line, index) => (
           <Typography key={`${activeTime}-${index}`} noWrap sx={{ fontSize: "1.15rem", fontWeight: 700, textShadow: "0 1px 3px #000" }}>{line}</Typography>
         )) : (
           <Typography noWrap sx={{ fontSize: "1.15rem", fontWeight: 700, textShadow: "0 1px 3px #000" }}>{fallback}</Typography>
