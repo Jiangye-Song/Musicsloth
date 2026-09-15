@@ -1,11 +1,23 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { emitTo } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 
 const LABEL = "lyrics-overlay";
+const BOUNDS_STORAGE_KEY = "musicsloth-floating-lyrics-bounds";
 export type FloatingLyricsMode = "off" | "on" | "click-through";
+export interface FloatingLyricsBounds {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
 let currentMode: FloatingLyricsMode = "off";
 let initializationPromise: Promise<void> | null = null;
 const MODE_CHANGE_EVENT = "floating-lyrics-mode-change";
+
+void listen<FloatingLyricsMode>("floating-lyrics:mode-changed", event => {
+  currentMode = event.payload;
+  window.dispatchEvent(new Event(MODE_CHANGE_EVENT));
+});
 
 export function getFloatingLyricsMode(): FloatingLyricsMode {
   return currentMode;
@@ -17,15 +29,34 @@ export function subscribeFloatingLyricsMode(listener: (mode: FloatingLyricsMode)
   return () => window.removeEventListener(MODE_CHANGE_EVENT, handler);
 }
 
+export function getFloatingLyricsBounds(): Partial<FloatingLyricsBounds> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BOUNDS_STORAGE_KEY) ?? "{}") as Partial<FloatingLyricsBounds>;
+    return Object.fromEntries(
+      Object.entries(saved).filter(([, value]) => typeof value === "number" && Number.isFinite(value)),
+    ) as Partial<FloatingLyricsBounds>;
+  } catch {
+    return {};
+  }
+}
+
+export function saveFloatingLyricsBounds(bounds: Partial<FloatingLyricsBounds>): void {
+  const merged = { ...getFloatingLyricsBounds(), ...bounds };
+  localStorage.setItem(BOUNDS_STORAGE_KEY, JSON.stringify(merged));
+}
+
 async function getOrCreateFloatingLyrics(initialMode: FloatingLyricsMode): Promise<WebviewWindow> {
   const existing = await WebviewWindow.getByLabel(LABEL);
   if (existing) return existing;
 
+  const savedBounds = getFloatingLyricsBounds();
   return new WebviewWindow(LABEL, {
     url: `index.html?lyrics-overlay&lyrics-mode=${initialMode}`,
     title: "Musicsloth Lyrics",
-    width: 560,
-    height: 150,
+    width: savedBounds.width ?? 560,
+    height: savedBounds.height ?? 150,
+    x: savedBounds.x,
+    y: savedBounds.y,
     minWidth: 300,
     minHeight: 110,
     decorations: false,

@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Box, IconButton, Typography } from "@mui/material";
 import { Close, DragIndicator } from "@mui/icons-material";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Track } from "../services/api";
 import { activeLyricIndex, LyricLine, parseLrcLyrics } from "../utils/lyrics";
-import type { FloatingLyricsMode } from "../services/floatingLyrics";
+import { saveFloatingLyricsBounds, type FloatingLyricsBounds, type FloatingLyricsMode } from "../services/floatingLyrics";
 
 interface BackendPlayerState {
   position_ms: number;
@@ -16,6 +16,7 @@ export default function FloatingLyricsView() {
   const [track, setTrack] = useState<Track | null>(null);
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [position, setPosition] = useState(0);
+  const boundsUpdateRef = useRef<Partial<FloatingLyricsBounds>>({});
   const [mode, setMode] = useState<FloatingLyricsMode>(() =>
     new URLSearchParams(window.location.search).get("lyrics-mode") === "click-through" ? "click-through" : "on",
   );
@@ -36,6 +37,36 @@ export default function FloatingLyricsView() {
     elements.forEach(element => { element.style.backgroundColor = "transparent"; });
     return () => elements.forEach((element, index) => { element.style.backgroundColor = previousBackgrounds[index]; });
   }, [mode]);
+
+  useEffect(() => {
+    const floatingWindow = getCurrentWindow();
+    let unlistenFunctions: Array<() => void> = [];
+    let disposed = false;
+
+    const recordBounds = (bounds: Partial<FloatingLyricsBounds>) => {
+      boundsUpdateRef.current = { ...boundsUpdateRef.current, ...bounds };
+    };
+    const saveBoundsOnExit = () => {
+      if (Object.keys(boundsUpdateRef.current).length > 0) {
+        saveFloatingLyricsBounds(boundsUpdateRef.current);
+      }
+    };
+    window.addEventListener("beforeunload", saveBoundsOnExit);
+
+    void Promise.all([
+      floatingWindow.onResized(event => recordBounds({ width: event.payload.width, height: event.payload.height })),
+      floatingWindow.onMoved(event => recordBounds({ x: event.payload.x, y: event.payload.y })),
+    ]).then(unlisteners => {
+      if (disposed) unlisteners.forEach(unlisten => unlisten());
+      else unlistenFunctions = unlisteners;
+    });
+
+    return () => {
+      disposed = true;
+      window.removeEventListener("beforeunload", saveBoundsOnExit);
+      unlistenFunctions.forEach(unlisten => unlisten());
+    };
+  }, []);
 
   useEffect(() => {
     const refresh = async () => {
@@ -102,7 +133,10 @@ export default function FloatingLyricsView() {
         )}
       </Box>
       {mode !== "click-through" && (
-        <IconButton aria-label="Hide floating lyrics" onClick={() => void getCurrentWindow().hide()} size="small" sx={{ color: "rgba(255,255,255,0.75)" }}>
+        <IconButton aria-label="Hide floating lyrics" onClick={() => void (async () => {
+          await emitTo("main", "floating-lyrics:mode-changed", "off");
+          await getCurrentWindow().hide();
+        })()} size="small" sx={{ color: "rgba(255,255,255,0.75)" }}>
           <Close fontSize="small" />
         </IconButton>
       )}
