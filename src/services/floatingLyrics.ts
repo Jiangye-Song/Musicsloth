@@ -1,14 +1,15 @@
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { emitTo, listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 
 const LABEL = "lyrics-overlay";
-const BOUNDS_STORAGE_KEY = "musicsloth-floating-lyrics-bounds";
 export type FloatingLyricsMode = "off" | "on" | "click-through";
 export interface FloatingLyricsBounds {
   width: number;
   height: number;
   x: number;
   y: number;
+  logical: boolean;
 }
 let currentMode: FloatingLyricsMode = "off";
 let initializationPromise: Promise<void> | null = null;
@@ -29,27 +30,11 @@ export function subscribeFloatingLyricsMode(listener: (mode: FloatingLyricsMode)
   return () => window.removeEventListener(MODE_CHANGE_EVENT, handler);
 }
 
-export function getFloatingLyricsBounds(): Partial<FloatingLyricsBounds> {
-  try {
-    const saved = JSON.parse(localStorage.getItem(BOUNDS_STORAGE_KEY) ?? "{}") as Partial<FloatingLyricsBounds>;
-    return Object.fromEntries(
-      Object.entries(saved).filter(([, value]) => typeof value === "number" && Number.isFinite(value)),
-    ) as Partial<FloatingLyricsBounds>;
-  } catch {
-    return {};
-  }
-}
-
-export function saveFloatingLyricsBounds(bounds: Partial<FloatingLyricsBounds>): void {
-  const merged = { ...getFloatingLyricsBounds(), ...bounds };
-  localStorage.setItem(BOUNDS_STORAGE_KEY, JSON.stringify(merged));
-}
-
 async function getOrCreateFloatingLyrics(initialMode: FloatingLyricsMode): Promise<WebviewWindow> {
   const existing = await WebviewWindow.getByLabel(LABEL);
   if (existing) return existing;
 
-  const savedBounds = getFloatingLyricsBounds();
+  const savedBounds = await invoke<Partial<FloatingLyricsBounds> | null>("get_floating_lyrics_bounds") ?? {};
   return new WebviewWindow(LABEL, {
     url: `index.html?lyrics-overlay&lyrics-mode=${initialMode}`,
     title: "Musicsloth Lyrics",

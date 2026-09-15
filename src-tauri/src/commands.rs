@@ -1,6 +1,7 @@
 // Tauri command handlers
 use tauri::{State, AppHandle, Emitter, Manager};
 use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 
 use crate::state::AppState;
 use crate::library::scanner::DirectoryScanner;
@@ -1079,6 +1080,44 @@ pub async fn get_artwork_temp_path(app: AppHandle, file_path: String) -> Result<
 // ============================================================================
 
 use crate::settings::AppSettings;
+
+#[derive(Serialize, Deserialize)]
+pub struct FloatingLyricsBounds {
+    pub width: f64,
+    pub height: f64,
+    pub x: f64,
+    pub y: f64,
+    #[serde(default)]
+    pub logical: bool,
+}
+
+#[tauri::command]
+pub fn get_floating_lyrics_bounds(state: State<'_, AppState>, app: AppHandle) -> Result<Option<FloatingLyricsBounds>, String> {
+    let path = state.app_dir.join("floating_lyrics_bounds.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read floating lyrics bounds: {}", e))?;
+    let mut bounds: FloatingLyricsBounds = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse floating lyrics bounds: {}", e))?;
+
+    // Files saved before logical-unit support used physical pixels. Convert them
+    // once using the current main-window scale factor (e.g. 150% Windows DPI).
+    if !bounds.logical {
+        let scale_factor = app.get_webview_window("main")
+            .and_then(|window| window.scale_factor().ok())
+            .unwrap_or(1.0);
+        bounds.width /= scale_factor;
+        bounds.height /= scale_factor;
+        bounds.x /= scale_factor;
+        bounds.y /= scale_factor;
+        bounds.logical = true;
+    }
+
+    Ok(Some(bounds))
+}
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {

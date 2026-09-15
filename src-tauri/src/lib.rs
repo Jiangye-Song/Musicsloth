@@ -72,6 +72,34 @@ fn get_tray_icon() -> &'static [u8] {
     }
 }
 
+/// Persist the auxiliary window's native bounds before the process exits.
+fn persist_floating_lyrics_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    let Some(window) = app.get_webview_window("lyrics-overlay") else {
+        return;
+    };
+    let (Ok(size), Ok(position), Ok(scale_factor)) = (
+        window.inner_size(),
+        window.outer_position(),
+        window.scale_factor(),
+    ) else {
+        return;
+    };
+    let Ok(app_dir) = app.path().app_data_dir() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(&app_dir);
+    let bounds = serde_json::json!({
+        "width": size.width as f64 / scale_factor,
+        "height": size.height as f64 / scale_factor,
+        "x": position.x as f64 / scale_factor,
+        "y": position.y as f64 / scale_factor,
+        "logical": true,
+    });
+    if let Ok(content) = serde_json::to_string(&bounds) {
+        let _ = std::fs::write(app_dir.join("floating_lyrics_bounds.json"), content);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "windows")]
@@ -162,6 +190,7 @@ pub fn run() {
                         }
                     }
                     "quit" => {
+                        persist_floating_lyrics_bounds(app);
                         app.exit(0);
                     }
                     _ => {}
@@ -201,7 +230,9 @@ pub fn run() {
                     } else {
                         // Closing the main window would otherwise leave the hidden
                         // floating-lyrics window alive and keep the process running.
-                        window.app_handle().exit(0);
+                        let app_handle = window.app_handle();
+                        persist_floating_lyrics_bounds(&app_handle);
+                        app_handle.exit(0);
                     }
                 }
                 WindowEvent::Focused(false) => {
@@ -303,6 +334,7 @@ pub fn run() {
             // Settings commands
             commands::get_settings,
             commands::save_settings,
+            commands::get_floating_lyrics_bounds,
             // Audio analysis commands
             commands::enable_audio_analysis,
             commands::get_audio_analysis,
