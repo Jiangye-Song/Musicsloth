@@ -379,6 +379,10 @@ export const playlistApi = {
     return await invoke("get_playlist_tracks", { playlistId });
   },
 
+  exportPlaylist: async (playlistId: number, playlistName: string): Promise<boolean> => {
+    return await invoke("export_playlist", { playlistId, playlistName });
+  },
+
   removeTrackFromPlaylist: async (playlistId: number, trackId: number): Promise<void> => {
     return await invoke("remove_track_from_playlist", { playlistId, trackId });
   },

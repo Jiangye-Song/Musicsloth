@@ -541,14 +541,20 @@ const VirtualTrackList = forwardRef<VirtualTrackListRef, VirtualTrackListProps>(
         // Check if we should inherit shuffle state from the current queue
         const shouldInheritShuffle = isShuffled;
 
-        // Get all track IDs (use original tracks, not filtered)
-        console.log(`[Frontend] Getting track IDs from ${tracks.length} tracks...`);
-        const trackIds = tracks.map(t => t.id);
+        // Include at most 999 tracks, starting with the clicked track. This
+        // prevents very large sources from making queue creation laggy.
+        const maxQueueTracks = 999;
+        const trackCount = Math.min(tracks.length, maxQueueTracks);
+        console.log(`[Frontend] Getting ${trackCount} track IDs from ${tracks.length} tracks...`);
+        const trackIds = Array.from(
+          { length: trackCount },
+          (_, offset) => tracks[(index + offset) % tracks.length].id,
+        );
         console.log(`[Frontend] Got ${trackIds.length} track IDs`);
 
         // Create or reuse queue (backend handles duplicate detection and returns immediately after first batch)
         console.log(`[Frontend] Creating queue "${queueName}"...`);
-        const newQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, index);
+        const newQueueId = await queueApi.createQueueFromTracks(queueName, trackIds, 0);
         console.log(`[Frontend] Queue created successfully with ID: ${newQueueId}`);
 
         // Set shuffle state for the new queue (inherit from previous queue if it was shuffled)

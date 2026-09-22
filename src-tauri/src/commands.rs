@@ -440,6 +440,8 @@ pub async fn get_lyrics(file_path: String) -> Result<Option<String>, String> {
 
 // ===== Queue Management Commands =====
 
+const MAX_QUEUE_TRACKS: usize = 999;
+
 #[tauri::command]
 pub fn create_queue_from_tracks(
     name: String,
@@ -450,16 +452,16 @@ pub fn create_queue_from_tracks(
     println!("[Queue] Starting queue creation with {} tracks", track_ids.len());
     
     // Reorder tracks: clicked track first, then remaining after, then before clicked
-    let mut reordered_tracks = Vec::new();
+    let mut reordered_tracks = Vec::with_capacity(track_ids.len().min(MAX_QUEUE_TRACKS));
     reordered_tracks.push(track_ids[clicked_index]);
     
     // Add tracks after clicked track
-    for i in (clicked_index + 1)..track_ids.len() {
+    for i in (clicked_index + 1)..track_ids.len().min(clicked_index + MAX_QUEUE_TRACKS) {
         reordered_tracks.push(track_ids[i]);
     }
     
     // Add tracks before clicked track
-    for i in 0..clicked_index {
+    for i in 0..clicked_index.min(MAX_QUEUE_TRACKS - reordered_tracks.len()) {
         reordered_tracks.push(track_ids[i]);
     }
     
@@ -652,6 +654,44 @@ pub fn add_track_to_playlist(state: State<'_, AppState>, playlist_id: i64, track
 pub fn get_playlist_tracks(state: State<'_, AppState>, playlist_id: i64) -> Result<Vec<Track>, String> {
     DbOperations::get_playlist_tracks(&state.db, playlist_id)
         .map_err(|e| format!("Failed to get playlist tracks: {}", e))
+}
+
+/// Export a playlist as an M3U8 file containing absolute paths in playlist order.
+/// Returns `false` when the save dialog is cancelled.
+#[tauri::command]
+pub fn export_playlist(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    playlist_id: i64,
+    playlist_name: String,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let tracks = DbOperations::get_playlist_tracks(&state.db, playlist_id)
+        .map_err(|e| format!("Failed to get playlist tracks: {e}"))?;
+    let mut contents = String::from("#EXTM3U\n");
+    for track in tracks {
+        contents.push_str(&track.file_path);
+        contents.push('\n');
+    }
+
+    let default_name = format!("{}.m3u8", playlist_name);
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog()
+        .file()
+        .set_file_name(&default_name)
+        .add_filter("M3U8 Playlist", &["m3u8"])
+        .save_file(move |file_path| {
+            let result = match file_path {
+                Some(path) => std::fs::write(path.as_path().unwrap(), contents)
+                    .map(|_| true)
+                    .map_err(|e| format!("Failed to write playlist: {e}")),
+                None => Ok(false),
+            };
+            let _ = tx.send(result);
+        });
+
+    rx.recv().map_err(|e| format!("Playlist save dialog failed: {e}"))?
 }
 
 #[tauri::command]
@@ -1108,6 +1148,7 @@ pub struct PlaylistImportProgress {
 
 /// Import an M3U/M3U8 playlist. Only paths that already exist in the indexed
 /// library are included; importing a playlist never adds files to the library.
+/// If a playlist with the imported name already exists, matched tracks are added to it.
 #[tauri::command]
 pub async fn import_playlist(app: AppHandle, state: State<'_, AppState>) -> Result<PlaylistImportResult, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -1145,13 +1186,29 @@ fn import_playlist_file(app: &AppHandle, db: &crate::db::connection::DatabaseCon
     }
     let name = playlist_path.file_stem().and_then(|name| name.to_str())
         .filter(|name| !name.trim().is_empty()).unwrap_or("Imported Playlist");
-    let playlist_id = DbOperations::create_playlist(db, name, None)
-        .map_err(|e| format!("Failed to create imported playlist: {e}"))?;
+    let playlist_id = match DbOperations::get_playlist_by_name(db, name)
+        .map_err(|e| format!("Failed to look up imported playlist: {e}"))?
+    {
+        Some(playlist) => playlist.id,
+        None => DbOperations::create_playlist(db, name, None)
+            .map_err(|e| format!("Failed to create imported playlist: {e}"))?,
+    };
+    let existing_track_ids: HashSet<i64> = DbOperations::get_playlist_tracks(db, playlist_id)
+        .map_err(|e| format!("Failed to read imported playlist tracks: {e}"))?
+        .into_iter()
+        .map(|track| track.id)
+        .collect();
+    let mut imported = 0;
     for track_id in &matched_track_ids {
+        if existing_track_ids.contains(track_id) {
+            skipped += 1;
+            continue;
+        }
         DbOperations::add_track_to_playlist(db, playlist_id, *track_id)
             .map_err(|e| format!("Failed to add imported track: {e}"))?;
+        imported += 1;
     }
-    Ok(PlaylistImportResult { playlist_id: Some(playlist_id), imported: matched_track_ids.len(), skipped })
+    Ok(PlaylistImportResult { playlist_id: Some(playlist_id), imported, skipped })
 }
 
 fn m3u_entry_path(entry: &str, playlist_dir: &std::path::Path) -> PathBuf {

@@ -297,6 +297,7 @@ pub fn run() {
             commands::rename_playlist,
             commands::add_track_to_playlist,
             commands::get_playlist_tracks,
+            commands::export_playlist,
             commands::remove_track_from_playlist,
             commands::delete_playlist,
             commands::reorder_playlist_track,

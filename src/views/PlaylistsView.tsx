@@ -212,6 +212,20 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
     setContextMenuPlaylist(null);
   };
 
+  const handleExportPlaylist = async () => {
+    if (!contextMenuPlaylist) return;
+    try {
+      const saved = await playlistApi.exportPlaylist(
+        contextMenuPlaylist.id,
+        contextMenuPlaylist.name,
+      );
+      if (saved) alert(`Exported "${contextMenuPlaylist.name}" as an M3U8 playlist.`);
+    } catch (error) {
+      console.error("Failed to export playlist:", error);
+      alert(`Failed to export playlist: ${error}`);
+    }
+  };
+
   const handleOpenCreateDialog = () => {
     setDialogPlaylist(null);
     setDialogMode("create");
@@ -225,7 +239,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
       const result = await playlistApi.importPlaylist();
       if (result.playlist_id === null) return;
       await loadUserPlaylists();
-      alert(`Imported ${result.imported} track${result.imported === 1 ? "" : "s"}. ${result.skipped} skipped because ${result.skipped === 1 ? "it is not" : "they are not"} in the current library.`);
+      alert(`Added ${result.imported} track${result.imported === 1 ? "" : "s"}. ${result.skipped} skipped because ${result.skipped === 1 ? "it was" : "they were"} not in the current library or already in the playlist.`);
     } catch (error) {
       console.error("Failed to import playlist:", error);
       alert(`Failed to import playlist: ${error}`);
@@ -501,6 +515,7 @@ export default function PlaylistsView({ searchQuery = "", onClearSearch, onNavig
           playlistId={contextMenuPlaylist.id}
           playlistName={contextMenuPlaylist.name}
           onRename={handleOpenRenameDialog}
+          onExport={handleExportPlaylist}
           onDelete={handleDeletePlaylist}
         />
       )}

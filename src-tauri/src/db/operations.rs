@@ -1773,6 +1773,27 @@ impl DbOperations {
         Ok(playlists)
     }
 
+    /// Find a user-created playlist by its exact name.
+    pub fn get_playlist_by_name(
+        db: &DatabaseConnection,
+        name: &str,
+    ) -> Result<Option<Playlist>, anyhow::Error> {
+        let conn = db.get_connection();
+        let conn = conn.lock().unwrap();
+
+        let playlist = conn.query_row(
+            "SELECT id, name, description FROM playlists WHERE name = ?1",
+            [name],
+            |row| Ok(Playlist {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+            }),
+        ).optional()?;
+
+        Ok(playlist)
+    }
+
     /// Create a new playlist
     pub fn create_playlist(
         db: &DatabaseConnection,
